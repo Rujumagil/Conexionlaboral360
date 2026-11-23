@@ -1,0 +1,59 @@
+# CRM de Reclutamiento · Conexión Laboral 360
+
+**Estado a 23/nov/2026:** infraestructura y primera interfaz desarrolladas en `main`, con GitHub Pages como frontend estático; integración real con Fly aún pendiente de conectar y probar. No se ha validado una postulación real de extremo a extremo.
+
+## Enlaces
+
+- Sitio: https://rujumagil.github.io/Conexionlaboral360/
+- CRM privado: https://rujumagil.github.io/Conexionlaboral360/crm/
+- Integración Fly: https://github.com/Rujumagil/compas-evolution/issues/305
+
+## Arquitectura real
+
+- Frontend web estático: GitHub Pages, sin credenciales secretas en frontend.
+- Base de datos compartida: Supabase `compas-one`, con **workspace propio**: `c7ab2a78-08e0-4a29-8a3b-fadaf244002f`.
+- `cl360_jobs`: catálogo de vacantes de múltiples áreas; se publican solo entradas con `status=active`; **no se almacena ni publica sueldo**.
+- `cl360_candidates`: expedientes de postulantes; privados por tenant. Formulario captura nombre, teléfono, vacante y experiencia con consentimiento.
+- `cl360_events`: historial de registro, notas y acciones.
+- `cl360_followups`: agenda de seguimiento.
+- `cl360_submission_limits`: control básico de abuso; no existe política pública de lectura.
+- Edge Function `cl360-apply`: única ruta de escritura pública, con validación server-side, control de origen, honeypot y límite aproximado por IP. La clave de servicio permanece en variables del servidor. El RPC `cl360_submit_application` no es ejecutable por roles anónimos.
+- `cl360_set_stage`: RPC de cambios de estado en transacción con nota de auditoría y permisos de usuario.
+
+## Reglas de acceso
+- Login por Supabase Auth. Solo miembros activos del workspace con rol `owner`, `admin`, `manager`, `sales` o `support` pueden consultar candidatos.
+- Alta, publicación o pausa de vacantes: `owner`, `admin`, `manager`.
+- Se importó al nuevo workspace la membresía de la cuenta administradora existente de Compás Evolution; los otros reclutadores deben agregarse como miembros autorizados tras validar sus cuentas.
+- RLS y restricciones de SQL aíslan expedientes frente a visitantes y otros workspaces. **No** otorgar permiso del panel de Compás Evolution a los reclutadores por este CRM.
+
+## Flujo de candidatos
+
+1. La landing consulta vacantes activas desde `cl360_jobs` (solo datos públicos).
+2. La persona completa el formulario y autoriza el tratamiento.
+3. Edge valida y llama al RPC transaccional; si no hay éxito, la web **no afirma** que se guardó la postulación.
+4. El candidato aparece en el CRM como `new`; puede continuarse la conversación por WhatsApp.
+5. Asesora registra notas, cambia etapa, agenda una tarea y decide el resultado.
+6. Ingresos directos por WhatsApp/Facebook sin formulario **no se capturan automáticamente** hasta conectar proveedores oficiales o crear una función de captura manual.
+
+## Etapas
+
+`new` → `contacted` → `screening` → `interview` → `qualified` → `hired`. También `rejected` o `archived` por decisión humana. No hay rechazo por IA.
+
+## Compás Fly
+
+Perfil `Fly Recruiter · Conexión Laboral 360` creado en `ai_agent_profiles`, **habilitado=false**, modo `observer`, herramientas de escritura vacías y sin presupuesto asignado. El funcionamiento de Fly todavía **no está conectado** a estas tablas. El adaptador debe verificar autorización y eventos, clasificar por factores objetivos, generar propuestas auditadas, programar seguimientos supervisados y escalar a humanos. Ninguna mensajería autónoma está habilitada.
+
+## Seguridad y límites conocidos
+
+- Se verificó por SQL que `anon` no tiene privilegio SELECT en candidatos ni EXECUTE en RPC de captura y que un usuario autenticado no miembro no ve vacantes internas. El despliegue de Edge Function consta como ACTIVE.
+- Falta una prueba de postulación de extremo a extremo con una persona de pruebas consentida. Evitar simular candidatos reales en producción.
+- La protección antispam del MVP no reemplaza CAPTCHA/Turnstile, monitoreo, alertas ni controles antifraude de producción.
+- Falta aviso de privacidad legal definitivo (razón social/domicilio responsable, conservación, transferencias, ejercicio de derechos); `aviso-candidatos.html` es preliminar y debe validarse antes de una campaña de captación.
+- La publicación de la web depende del estado del workflow GitHub Pages; comprobar carga de JS y acciones desde navegador real.
+- El logotipo sigue disponible en encabezado/pie. El flyer fotográfico en `assets/flyer-reclutamiento.webp` aún debe cargarse si se desea mostrar la versión con fotografías.
+- El CRM limita la vista a 500 candidatos en esta primera entrega; desarrollar paginación antes de grandes volúmenes.
+- Evaluar política de retención y borrado de postulantes y limpieza programada de registros de frecuencia.
+
+## Alcance no implementado
+
+Conector operativo Fly, autoseguimiento de mensajes reales, sincronización oficial WhatsApp/Messenger, importación automática de conversaciones externas, notificaciones push de seguimiento, reportes PDF y filtro avanzado de CV. No anunciar estas funciones como disponibles.
