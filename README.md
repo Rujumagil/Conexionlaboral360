@@ -1,6 +1,6 @@
 # Conexión Laboral 360
 
-Landing de reclutamiento de guardias de seguridad. Página estática sin backend.
+Sitio de oportunidades laborales de distintas áreas. Actualmente se publican vacantes de guardias de seguridad; los siguientes sectores se incorporarán cuando existan ofertas confirmadas. Página estática sin backend.
 
 ## Uso
 
@@ -8,7 +8,8 @@ Abrir `index.html` en un navegador o servir la carpeta con un servidor estático
 
 ## Contenido
 
-- Cinco vacantes de guardias de seguridad
+- Cinco vacantes vigentes de guardias de seguridad (categoría actual)
+- Espacio informativo para futuras áreas laborales, sin anunciar vacantes inexistentes
 - Beneficios y contacto de la Lic. Astrid Araiza
 - Postulación por WhatsApp y Facebook
 - Anuncio accesible y adaptable sin logotipo dentro del flyer
