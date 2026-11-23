@@ -9,7 +9,7 @@
 - Botones móviles fijos para WhatsApp y llamada.
 
 ## Pendiente antes de producción
-- **Flyer oficial de reclutamiento:** no se adjuntó su archivo en esta conversación. El bloque visual actual usa el logo y un resumen editorial, no pretende hacerse pasar por el flyer oficial. Sustituirlo cuando se proporcione el flyer.
+- **Flyer oficial de reclutamiento:** recibido y preparado como archivo WebP optimizado. El HTML apunta a `assets/flyer-reclutamiento.webp`, pero el archivo binario todavía debe subirse a esa ruta en GitHub; hasta entonces el espacio de imagen aparecerá vacío. No considerar listo el preview antes de cargarlo.
 - Confirmar si el dominio ya fue adquirido y cuál será el nombre definitivo.
 - Revisar las particularidades del servicio Coto La Cima ("horno / baño / tolerancia") antes de difundir.
 - Confirmar vigencia de las cinco vacantes.
