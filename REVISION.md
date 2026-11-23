@@ -9,7 +9,7 @@
 - Botones móviles fijos para WhatsApp y llamada.
 
 ## Pendiente antes de producción
-- **Flyer oficial de reclutamiento:** recibido y preparado como archivo WebP optimizado. El HTML apunta a `assets/flyer-reclutamiento.webp`, pero el archivo binario todavía debe subirse a esa ruta en GitHub; hasta entonces el espacio de imagen aparecerá vacío. No considerar listo el preview antes de cargarlo.
+- **Flyer rediseñado sin logo:** preparado como WebP optimizado. El HTML apunta a `assets/flyer-reclutamiento.webp` y muestra una versión HTML accesible sin logo mientras no se suba el archivo binario. Para mostrar el flyer con las fotografías, cargar el archivo optimizado en esa ruta del repositorio.
 - Confirmar si el dominio ya fue adquirido y cuál será el nombre definitivo.
 - Revisar las particularidades del servicio Coto La Cima ("horno / baño / tolerancia") antes de difundir.
 - Confirmar vigencia de las cinco vacantes.
