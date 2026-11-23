@@ -1,21 +1,15 @@
-# Revisión de landing — Conexión Laboral 360
+# Estado de la landing y CRM — 23 de noviembre de 2026
 
-## Incluido
-- Una sola landing responsive en `index.html`.
-- Cinco servicios y sus datos según el documento aportado.
-- Beneficios, WhatsApp, Facebook y contacto telefónico.
-- Formulario local sin backend; abre WhatsApp con texto prellenado, sin guardar datos.
-- Logotipo oficial proporcionado, incorporado como versión web optimizada en `assets/logo-oficial.svg`.
-- Botones móviles fijos para WhatsApp y llamada.
+**Frontend:** GitHub Pages conectado a `main`, con despliegues verificados mediante GitHub Actions.
 
-## Pendientes para vista previa fotográfica y publicación
-- **Flyer rediseñado sin logo:** preparado como WebP optimizado. El HTML apunta a `assets/flyer-reclutamiento.webp` y muestra una versión HTML accesible sin logo mientras no se suba el archivo binario. Para mostrar el flyer con las fotografías, cargar el archivo optimizado en esa ruta del repositorio.
-- Confirmar si el dominio ya fue adquirido y cuál será el nombre definitivo.
-- Revisar las particularidades del servicio Coto La Cima ("horno / baño / tolerancia") antes de difundir.
-- Confirmar vigencia de las cinco vacantes.
-- Probar en navegador móvil y escritorio y revisar los mensajes WhatsApp.
-- Aprobar despliegue en Cloudflare y, posteriormente, enlace en Facebook.
+**CRM:** disponible en la ruta `/crm/`, protegido con Supabase Auth y RLS. Acceso inicial habilitado al administrador de Compás Evolution y a la cuenta activa de la Lic. Astrid Araiza (rol manager). El acceso exige contraseña correcta en Supabase Auth.
 
-## Protección
-**Integrado en `main` el 23 de noviembre de 2026 mediante PR #1.** Todavía no se ha publicado la web en Cloudflare ni configurado el dominio.
-Cloudflare Pages puede conectarse a GitHub para publicar previews de ramas no productivas tras la configuración autorizada.
+**Vacantes:** cinco servicios de seguridad actualmente activos; catálogo de más áreas administrable desde el CRM; sueldos excluidos.
+
+**Postulaciones:** Edge Function `cl360-apply` desplegada como ACTIVE. Registros protegidos en `cl360_candidates` con evento y seguimiento. Falta verificar extremo a extremo con un candidato real de prueba consentida; no se garantiza disponibilidad hasta esa prueba.
+
+**Agente:** perfil Fly Recruiter creado con `enabled=false`; conector pendiente. No se han habilitado respuestas autónomas ni envíos de WhatsApp.
+
+**Bloqueantes de operación completa:** validar aviso de privacidad y política de conservación; mejorar protección antispam; conectar Fly y mensajería oficial; completar flyer fotográfico sin logo si se quiere usar.
+
+Ver `docs/CRM-FLY-RECLUTAMIENTO.md`.
