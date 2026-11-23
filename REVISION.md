@@ -8,7 +8,7 @@
 - Logotipo oficial proporcionado, incorporado como versión web optimizada en `assets/logo-oficial.svg`.
 - Botones móviles fijos para WhatsApp y llamada.
 
-## Pendiente antes de producción
+## Pendientes para vista previa fotográfica y publicación
 - **Flyer rediseñado sin logo:** preparado como WebP optimizado. El HTML apunta a `assets/flyer-reclutamiento.webp` y muestra una versión HTML accesible sin logo mientras no se suba el archivo binario. Para mostrar el flyer con las fotografías, cargar el archivo optimizado en esa ruta del repositorio.
 - Confirmar si el dominio ya fue adquirido y cuál será el nombre definitivo.
 - Revisar las particularidades del servicio Coto La Cima ("horno / baño / tolerancia") antes de difundir.
@@ -17,5 +17,5 @@
 - Aprobar despliegue en Cloudflare y, posteriormente, enlace en Facebook.
 
 ## Protección
-**No se ha hecho merge a main ni publicación a producción.** La rama de revisión es `feature/landing-reclutamiento-guardias`.
+**Integrado en `main` el 23 de noviembre de 2026 mediante PR #1.** Todavía no se ha publicado la web en Cloudflare ni configurado el dominio.
 Cloudflare Pages puede conectarse a GitHub para publicar previews de ramas no productivas tras la configuración autorizada.
