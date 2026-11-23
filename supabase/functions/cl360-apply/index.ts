@@ -7,7 +7,7 @@ function response(status: number, data: Record<string, unknown>) {
 Deno.serve(async (request: Request) => {
   const origin = request.headers.get("origin") || "";
   if (origin !== allowedOrigin) return response(403, { ok: false, error: "origen_no_permitido" });
-  if (request.method === "OPTIONS") return response(204, {});
+  if (request.method === "OPTIONS") return new Response(null, {status: 204, headers: cors});
   if (request.method !== "POST") return response(405, { ok: false, error: "metodo_no_permitido" });
   if (!request.headers.get("content-type")?.startsWith("application/json")) return response(415, { ok: false, error: "formato_invalido" });
   const url = Deno.env.get("SUPABASE_URL");
