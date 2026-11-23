@@ -13,6 +13,16 @@
 <div class="twocol"><section class="panel"><div class="panel-head"><h2>Candidatos <span class="count" id="result-count"></span></h2><div class="controls"><input type="search" id="search" placeholder="Buscar nombre, teléfono o vacante" aria-label="Buscar candidatos"><select id="filter-stage" aria-label="Filtrar por etapa"><option value="">Todas las etapas</option><option value="new">Sin contactar</option><option value="contacted">Contactado</option><option value="screening">Filtrado</option><option value="interview">Entrevista</option><option value="qualified">Calificado</option><option value="hired">Contratado</option><option value="rejected">No seleccionado</option><option value="archived">Archivado</option></select><button id="refresh" class="btn ghost">Actualizar</button></div></div><div class="table-wrap"><table><thead><tr><th>Candidato</th><th>Vacante</th><th>Etapa</th><th>Registro</th></tr></thead><tbody id="candidate-rows"><tr><td colspan="4">Cargando…</td></tr></tbody></table></div></section>
 <section class="panel detail" id="detail"><div class="empty">Selecciona un candidato para revisar sus datos y dar seguimiento.</div></section></div>
 <section class="panel"><div class="panel-head"><h2>Agenda de seguimientos</h2><span class="small">Pendientes por fecha</span></div><div id="followups"><p class="empty">Sin seguimientos programados.</p></div></section>
+<section class="panel" id="vacancy-management"><div class="panel-head"><h2>Catálogo de vacantes</h2><span class="small">Sin publicar salarios</span></div><div id="job-management-list" class="table-wrap"></div>
+<form id="new-job-form" class="hide" style="margin-top:20px;border-top:1px solid var(--line);padding-top:18px">
+<h3 style="margin:0 0 8px">Agregar vacante de otra área</h3><p class="small">Se guardará pausada; solo se publicará al activarla desde el listado.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:13px">
+<div><label class="label" for="job-title">Nombre del puesto o servicio</label><input class="field" id="job-title" maxlength="160" required></div>
+<div><label class="label" for="job-area">Área laboral</label><input class="field" id="job-area" maxlength="80" placeholder="Seguridad, administración, almacén…" required></div>
+<div><label class="label" for="job-location">Ubicación</label><input class="field" id="job-location" required></div>
+<div><label class="label" for="job-shift">Turno / horario</label><input class="field" id="job-shift" required></div></div>
+<label class="label" for="job-details">Información de la vacante (un punto por línea)</label><textarea class="field" id="job-details" placeholder="Funciones y datos confirmados del puesto" maxlength="1200"></textarea>
+<button type="submit" class="btn yellow" style="margin-top:10px">Guardar vacante pausada</button><p id="job-error" class="error" role="alert"></p></form></section>
 <section class="panel"><div class="panel-head"><h2>Agente de reclutamiento · Compás Fly</h2><span class="pill">Integración pendiente</span></div><div class="fly"><div class="fly-icon">✦</div><div><strong>Preparado para integrar Fly</strong><p>La estructura registra postulaciones, etapas, notas y tareas. La clasificación automática, las conversaciones y los mensajes de seguimiento solo se habilitarán cuando se verifique el conector autorizado. No hay respuestas autónomas activas.</p></div></div></section>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.min.js"></script>
@@ -26,7 +36,7 @@ const $=(id)=>document.getElementById(id);
 const safe=(x)=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt=(date)=>date?new Date(date).toLocaleString('es-MX',{dateStyle:'medium',timeStyle:'short'}):"—";
 const stageNames={new:"Sin contactar",contacted:"Contactado",screening:"Filtrado",interview:"Entrevista",qualified:"Calificado",hired:"Contratado",rejected:"No seleccionado",archived:"Archivado"};
-let user=null, candidates=[], followups=[], jobs=[], selected=null, canLoad=false;
+let user=null, staffRole=null, candidates=[], followups=[], jobs=[], selected=null, canLoad=false;
 const working=(msg)=>{if($("detail"))$("detail").innerHTML='<p class="loading">'+safe(msg)+'</p>'};
 function authScreen(show){$("auth-screen").classList.toggle("hide",!show);$("dashboard").classList.toggle("hide",show);$("signout").classList.toggle("hide",show);}
 function err(error){alert(error?.message||"No se pudo completar la operación. Reintenta.");}
@@ -38,14 +48,14 @@ async function checkAuth(){
   if(error||!membership||!["owner","admin","manager","sales","support"].includes(membership.role)){
     await db.auth.signOut();authScreen(true);$("login-error").textContent="Tu cuenta todavía no tiene acceso a este CRM.";return;
   }
-  user=activeUser;canLoad=true;$("signed").textContent=activeUser.email||"";authScreen(false);await load();
+  user=activeUser;staffRole=membership.role;canLoad=true;$("signed").textContent=activeUser.email||"";authScreen(false);await load();
 }
 async function load(){
  if(!canLoad)return;
  $("refresh").disabled=true;
  const [c,j,f]=await Promise.all([
   db.from("cl360_candidates").select("id,full_name,phone,job_slug,area,experience,stage,source,consent_at,assigned_user_id,last_contact_at,next_followup_at,created_at,submission_count").eq("workspace_id",WS).order("created_at",{ascending:false}).limit(500),
-  db.from("cl360_jobs").select("slug,title,area,status").eq("workspace_id",WS).order("title"),
+  db.from("cl360_jobs").select("id,slug,title,area,location,shift,details,status").eq("workspace_id",WS).order("title"),
   db.from("cl360_followups").select("id,candidate_id,title,due_at,status,assigned_user_id").eq("workspace_id",WS).order("due_at").limit(500)
  ]);
  $("refresh").disabled=false;
@@ -59,10 +69,35 @@ async function load(){
  $("m-qualified").textContent=candidates.filter(x=>x.stage==="qualified").length;
  $("m-overdue").textContent=followups.filter(x=>x.status==="pending"&&new Date(x.due_at).getTime()<now).length;
  $("last-updated").textContent="Actualizado "+new Date().toLocaleTimeString("es-MX");
- renderCandidates();renderFollowups();
+ renderCandidates();renderFollowups();renderJobManagement();
  if(selected){const still=candidates.find(x=>x.id===selected);if(still)renderDetail(still);else $("detail").innerHTML='<div class="empty">Selecciona un candidato.</div>'}
 }
 function title(slug){return jobs.find(x=>x.slug===slug)?.title||slug||"Sin vacante";}
+function renderJobManagement(){
+ const manager=["owner","admin","manager"].includes(staffRole);
+ $("new-job-form").classList.toggle("hide",!manager);
+ const rows=jobs.map(j=>'<tr><td><b>'+safe(j.title)+'</b><div class="small">'+safe(j.area)+'</div></td><td>'+safe(j.location||"—")+'</td><td><span class="pill '+(j.status==="active"?"qualified":"")+'">'+safe(j.status==="active"?"Publicada":j.status==="paused"?"Pausada":"Cerrada")+'</span></td><td>'+(manager?'<button type="button" class="mini-btn" data-job-toggle="'+safe(j.id)+'">'+(j.status==="active"?"Pausar":"Activar")+'</button>':"—")+'</td></tr>').join("");
+ $("job-management-list").innerHTML=jobs.length?'<table><thead><tr><th>Vacante</th><th>Ubicación</th><th>Estado</th><th>Acción</th></tr></thead><tbody>'+rows+'</tbody></table>':'<p class="empty">Aún no hay vacantes registradas.</p>';
+ document.querySelectorAll("[data-job-toggle]").forEach(btn=>btn.addEventListener("click",async()=>{
+  if(!manager)return;
+  const job=jobs.find(j=>j.id===btn.dataset.jobToggle);if(!job)return;
+  const next=job.status==="active"?"paused":"active";
+  if(next==="active"&&!confirm("¿Publicar esta vacante en la página pública?"))return;
+  const {error}=await db.from("cl360_jobs").update({status:next}).eq("id",job.id).eq("workspace_id",WS);
+  if(error)return err(error);await load();
+ }));
+}
+$("new-job-form").addEventListener("submit",async(e)=>{
+ e.preventDefault();$("job-error").textContent="";
+ if(!["owner","admin","manager"].includes(staffRole))return;
+ const title=$("job-title").value.trim(),area=$("job-area").value.trim(),location=$("job-location").value.trim(),shift=$("job-shift").value.trim();
+ const slug=title.normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,70);
+ const details=$("job-details").value.split("\\n").map(t=>t.trim()).filter(Boolean);
+ if(slug.length<3||!area||!location||!shift){$("job-error").textContent="Completa todos los campos.";return;}
+ const {error}=await db.from("cl360_jobs").insert({workspace_id:WS,slug,area,title,location,shift,details,status:"paused"});
+ if(error){$("job-error").textContent="No se pudo guardar la vacante. Revisa si el nombre ya existe.";return;}
+ e.target.reset();await load();
+});
 function renderCandidates(){
  const q=$("search").value.trim().toLocaleLowerCase("es-MX"), stage=$("filter-stage").value;
  const matching=candidates.filter(x=>(!stage||x.stage===stage)&&(!q||[x.full_name,x.phone,title(x.job_slug)].join(" ").toLocaleLowerCase("es-MX").includes(q)));
@@ -121,7 +156,7 @@ $("login-form").addEventListener("submit",async e=>{
  const {error}=await db.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});
  if(error){$("login-error").textContent="No fue posible iniciar sesión. Verifica correo y contraseña.";return;}await checkAuth();
 });
-$("signout").addEventListener("click",async()=>{await db?.auth.signOut();canLoad=false;user=null;authScreen(true);});
+$("signout").addEventListener("click",async()=>{await db?.auth.signOut();canLoad=false;user=null;staffRole=null;authScreen(true);});
 $("search").addEventListener("input",renderCandidates);$("filter-stage").addEventListener("change",renderCandidates);$("refresh").addEventListener("click",load);
 checkAuth().catch(error=>{$("login-error").textContent="Error de conexión. Actualiza la página.";console.error(error?.message||"Error");});
 })();
