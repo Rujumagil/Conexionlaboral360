@@ -22,12 +22,12 @@ Deno.serve(async (request: Request) => {
   } catch { return response(400, { ok: false, error: "datos_invalidos" }); }
   // Honeypot: bots which fill the hidden field are discarded without writing PII.
   if (typeof body.website === "string" && body.website.trim()) return response(201, { ok:true });
-  const name = String(body.name ?? "").trim().replace(/\\s+/g, " ");
+  const name = String(body.name ?? "").trim().replace(/\s+/g, " ");
   const phone = String(body.phone ?? "").replace(/[^+0-9]/g, "");
   const job = String(body.job ?? "");
   const experience = String(body.experience ?? "").trim();
   if (body.consent !== true || name.length < 3 || name.length > 120 ||
-    !/^\\+?[0-9]{10,15}$/.test(phone) || !/^[a-z0-9-]{3,80}$/.test(job) ||
+    !/^\+?[0-9]{10,15}$/.test(phone) || !/^[a-z0-9-]{3,80}$/.test(job) ||
     experience.length < 2 || experience.length > 1000) return response(400, { ok:false, error:"verifica_los_campos_y_el_consentimiento" });
   const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   const ip = request.headers.get("cf-connecting-ip") || request.headers.get("x-real-ip") || forwarded || "unknown";
