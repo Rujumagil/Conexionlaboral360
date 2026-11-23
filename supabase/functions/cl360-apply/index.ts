@@ -1,0 +1,53 @@
+// Conexión Laboral 360 — public application intake. No client-supplied tenant, role or stage.
+const allowedOrigin = "https://rujumagil.github.io";
+const cors = { "Access-Control-Allow-Origin": allowedOrigin, "Access-Control-Allow-Headers": "content-type, apikey, authorization, x-client-info", "Access-Control-Allow-Methods": "POST, OPTIONS", "Vary": "Origin" };
+function response(status: number, data: Record<string, unknown>) {
+  return new Response(JSON.stringify(data), { status, headers: { ...cors, "content-type": "application/json; charset=utf-8", "cache-control":"no-store" } });
+}
+Deno.serve(async (request: Request) => {
+  const origin = request.headers.get("origin") || "";
+  if (origin !== allowedOrigin) return response(403, { ok: false, error: "origen_no_permitido" });
+  if (request.method === "OPTIONS") return response(204, {});
+  if (request.method !== "POST") return response(405, { ok: false, error: "metodo_no_permitido" });
+  if (!request.headers.get("content-type")?.startsWith("application/json")) return response(415, { ok: false, error: "formato_invalido" });
+  const url = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SECRET_KEY");
+  if (!url || !serviceKey) return response(503, { ok: false, error: "servicio_no_configurado" });
+  let body: Record<string, unknown>;
+  try {
+    const raw = await request.text();
+    if (raw.length > 5000) return response(413, { ok: false, error: "datos_demasiado_grandes" });
+    body = JSON.parse(raw);
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw Error("bad json");
+  } catch { return response(400, { ok: false, error: "datos_invalidos" }); }
+  // Honeypot: bots which fill the hidden field are discarded without writing PII.
+  if (typeof body.website === "string" && body.website.trim()) return response(201, { ok:true });
+  const name = String(body.name ?? "").trim().replace(/\\s+/g, " ");
+  const phone = String(body.phone ?? "").replace(/[^+0-9]/g, "");
+  const job = String(body.job ?? "");
+  const experience = String(body.experience ?? "").trim();
+  if (body.consent !== true || name.length < 3 || name.length > 120 ||
+    !/^\\+?[0-9]{10,15}$/.test(phone) || !/^[a-z0-9-]{3,80}$/.test(job) ||
+    experience.length < 2 || experience.length > 1000) return response(400, { ok:false, error:"verifica_los_campos_y_el_consentimiento" });
+  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const ip = request.headers.get("cf-connecting-ip") || request.headers.get("x-real-ip") || forwarded || "unknown";
+  const fingerprintBytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(serviceKey.slice(-24) + "|" + ip));
+  const fingerprint = Array.from(new Uint8Array(fingerprintBytes)).map(n => n.toString(16).padStart(2, "0")).join("");
+  let upstream: Response;
+  try {
+    upstream = await fetch(url + "/rest/v1/rpc/cl360_submit_application", {
+      method: "POST",
+      headers: { "apikey": serviceKey, "authorization": "Bearer " + serviceKey, "content-type": "application/json", "prefer": "return=representation" },
+      body: JSON.stringify({ p_name:name, p_phone:phone, p_job_slug:job, p_experience:experience, p_consent:true, p_fingerprint:fingerprint })
+    });
+  } catch { return response(503, {ok:false,error:"servicio_temporalmente_no_disponible"}); }
+  if (!upstream.ok) {
+    const err = await upstream.json().catch(() => ({}));
+    const message = String(err?.message || "");
+    if (message.includes("rate_limited")) return response(429, {ok:false,error:"limite_de_intentos"});
+    if (message.includes("job_not_available")) return response(400, {ok:false,error:"vacante_no_disponible"});
+    if (message.includes("invalid_application")) return response(400, {ok:false,error:"datos_invalidos"});
+    return response(503, {ok:false,error:"no_se_pudo_registrar"});
+  }
+  return response(201, {ok:true});
+});
