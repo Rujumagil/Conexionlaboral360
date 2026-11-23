@@ -1,24 +1,30 @@
 # Conexión Laboral 360
 
-Sitio de oportunidades laborales de distintas áreas. Actualmente se publican vacantes de guardias de seguridad; los siguientes sectores se incorporarán cuando existan ofertas confirmadas. Página estática sin backend.
+Sitio web de oportunidades laborales y CRM privado de reclutamiento. Hoy se publican cinco vacantes de seguridad, pero el catálogo admite **otras áreas** sin reconstruir la página.
 
-## Uso
+## Páginas
 
-Abrir `index.html` en un navegador o servir la carpeta con un servidor estático. El formulario prepara un mensaje para WhatsApp y no guarda datos.
+- Landing: https://rujumagil.github.io/Conexionlaboral360/
+- CRM del equipo: https://rujumagil.github.io/Conexionlaboral360/crm/
+- Información sobre tratamiento de datos: https://rujumagil.github.io/Conexionlaboral360/aviso-candidatos.html
 
-## Contenido
+## Funcionalidades
 
-- Cinco vacantes vigentes de guardias de seguridad (categoría actual)
-- Espacio informativo para futuras áreas laborales, sin anunciar vacantes inexistentes
-- Beneficios y contacto de la Lic. Astrid Araiza
-- Postulación por WhatsApp y Facebook
-- Anuncio accesible y adaptable sin logotipo dentro del flyer
-- Identidad oficial en el encabezado y pie de la landing
+- Catálogo público de vacantes activas en Supabase, sin sueldos.
+- Formulario con consentimiento que registra candidatos mediante Edge Function `cl360-apply`; tras guardar, abre WhatsApp con un mensaje preparado.
+- CRM para equipo autorizado: tabla de candidatos, filtros, etapas, notas, agenda e historial; alta y pausa de vacantes sin sueldo.
+- Resguardo de datos de candidatos con autenticación y RLS por workspace de Conexión Laboral 360.
+- Compás Fly: perfil **Fly Recruiter** creado y desactivado en modo observador. Integración real de conversaciones/filtrado/seguimiento **pendiente**: https://github.com/Rujumagil/compas-evolution/issues/305
 
-## Imagen fotográfica pendiente
+## Pendientes críticos
 
-La imagen rediseñada sin logo necesita subirse a `assets/flyer-reclutamiento.webp`. Mientras tanto, la landing muestra automáticamente el anuncio en HTML con todos los beneficios y datos de contacto, sin imagen rota.
+- Validar un registro extremo a extremo en navegador real y revisar que funcione el inicio de sesión de todos los reclutadores.
+- Completar y aprobar el aviso de privacidad legal; el actual es preliminar.
+- Configurar CAPTCHA/Turnstile, alertas y política de conservación antes de campañas a escala.
+- Conectar canal de WhatsApp oficial para registro automático de conversaciones externas (los chats directos hoy no se sincronizan).
+- Añadir `assets/flyer-reclutamiento.webp` si se desea mostrar el flyer fotográfico (actualmente existe una versión de respaldo en HTML).
+- Integrar Fly Connect/API con permisos mínimos y confirmar funcionalidades antes de habilitar el agente.
 
-## Publicación
+## Desarrollo
 
-La rama `main` contiene el código de la landing. El dominio propio y el despliegue a Cloudflare se configuran por separado; fusionar código no publica automáticamente la web.
+La web se sirve desde `main` mediante GitHub Pages. El código de la función de recepción está en `supabase/functions/cl360-apply/index.ts`. Para límites y contrato, consulta `docs/CRM-FLY-RECLUTAMIENTO.md`. Nunca subir claves privadas al repositorio.
