@@ -168,7 +168,8 @@ function recognizeIntroductionName(text){
  return value;
 }
 function parseContactPhone(text){
- const value=text.replace(/[\s().-]/g,"").replace(/^(mi numero es|mi teléfono es|mi telefono es|mi whatsapp es|es)/i,"").trim();
+ const normalized=normalizeQuestion(text).replace(/^(?:mi (?:numero|telefono|whatsapp)(?: es)?|te paso mi (?:numero|telefono)|es)\s*/,"");
+ const value=normalized.replace(/[\s().-]/g,"");
  return /^\+?[0-9]{10,15}$/.test(value)?value:null;
 }
 function isSkipIntro(text){
@@ -377,9 +378,9 @@ async function handleNaturalMessage(message){
  const q=normalizeQuestion(message);
  if(phase==="introName"){
   if(isSkipIntro(message)||isJobQuestion(q)||matchJob(message)){
-   await finishIntroduction();
-   if(isJobQuestion(q))return;
-   return;
+   const requestedJob=matchJob(message);
+   if(requestedJob&&!isJobQuestion(q)){pendingIntroJob=requestedJob;}
+   await finishIntroduction();return;
   }
   const name=recognizeIntroductionName(message);
   if(name){answers.name=name;await promptIntroPhone();return;}
