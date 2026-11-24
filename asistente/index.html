@@ -29,6 +29,12 @@ header{background:var(--dark);color:#fff}.head{max-width:1080px;margin:auto;min-
 .question-form .label{margin:0 0 8px}
 .question-form .footnote{margin-top:8px}
 @media(max-width:520px){.question-row{flex-direction:column}.question-row .action,.question-row .field{width:100%}}
+
+.chat>.question-form{margin:0;border-radius:0;border:0;border-top:1px solid var(--line);padding:14px 20px;background:#fff}
+.chat>.question-form .label{font-size:.8rem;color:var(--muted)}
+.chat>.question-form .action{background:var(--navy);color:#fff;border-color:var(--navy)}
+.chat>.question-form .footnote{margin-bottom:0}
+@media(max-width:600px){.chat>.question-form{padding:12px 14px}}
 </style>
 </head>
 <body>
@@ -40,11 +46,12 @@ header{background:var(--dark);color:#fff}.head{max-width:1080px;margin:auto;min-
 <div class="progress"><span id="progress" style="width:0%"></span></div>
 <div class="messages" id="messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
 <div id="controls" class="controls"></div>
+<form id="question-form" class="question-form"><label class="label" for="candidate-question">O escríbeme tu duda con tus propias palabras</label><div class="question-row"><input class="field" id="candidate-question" maxlength="240" placeholder="Ej. ¿Dónde está el servicio?, ¿cuál es el horario?" autocomplete="off" aria-describedby="question-help"><button class="action secondary" type="submit">Preguntar</button></div><p class="footnote" id="question-help">Te responderé con información confirmada; si algo requiere aclaración, te lo indicará la asesora.</p></form>
 </section>
 <section class="faq" aria-label="Información general">
 <h2>¿Te quedó alguna duda? Podemos platicarla</h2>
 <div class="choices"><button class="action secondary faq-btn" data-faq="salary">Sueldos</button><button class="action secondary faq-btn" data-faq="benefits">Beneficios</button><button class="action secondary faq-btn" data-faq="process">Proceso de contratación</button><button class="action secondary faq-btn" data-faq="privacy">Mis datos</button><button class="action secondary faq-btn" data-faq="identity">¿Quién me atiende?</button></div>
-<form id="question-form" class="question-form"><label class="label" for="candidate-question">O escríbeme tu duda con tus propias palabras</label><div class="question-row"><input class="field" id="candidate-question" maxlength="240" placeholder="Ej. ¿Dónde está el servicio?, ¿cuál es el horario?" autocomplete="off" aria-describedby="question-help"><button class="action secondary" type="submit">Preguntar</button></div><p class="footnote" id="question-help">Te responderé con información confirmada; si algo requiere aclaración, te lo indicará la asesora.</p></form><div class="answer" id="faq-answer" hidden></div>
+<div class="answer" id="faq-answer" hidden></div>
 </section>
 <p class="notice">Te acompaña un asistente virtual en esta primera conversación. El seguimiento y las decisiones de reclutamiento corresponden al personal de Conexión Laboral 360. <a href="../aviso-candidatos.html" target="_blank" rel="noopener noreferrer">Información de privacidad</a>.</p>
 </main>
