@@ -1,0 +1,112 @@
+<header class="top"><div class="top-inner"><div class="brand"><img src="../assets/logo-oficial.svg" alt=""><div><b>Conexión Laboral 360</b><small>CRM privado de reclutamiento</small></div></div><div class="top-right"><a href="../">Ver sitio público</a><span class="signed" id="signed"></span><button id="signout" class="hide">Cerrar sesión</button></div></div></header>
+<section id="auth-screen" class="auth-page"><form class="auth-card" id="login-form"><h1>Acceso al CRM</h1><p>Ingreso exclusivo para el equipo autorizado de Conexión Laboral 360.</p><label class="label" for="email">Correo electrónico</label><input class="field" id="email" type="email" autocomplete="username" required><label class="label" for="password">Contraseña</label><input class="field" id="password" type="password" autocomplete="current-password" required><button class="btn yellow" type="submit">Entrar</button><p class="error" id="login-error" role="alert"></p><p class="notice">Tus credenciales se verifican con Supabase Auth. El CRM y la información de postulantes están protegidos mediante permisos por espacio de trabajo.</p></form></section>
+
+<main id="dashboard" class="workspace hide">
+ <aside class="app-sidebar">
+  <div class="side-logo"><img src="../assets/logo-oficial.svg" alt=""><div><b>Conexión 360</b><small>Recruitment Hub</small></div></div>
+  <div class="nav-subtitle">OPERACIÓN</div>
+  <nav class="app-menu" aria-label="Módulos del CRM">
+   <button class="nav-item active" data-nav="inicio"><span class="nav-icon">▦</span> Inicio</button>
+   <button class="nav-item" data-nav="vacantes"><span class="nav-icon">▤</span> Vacantes</button>
+   <button class="nav-item" data-nav="candidatos"><span class="nav-icon">♙</span> Candidatos</button>
+   <button class="nav-item" data-nav="pipeline"><span class="nav-icon">☷</span> Pipeline</button>
+   <button class="nav-item" data-nav="conversaciones"><span class="nav-icon">◉</span> Conversaciones <span id="nav-inbox-count" class="nav-count">0</span></button>
+  </nav>
+  <div class="nav-subtitle">GESTIÓN</div>
+  <nav class="app-menu" aria-label="Herramientas de gestión">
+   <button class="nav-item" data-nav="seguimientos"><span class="nav-icon">▣</span> Seguimientos</button>
+   <button class="nav-item" data-nav="fly"><span class="nav-icon">✦</span> Compás Fly</button>
+   <button class="nav-item" data-nav="ajustes"><span class="nav-icon">⚙</span> Ajustes</button>
+  </nav>
+  <div class="sidebar-foot"><div class="user-dot">CL</div><div><b>Equipo de reclutamiento</b><small>Acceso protegido</small></div></div>
+ </aside>
+ <div class="app-main">
+ <div class="app-toolbar">
+   <div><p class="eyebrow">CONEXIÓN LABORAL 360 · CRM</p><h1 id="view-title">Centro de operaciones</h1></div>
+   <div class="toolbar-actions"><span id="last-updated" class="stamp">Última actualización —</span><button class="btn ghost" id="global-refresh" type="button">↻ Actualizar</button><a class="btn yellow" href="../asistente/" target="_blank" rel="noopener noreferrer">Ver asistente ↗</a></div>
+ </div>
+ <div class="app-content">
+  <section class="app-view" data-view="inicio" id="view-inicio">
+   <div class="welcome-banner"><div><span class="banner-overline">PANEL GENERAL</span><h2>Tu operación de reclutamiento, en un solo lugar.</h2><p>Vacantes, candidatos, conversaciones y seguimientos organizados para el equipo.</p></div><button class="btn yellow" data-go="vacantes">Administrar vacantes</button></div>
+   <div class="metrics" aria-label="Indicadores de reclutamiento">
+    <div class="metric"><span class="metric-icon">♙</span><strong id="m-total">—</strong><span>Postulantes</span></div>
+    <div class="metric"><span class="metric-icon">✧</span><strong id="m-new">—</strong><span>Sin contactar</span></div>
+    <div class="metric"><span class="metric-icon">↗</span><strong id="m-active">—</strong><span>En proceso</span></div>
+    <div class="metric"><span class="metric-icon">✓</span><strong id="m-qualified">—</strong><span>Calificados</span></div>
+    <div class="metric"><span class="metric-icon">▣</span><strong id="m-overdue">—</strong><span>Seguimientos vencidos</span></div>
+   </div>
+
+ <div class="dashboard-secondary-kpis">
+  <div class="mini-kpi"><span>Vacantes activas</span><strong id="kpi-open-jobs">—</strong></div>
+  <div class="mini-kpi"><span>Conversaciones pendientes</span><strong id="kpi-waiting">—</strong></div>
+  <div class="mini-kpi"><span>Atención humana</span><strong id="kpi-human">—</strong></div>
+  <div class="mini-kpi"><span>Contrataciones</span><strong id="kpi-hired">—</strong></div>
+ </div>
+   <div class="home-grid">
+    <section class="panel"><div class="section-title"><div><span class="tag">ACTIVIDAD</span><h2>Próximas acciones</h2></div><button class="text-button" data-go="seguimientos">Ver agenda →</button></div><div id="home-followups" class="home-mini"><div class="empty">Sin seguimientos pendientes.</div></div></section>
+    <section class="panel"><div class="section-title"><div><span class="tag">RESUMEN</span><h2>Tu equipo de reclutamiento</h2></div></div>
+     <div class="quick-card"><span>Vacantes publicadas</span><strong id="home-open-jobs">—</strong></div>
+     <div class="quick-card"><span>Casos por atender</span><strong id="home-waiting">—</strong></div>
+     <div class="quick-card"><span>Conversaciones tomadas</span><strong id="home-human">—</strong></div>
+     <button class="btn ghost" data-go="conversaciones" style="width:100%;margin-top:10px">Abrir bandeja de conversaciones</button>
+    </section>
+   </div>
+  </section>
+  <section class="app-view hide" data-view="vacantes" id="view-vacantes">
+   <div class="page-intro"><div><span class="tag">CATÁLOGO DE OPORTUNIDADES</span><h2>Vacantes</h2><p>Publica puestos de distintas áreas sin mostrar sueldos.</p></div><button class="btn yellow" id="job-add-shortcut">+ Nueva vacante</button></div>
+   <section class="panel" id="vacancy-management"><div class="panel-head"><h2>Vacantes registradas</h2><span class="small">Solo las activas se publican en la web</span></div><div id="job-management-list" class="table-wrap"></div>
+    <form id="new-job-form" class="hide form-block">
+    <h3>Agregar nueva vacante</h3><p class="small">La vacante se guardará pausada. Actívala tras verificar su información.</p>
+    <div class="job-form-grid">
+      <div><label class="label" for="job-title">Puesto o servicio</label><input class="field" id="job-title" maxlength="160" required></div>
+      <div><label class="label" for="job-area">Área laboral</label><input class="field" id="job-area" maxlength="80" placeholder="Administración, seguridad…" required></div>
+      <div><label class="label" for="job-location">Ubicación</label><input class="field" id="job-location" required></div>
+      <div><label class="label" for="job-shift">Turno / horario</label><input class="field" id="job-shift" required></div>
+    </div>
+    <label class="label" for="job-details">Información confirmada (un punto por línea)</label><textarea class="field" id="job-details" maxlength="1200" placeholder="Funciones y requisitos objetivos"></textarea>
+    <button type="submit" class="btn yellow">Guardar vacante pausada</button><p class="error" id="job-error" role="alert"></p>
+    </form></section>
+  </section>
+  <section class="app-view hide" data-view="candidatos" id="view-candidatos">
+   <div class="page-intro"><div><span class="tag">BASE DE TALENTO</span><h2>Candidatos <span class="count" id="result-count"></span></h2><p>Consulta registros, preentrevistas y próximas acciones.</p></div><button class="btn ghost" id="refresh">↻ Actualizar</button></div>
+   <section class="panel" id="candidates-section"><div class="controls"><input type="search" id="search" placeholder="Buscar candidato, teléfono o vacante" aria-label="Buscar candidatos"><select id="filter-stage" aria-label="Filtrar por etapa">
+    <option value="">Todas las etapas</option><option value="new">Sin contactar</option><option value="contacted">Contactado</option><option value="screening">Filtrado</option><option value="interview">Entrevista</option><option value="qualified">Calificado</option><option value="hired">Contratado</option><option value="rejected">No seleccionado</option><option value="archived">Archivado</option></select>
+    <select id="filter-turno" aria-label="Filtrar disponibilidad"><option value="">Todos los turnos</option><option value="si">Turno disponible</option><option value="revisar">Revisar disponibilidad</option><option value="none">Por confirmar</option></select></div>
+    <div class="table-wrap"><table class="candidate-table"><thead><tr><th>Candidato</th><th>Vacante</th><th>Etapa</th><th>Preentrevista</th><th>Registro</th></tr></thead><tbody id="candidate-rows"><tr><td colspan="5">Cargando…</td></tr></tbody></table></div>
+   </section>
+  </section>
+  <section class="app-view hide" data-view="pipeline" id="view-pipeline">
+   <div class="page-intro"><div><span class="tag">SEGUIMIENTO VISUAL</span><h2>Pipeline de reclutamiento</h2><p>Cambia la etapa de cada candidato desde su tarjeta. No hay descartes automáticos.</p></div></div>
+   <div class="pipeline-board" id="pipeline-board" aria-label="Tablero de candidatos por etapa"></div>
+  </section>
+  <section class="app-view hide" data-view="conversaciones" id="view-conversaciones">
+   <div class="page-intro"><div><span class="tag">BANDEJA DE ATENCIÓN</span><h2>Conversaciones</h2><p>Historial del caso, notas internas, toma humana y contacto por WhatsApp.</p></div><button id="conversation-refresh" class="btn ghost">↻ Actualizar</button></div>
+   <div class="inbox-layout">
+    <section class="inbox-list"><div class="inbox-heading"><strong>Bandeja</strong><select id="inbox-filter" aria-label="Filtrar conversaciones"><option value="all">Todas</option><option value="waiting">Pendientes</option><option value="human">Tomadas</option><option value="bot">Asistente</option><option value="closed">Cerradas</option></select></div><div id="inbox-threads"><p class="empty">Sin conversaciones todavía.</p></div></section>
+    <section class="chat-pane" id="chat-pane"><div class="empty">Selecciona una conversación para ver el caso y sus notas internas.</div></section>
+   </div>
+   <p class="inbox-hint">Los mensajes escritos aquí son notas internas del equipo. No se envían al candidato. La integración de mensajes reales de WhatsApp y transcripciones completas del asistente todavía está pendiente.</p>
+  </section>
+  <section class="app-view hide" data-view="seguimientos" id="view-seguimientos">
+    <div class="page-intro"><div><span class="tag">TAREAS</span><h2>Agenda de seguimientos</h2><p>Controla las siguientes llamadas, entrevistas y contactos.</p></div></div>
+    <section class="panel"><div class="panel-head"><h2>Próximas tareas</h2><span class="small">Ordenadas por fecha</span></div><div id="followups"><p class="empty">Sin seguimientos programados.</p></div></section>
+  </section>
+  <section class="app-view hide" data-view="fly" id="view-fly">
+   <div class="page-intro"><div><span class="tag">AUTOMATIZACIÓN SUPERVISADA</span><h2>Compás Fly Recruiter</h2><p>Atención inicial virtual y revisión humana antes de la contratación.</p></div></div>
+   <section class="panel"><div class="panel-head"><h2>Estado del asistente</h2><span id="fly-health-badge" class="pill">Verificando conexión</span></div>
+    <div class="fly"><div class="fly-icon">✦</div><div><strong>Fly Recruiter · Atención supervisada</strong><p id="fly-health-detail">Consultando disponibilidad de la conversación contextual.</p>
+    <p class="small">La decisión de entrevista y contratación corresponde a personas. No se publican sueldos ni se envían mensajes automáticos por WhatsApp.</p></div></div>
+    <div class="fly-rules"><div>✓ Vacantes verificadas</div><div>✓ Sin rechazo automático</div><div>✓ WhatsApp mediante acción humana</div><div>◌ Conversación generativa pendiente de credencial</div></div>
+   </section>
+  </section>
+  <section class="app-view hide" data-view="ajustes" id="view-ajustes">
+   <div class="page-intro"><div><span class="tag">ADMINISTRACIÓN</span><h2>Ajustes del CRM</h2><p>Configuración y permisos del espacio de Conexión Laboral 360.</p></div></div>
+   <section class="panel"><h2>Otros módulos</h2><div class="settings-actions"><button class="btn ghost" data-go="seguimientos">▣ Agenda de seguimientos</button><button class="btn ghost" data-go="fly">✦ Estado de Compás Fly</button></div></section><section class="panel"><h2>Tu acceso</h2><p id="settings-user">Cuenta autorizada</p><p>Permisos por espacio de trabajo, gestionados desde Supabase Auth.</p><hr><h3>Enlaces de operación</h3><p><a href="../" target="_blank" rel="noopener noreferrer">Página pública de vacantes ↗</a></p><p><a href="../asistente/" target="_blank" rel="noopener noreferrer">Asistente de reclutamiento ↗</a></p><p><a href="../aviso-candidatos.html" target="_blank" rel="noopener noreferrer">Información de privacidad ↗</a></p><button type="button" class="btn ghost" id="settings-signout">Cerrar sesión</button></section>
+  </section>
+  <section class="panel detail hide" id="detail" aria-label="Expediente del candidato"></section>
+ </div></div>
+ <nav class="mobile-nav" aria-label="Pestañas principales">
+   <button data-nav="inicio" class="active"><span>▦</span>Inicio</button><button data-nav="vacantes"><span>▤</span>Vacantes</button><button data-nav="candidatos"><span>♙</span>Candidatos</button><button data-nav="pipeline"><span>☷</span>Pipeline</button><button data-nav="conversaciones"><span>◉</span>Chats</button><button data-nav="ajustes"><span>☰</span>Más</button>
+ </nav>
+</main>
+<!-- Shared application layout: views use separate GitHub Pages URLs. -->
