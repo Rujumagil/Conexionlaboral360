@@ -1,12 +1,10 @@
 // Conexión Laboral 360 — public application intake. No client-supplied tenant, role or stage.
-const allowedOrigin = "https://rujumagil.github.io";
-const cors = { "Access-Control-Allow-Origin": allowedOrigin, "Access-Control-Allow-Headers": "content-type, apikey, authorization, x-client-info", "Access-Control-Allow-Methods": "POST, OPTIONS", "Vary": "Origin" };
-function response(status: number, data: Record<string, unknown>) {
-  return new Response(JSON.stringify(data), { status, headers: { ...cors, "content-type": "application/json; charset=utf-8", "cache-control":"no-store" } });
-}
+const ALLOWED_ORIGINS=new Set(["https://rujumagil.github.io","https://conexionlaboral360.app","https://conexionlaboral360.proyectocompas-info.workers.dev"]);
 Deno.serve(async (request: Request) => {
   const origin = request.headers.get("origin") || "";
-  if (origin !== allowedOrigin) return response(403, { ok: false, error: "origen_no_permitido" });
+  const cors = { "Access-Control-Allow-Origin":ALLOWED_ORIGINS.has(origin)?origin:"https://rujumagil.github.io", "Access-Control-Allow-Headers": "content-type, apikey, authorization, x-client-info", "Access-Control-Allow-Methods": "POST, OPTIONS", "Vary": "Origin" };
+  const response=(status:number,data:Record<string,unknown>)=>new Response(JSON.stringify(data),{status,headers:{...cors,"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
+  if (!ALLOWED_ORIGINS.has(origin)) return response(403, { ok: false, error: "origen_no_permitido" });
   if (request.method === "OPTIONS") return new Response(null, {status: 204, headers: cors});
   if (request.method !== "POST") return response(405, { ok: false, error: "metodo_no_permitido" });
   if (!request.headers.get("content-type")?.startsWith("application/json")) return response(415, { ok: false, error: "formato_invalido" });
