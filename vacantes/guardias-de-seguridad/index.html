@@ -63,4 +63,7 @@ h1{font-size:clamp(2.5rem,5.4vw,4.5rem);line-height:1.05;letter-spacing:-.055em;
 </main>
 <footer class="footer"><div class="wrap footer-inner"><span>© Conexión Laboral 360 · Reclutamiento con atención humana</span><a href="../../aviso-candidatos.html">Información de privacidad</a></div></footer>
 <div class="mobile-cta"><a class="btn btn-gold" href="../../asistente/?campana=guardias-de-seguridad&amp;mobile=1">Postularme con Andy →</a></div>
+<script>
+(()=>{const incoming=new URLSearchParams(location.search);const keys=["utm_source","utm_medium","utm_campaign","utm_content","utm_term"];const clean=v=>/^[a-zA-Z0-9_.-]{1,100}$/.test(v||"")?v:"";const values=new URLSearchParams();for(const k of keys){const v=clean(incoming.get(k));if(v)values.set(k,v)}if(!values.has("utm_source")){let host="";try{host=new URL(document.referrer).hostname}catch{};values.set("utm_source",/(^|\.)facebook\.com$/.test(host)?"facebook":/(^|\.)instagram\.com$/.test(host)?"instagram":host?"referral":"direct")}for(const node of document.querySelectorAll("iframe[src],a[href]")){const attr=node.tagName==="IFRAME"?"src":"href";const raw=node.getAttribute(attr);if(!raw||!raw.startsWith("../../asistente/"))continue;const url=new URL(raw,location.href);for(const [k,v] of values)url.searchParams.set(k,v);node.setAttribute(attr,url.href)}})();
+</script>
 </body></html>
