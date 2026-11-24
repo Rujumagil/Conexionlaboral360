@@ -15,7 +15,7 @@ jobs:
         run: |
           python3 - <<'PY'
           import urllib.request, urllib.error, socket, ssl
-          hosts=["https://conexionlaboral360.app","https://conexionlaboral360.proyectocompas-info.workers.dev"]
+          hosts=["https://conexionlaboral360.app"]
           paths=["/","/asistente/","/crm/","/crm/app.js"]
           for host in hosts:
             print("DOMINIO:",host)
