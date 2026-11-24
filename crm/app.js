@@ -122,7 +122,7 @@ async function load(){
  $("m-overdue").textContent=followups.filter(x=>x.status==="pending"&&new Date(x.due_at).getTime()<now).length;
  $("last-updated").textContent="Actualizado "+new Date().toLocaleTimeString("es-MX");
  renderCandidates();renderFollowups();renderJobManagement();renderFlyAgents();
- renderHome();renderPipeline();renderMarketing();renderCrmAlerts();maybeNotifyOverdue();await loadConversations();
+ renderHome();renderPipeline();renderMarketing();if(activeView==="marketing")void loadMarketingMeta();renderCrmAlerts();maybeNotifyOverdue();await loadConversations();
  if(selected){const still=candidates.find(x=>x.id===selected);if(still&&activeView==="candidatos")renderDetail(still);else if(!still){selected=null;$("detail").classList.add("hide");}}
 }
 function title(slug){return jobs.find(x=>x.slug===slug)?.title||slug||"Sin vacante";}
@@ -502,10 +502,24 @@ const appViews={
   view.innerHTML='<div class="page-intro"><div><span class="tag">CAPTACIÓN Y PUBLICIDAD</span><h2>Marketing y campañas</h2><p>Conoce el origen de las postulaciones y su etapa actual.</p></div></div>'+
    '<section class="panel"><h2>Rendimiento de reclutamiento</h2><p class="small">Datos de hasta 500 expedientes recientes del CRM. Periodo según fecha de registro original. No son estadísticas de clics ni de Meta Ads.</p><label class="label" for="marketing-period">Periodo</label><select id="marketing-period" class="field"><option value="30">Últimos 30 días</option><option value="7">Últimos 7 días</option><option value="all">Todos los expedientes cargados</option></select><div id="marketing-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:12px;margin-top:18px" aria-live="polite"></div></section>'+
    '<section class="panel"><h2>Resultados por campaña</h2><p class="small">Última atribución registrada en cada expediente; no representa conversiones verificadas por Meta.</p><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;text-align:left"><thead><tr><th scope="col">Canal</th><th scope="col">Campaña</th><th scope="col">Anuncio</th><th scope="col">Postulantes</th><th scope="col">Entrevista</th><th scope="col">Contratados</th></tr></thead><tbody id="marketing-rows"></tbody></table></div></section>'+
-   '<section class="panel"><h2>Métricas publicitarias pendientes</h2><p>Visitas a la landing, conversaciones iniciadas sin postulación, inversión, costo por candidato y conversiones de Meta Ads requieren una fuente de datos adicional. No se muestran valores ficticios.</p><a class="btn ghost" href="../vacantes/guardias-de-seguridad/?utm_source=facebook&amp;utm_medium=paid_social&amp;utm_campaign=guardias_seguridad&amp;utm_content=anuncio_01" target="_blank" rel="noopener noreferrer">Abrir landing de campaña ↗</a></section>';
+   '<section class="panel"><h2>Conexión con Meta Ads</h2><p id="marketing-meta-status" role="status">Verificando cuenta publicitaria…</p><p class="small">Conexión administrada por Compás Evolution. No se solicitan credenciales en este CRM.</p><div id="marketing-meta-metrics" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:12px"></div></section><section class="panel"><h2>Métricas publicitarias pendientes</h2><p>Visitas a la landing, conversaciones iniciadas sin postulación, inversión, costo por candidato y conversiones de Meta Ads requieren una fuente de datos adicional. No se muestran valores ficticios.</p><a class="btn ghost" href="../vacantes/guardias-de-seguridad/?utm_source=facebook&amp;utm_medium=paid_social&amp;utm_campaign=guardias_seguridad&amp;utm_content=anuncio_01" target="_blank" rel="noopener noreferrer">Abrir landing de campaña ↗</a></section>';
   settings.before(view);$("marketing-period").addEventListener("change",renderMarketing);
  }
 })();
+let marketingMetaVersion=0;
+async function loadMarketingMeta(){
+ const status=$("marketing-meta-status"),panel=$("marketing-meta-metrics");if(!status||!panel||!canLoad)return;
+ const version=++marketingMetaVersion;
+ panel.replaceChildren();status.textContent="Verificando cuenta publicitaria…";
+ try{
+ const result=await db.from("meta_ad_connections").select("id,status,currency,last_synced_at").eq("workspace_id",WS).limit(20);
+ if(version!==marketingMetaVersion)return;
+ if(result.error)throw result.error;
+ const accounts=result.data||[];
+ if(!accounts.length){status.textContent="Sin cuenta publicitaria vinculada. Compás Evolution debe autorizar la conexión.";return;}
+ status.textContent="Cuentas registradas: "+accounts.length+". Estadísticas pendientes de validar con Meta.";
+ }catch{if(version===marketingMetaVersion)status.textContent="No fue posible verificar la conexión publicitaria. Consulta con Compás Evolution.";}
+}
 function renderMarketing(){
  const panel=$("marketing-kpis"),body=$("marketing-rows");if(!panel||!body)return;
  const period=$("marketing-period").value;
@@ -558,7 +572,7 @@ function navigate(view,candidateId=null,fromHistory=false){
  if(view==="conversaciones")renderInbox();
  if(view==="inicio"){renderHome();renderFlyAgents();}
  if(view==="fly")renderFlyAgents();
- if(view==="marketing")renderMarketing();
+ if(view==="marketing"){renderMarketing();void loadMarketingMeta();}
  if(view==="ajustes")$("settings-user").textContent=(user?.email||"Cuenta autorizada")+" · "+(staffRole||"");
  document.title=appViews[view]+" · Conexión Laboral 360";
  window.scrollTo({top:0,behavior:"auto"});
