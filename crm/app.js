@@ -104,7 +104,7 @@ async function load(){
  if(!canLoad)return;
  $("refresh").disabled=true;
  const [c,j,f]=await Promise.all([
-  db.from("cl360_candidates").select("id,full_name,phone,job_slug,area,experience,screening_data,stage,source,consent_at,assigned_user_id,last_contact_at,next_followup_at,created_at,submission_count").eq("workspace_id",WS).order("created_at",{ascending:false}).limit(500),
+  db.from("cl360_candidates").select("id,full_name,phone,job_slug,area,experience,screening_data,stage,source,campaign_attribution,consent_at,assigned_user_id,last_contact_at,next_followup_at,created_at,submission_count").eq("workspace_id",WS).order("created_at",{ascending:false}).limit(500),
   db.from("cl360_jobs").select("id,slug,title,area,location,shift,details,status").eq("workspace_id",WS).order("title"),
   db.from("cl360_followups").select("id,candidate_id,title,due_at,status,assigned_user_id,created_at,updated_at").eq("workspace_id",WS).order("due_at").limit(500)
  ]);
@@ -419,6 +419,11 @@ async function renderDetail(candidate){
  $("detail").innerHTML='<h3>'+safe(candidate.full_name)+'</h3><p class="detail-sub">'+safe(title(candidate.job_slug))+' · '+safe(candidate.area)+' · Registrado '+safe(fmt(candidate.created_at))+'</p>'+
  '<div class="detail-actions"><a class="btn" target="_blank" rel="noopener noreferrer" href="https://wa.me/'+encodeURIComponent(phone.replace(/^\+/,""))+'">Abrir WhatsApp</a><a class="btn ghost" href="tel:'+encodeURIComponent(phone)+'">Llamar</a></div>'+
  '<label class="label">Teléfono</label><div>'+safe(candidate.phone)+'</div><label class="label">Experiencia declarada</label><div style="white-space:pre-wrap">'+safe(candidate.experience||"Sin información")+'</div>'+
+ '<div class="section-divider"></div><b>Origen publicitario</b>'+
+ '<label class="label">Canal</label><div>'+safe(candidate.campaign_attribution?.utm_source||"Sin atribución registrada")+'</div>'+
+ '<label class="label">Campaña</label><div>'+safe(candidate.campaign_attribution?.utm_campaign||candidate.campaign_attribution?.campana||"—")+'</div>'+
+ '<label class="label">Anuncio</label><div>'+safe(candidate.campaign_attribution?.utm_content||"—")+'</div>'+
+ '<label class="label">Medio</label><div>'+safe(candidate.campaign_attribution?.utm_medium||"—")+'</div>'+
  '<div class="section-divider"></div><b>Preentrevista inicial</b>'+
  '<div class="small" style="margin-top:8px">Datos declarados por el candidato. No representan una evaluación automática ni decisión de contratación.</div>'+
  '<label class="label">Experiencia previa</label><div>'+safe(({si:"Sí",no:"No",prefiero_comentarlo:"Prefiere comentarlo"})[candidate.screening_data?.experience_level]||"Por confirmar")+'</div>'+
