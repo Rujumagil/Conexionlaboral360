@@ -3,7 +3,7 @@ on:
   push:
     paths:
       - .github/workflows/cl360-integrity.yml
-      - crm/index.html
+      - crm/**
       - asistente/index.html
       - supabase/functions/cl360-fly-chat/index.ts
   workflow_dispatch:
@@ -44,6 +44,24 @@ jobs:
             });
             console.log('JavaScript correcto:',path);
           }
+          const app=fs.readFileSync('crm/app.js','utf8');
+          const shell=fs.readFileSync('crm/shell.html','utf8');
+          const styles=fs.readFileSync('crm/app.css','utf8');
+          new Function(app);
+          const pages=['inicio','vacantes','candidatos','pipeline','conversaciones','seguimientos','fly','ajustes'];
+          for(const page of pages){
+            const path=page==='inicio'?'crm/index.html':'crm/'+page+'/index.html';
+            const html=fs.readFileSync(path,'utf8');
+            if(!html.includes('app.css')||!html.includes('app.js')||!html.includes('shell.html'))
+              throw Error('Ruta con módulos compartidos incompletos: '+path);
+            if(!shell.includes('data-view="'+page+'"'))throw Error('Vista ausente: '+page);
+          }
+          if(!app.includes('location.assign(urlForView(view,candidateId).href)'))
+            throw Error('Navegación de páginas independientes ausente');
+          if(!['kpi-open-jobs','kpi-waiting','kpi-human','kpi-hired'].every(x=>shell.includes(x)&&app.includes(x)))
+            throw Error('Dashboard de KPIs incompleto');
+          if(!styles.includes('.dashboard-secondary-kpis'))throw Error('Estilos dashboard ausentes');
+          console.log('Ocho páginas y dashboard de KPIs: correctos');
           const landing=fs.readFileSync('index.html','utf8');
           const chat=fs.readFileSync('asistente/index.html','utf8');
           const edge=fs.readFileSync('supabase/functions/cl360-fly-chat/index.ts','utf8');
