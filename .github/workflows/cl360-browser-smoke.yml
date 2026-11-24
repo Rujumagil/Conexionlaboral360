@@ -67,6 +67,8 @@ jobs:
             await page.goto('http://127.0.0.1:8765/Conexionlaboral360/crm/',{waitUntil:'domcontentloaded'});
             await page.locator('#dashboard').waitFor({state:'visible',timeout:15000});
             const initialNavigations=changes.length;
+            await page.evaluate(()=>{window.__crmSessionProbe='same-document-session'});
+
             await page.locator('.mobile-nav [data-nav="vacantes"]').click();
             await page.locator('#view-vacantes').waitFor({state:'visible'});
             await page.locator('.mobile-nav [data-nav="candidatos"]').click();
@@ -74,8 +76,9 @@ jobs:
             await page.locator('.mobile-nav [data-nav="inicio"]').click();
             await page.locator('#view-inicio').waitFor({state:'visible'});
             const stillLoggedIn=await page.locator('#dashboard').isVisible()&&!await page.locator('#auth-screen').isVisible();
-            console.log(JSON.stringify({navigationWithoutReload:changes.length===initialNavigations,stillLoggedIn,latestPath:new URL(page.url()).pathname}));
-            if(changes.length!==initialNavigations||!stillLoggedIn)bad++;
+            const navigationWithoutReload=await page.evaluate(()=>window.__crmSessionProbe==='same-document-session');
+            console.log(JSON.stringify({navigationWithoutReload,stillLoggedIn,historyEvents:changes.length-initialNavigations,latestPath:new URL(page.url()).pathname}));
+            if(!navigationWithoutReload||!stillLoggedIn)bad++;
             await page.close();
             await browser.close();
             if(bad)process.exit(1);
