@@ -55,7 +55,15 @@ jobs:
               status:200,contentType:'application/javascript',
               body:`window.supabase={createClient(){return {
                 auth:{getUser:async()=>({data:{user:{id:'a78ef7ff-0389-4587-92b2-8e442973888b',email:'cuenta-prueba@example.invalid'}}}),signOut:async()=>({}),signInWithPassword:async()=>({error:null})},
-                from(name){const q={select(){return q},eq(){return q},order(){return q},limit(){return Promise.resolve({data:[],error:null})},maybeSingle(){return Promise.resolve({data:{role:'owner',status:'active'},error:null})}};return q},
+                from(name){
+                  const candidate={id:'c1111111-1111-4111-8111-111111111111',full_name:'Candidata ficticia',phone:'3312345678',job_slug:'coto-prueba',area:'Seguridad',experience:'Experiencia ficticia',stage:'new',created_at:'2026-11-24T12:00:00Z',screening_data:{availability:'consultar',experience_level:'no',preferred_zone:'Zapopan'}};
+                  window.__testFollowups=window.__testFollowups||[];
+                  const rows={cl360_candidates:[candidate],cl360_jobs:[{slug:'coto-prueba',title:'Vacante de prueba',area:'Seguridad',status:'active'}],cl360_followups:window.__testFollowups,cl360_conversations:[]};
+                  const q={select(){return q},eq(){return q},order(){return q},limit(){return Promise.resolve({data:rows[name]||[],error:null})},
+                    maybeSingle(){return Promise.resolve({data:{role:'owner',status:'active'},error:null})},
+                    insert(record){window.__testFollowups.push({...record,id:'f1111111-1111-4111-8111-111111111111'});return Promise.resolve({error:null})}};
+                  return q;
+                },
                 rpc:async()=>({error:null})
               }}};`
             }));
@@ -76,6 +84,14 @@ jobs:
             await page.locator('.mobile-nav [data-nav="inicio"]').click();
             await page.locator('#view-inicio').waitFor({state:'visible'});
             await page.locator('#fly-home-alerts').waitFor({state:'visible'});
+            if(!await page.locator('#fly-home-alerts .priority-item.new').isVisible())throw Error('Falta prioridad del candidato sin contactar');
+            await page.locator('#fly-home-alerts .priority-item.new').getByRole('button',{name:'Programar'}).click();
+            await page.locator('.priority-quick-form input[type="text"]').fill('Llamar para confirmar interés');
+            await page.locator('.priority-quick-form input[type="datetime-local"]').fill('2026-12-15T10:30');
+            await page.locator('.priority-quick-form button[type="submit"]').click();
+            await page.locator('#home-followups').getByText('Llamar para confirmar interés').waitFor({timeout:15000});
+            if(await page.evaluate(()=>window.__testFollowups.length)!==1)throw Error('No se guardó el seguimiento desde inicio');
+            console.log('Dashboard: prioridad y programación de tarea confirmada');
             await page.evaluate(()=>document.querySelector('button[data-nav="fly"]').click());
             await page.locator('#view-fly').waitFor({state:'visible'});
             for(const id of ['fly-review-list','fly-followup-list','fly-performance']){
