@@ -48,6 +48,11 @@ jobs:
           const shell=fs.readFileSync('crm/shell.html','utf8');
           const styles=fs.readFileSync('crm/app.css','utf8');
           new Function(app);
+          if(/\bnew URL\(/.test(app)&&app.includes('const URL="https://'))
+            throw Error('Conflicto entre URL de Supabase y constructor de rutas');
+          if(!app.includes('new window.URL("./",document.baseURI)'))
+            throw Error('Falta constructor correcto de rutas');
+
           const pages=['inicio','vacantes','candidatos','pipeline','conversaciones','seguimientos','fly','ajustes'];
           for(const page of pages){
             const path=page==='inicio'?'crm/index.html':'crm/'+page+'/index.html';
