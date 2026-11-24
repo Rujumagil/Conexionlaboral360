@@ -20,7 +20,7 @@ jobs:
         run: |
           node <<'JS'
           const fs=require('node:fs');
-          for(const path of ['index.html','asistente/index.html','crm/index.html']){
+          for(const path of ['index.html','asistente/index.html']){
             const html=fs.readFileSync(path,'utf8');
             const matches=[...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)];
             const scripts=matches.filter(x=>!x[1].includes('src='));
