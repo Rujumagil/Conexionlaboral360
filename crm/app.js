@@ -13,6 +13,37 @@ function candidateReviewNotes(candidate){
  if(candidate.screening_data?.experience_level==="prefiero_comentarlo")notes.push("Prefiere conversar sobre su experiencia con Astrid.");
  return notes;
 }
+function candidateIntakeSummary(candidate){
+ const screened=candidate.screening_data||{};
+ const job=jobs.find(x=>x.slug===candidate.job_slug);
+ const experienceLevels={si:"Con experiencia previa declarada",no:"Sin experiencia previa en puesto similar",prefiero_comentarlo:"Prefiere comentar la experiencia con Astrid"};
+ const availability={si:"Indica que el turno le funciona",no:"Indica que el turno no le funciona",consultar:"Necesita revisar el turno"};
+ const review=candidateReviewNotes(candidate);
+ if(!job)review.push("Confirmar que la vacante y sus condiciones sigan disponibles.");
+ if(!screened.preferred_zone)review.push("Zona preferida sin especificar.");
+ review.push("Validar requisitos, sueldo, prestaciones y siguientes pasos con la persona reclutadora.");
+ const fields=[
+  "RESUMEN DE PREENTREVISTA · ANDY",
+  "Estado: Pendiente de revisión humana",
+  "Candidato: "+(candidate.full_name||"Por confirmar"),
+  "Teléfono: "+(candidate.phone||"Por confirmar"),
+  "Vacante: "+(job?.title||candidate.job_slug||"Por confirmar"),
+  "Área: "+(job?.area||candidate.area||"Por confirmar"),
+  "Zona anunciada: "+(job?.location||"Por confirmar con Astrid"),
+  "Turno anunciado: "+(job?.shift||"Por confirmar con Astrid"),
+  "Experiencia previa: "+(experienceLevels[screened.experience_level]||"Por confirmar"),
+  "Experiencia compartida: "+(candidate.experience?.trim()||"Sin descripción"),
+  "Disponibilidad: "+(availability[screened.availability]||"Por confirmar"),
+  "Zona de interés: "+(screened.preferred_zone||"Sin preferencia informada"),
+  "Registro: "+fmt(candidate.created_at),
+  "",
+  "PUNTOS PARA ASTRID",
+  ...review.map(note=>"• "+note),
+  "",
+  "Importante: son datos proporcionados por el candidato y del catálogo vigente. No constituyen una evaluación de idoneidad ni una decisión de contratación."
+ ];
+ return fields.join("\n");
+}
 const stageNames={new:"Sin contactar",contacted:"Contactado",screening:"Filtrado",interview:"Entrevista",qualified:"Calificado",hired:"Contratado",rejected:"No seleccionado",archived:"Archivado"};
 let user=null, staffRole=null, candidates=[], followups=[], jobs=[], selected=null, canLoad=false;
 const working=(msg)=>{if($("detail"))$("detail").innerHTML='<p class="loading">'+safe(msg)+'</p>'};
@@ -130,12 +161,24 @@ async function renderDetail(candidate){
  '<label class="label">Disponibilidad para turno</label><div>'+safe(({si:"Disponible",no:"No disponible",consultar:"Necesita consultar"})[candidate.screening_data?.availability]||"Por confirmar")+'</div>'+
  '<label class="label">Zona preferida</label><div>'+safe(candidate.screening_data?.preferred_zone||"Sin preferencia informada")+'</div>'+
  '<label class="label">Orientación de Andy</label><div class="small">'+safe(candidateReviewNotes(candidate).join(" ")||"Datos recibidos. Astrid revisará la postulación y decidirá la siguiente etapa.")+'</div>'+
+ '<div class="section-divider"></div><h3>Resumen preparado por Andy</h3>'+
+ '<div class="small" style="margin-bottom:8px">Síntesis del expediente basada en datos declarados. Solo para revisión del personal autorizado.</div>'+
+ '<pre id="andy-intake-summary" style="font:inherit;white-space:pre-wrap;overflow-wrap:anywhere;padding:14px;border:1px solid #dce6f1;border-radius:12px;background:#f5f9fd;color:#16334d">'+safe(candidateIntakeSummary(candidate))+'</pre>'+
+ '<button type="button" class="btn ghost" id="copy-andy-summary">Copiar resumen</button><span id="andy-summary-feedback" class="small" role="status" style="margin-left:10px"></span>'+
  '<label class="label" for="candidate-stage">Etapa del candidato</label><select id="candidate-stage" class="field">'+dateOptions+'</select>'+
  '<button class="btn yellow" style="margin-top:10px" id="save-stage">Guardar etapa</button><div class="section-divider"></div>'+
  '<label class="label" for="candidate-note">Nota de seguimiento</label><textarea id="candidate-note" class="field" maxlength="1500" placeholder="Resumen de conversación, disponibilidad o siguiente acción"></textarea>'+
  '<button class="btn" id="save-note" style="margin-top:8px">Agregar nota</button>'+
  '<div class="section-divider"></div><label class="label" for="followup-title">Próxima acción</label><input class="field" id="followup-title" maxlength="200" placeholder="Llamar para entrevista"><label class="label" for="followup-date">Fecha y hora</label><input type="datetime-local" class="field" id="followup-date"><button class="btn" id="save-followup" style="margin-top:8px">Programar seguimiento</button>'+
  '<div class="section-divider"></div><b>Historial</b><div id="events" class="timeline"><p class="small">Cargando historial…</p></div>';
+ $("copy-andy-summary").addEventListener("click",async()=>{
+  try{
+   await navigator.clipboard.writeText(candidateIntakeSummary(candidate));
+   $("andy-summary-feedback").textContent="Resumen copiado";
+  }catch{
+   $("andy-summary-feedback").textContent="No se pudo copiar. Selecciona el texto del resumen manualmente.";
+  }
+ });
  $("save-stage").addEventListener("click",async()=>{
   const stage=$("candidate-stage").value;
   const {error}=await db.rpc("cl360_set_stage",{p_candidate:candidate.id,p_stage:stage});
