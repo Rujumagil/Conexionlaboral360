@@ -122,7 +122,7 @@ async function load(){
  $("m-overdue").textContent=followups.filter(x=>x.status==="pending"&&new Date(x.due_at).getTime()<now).length;
  $("last-updated").textContent="Actualizado "+new Date().toLocaleTimeString("es-MX");
  renderCandidates();renderFollowups();renderJobManagement();renderFlyAgents();
- renderHome();renderPipeline();renderCrmAlerts();maybeNotifyOverdue();await loadConversations();
+ renderHome();renderPipeline();renderMarketing();renderCrmAlerts();maybeNotifyOverdue();await loadConversations();
  if(selected){const still=candidates.find(x=>x.id===selected);if(still&&activeView==="candidatos")renderDetail(still);else if(!still){selected=null;$("detail").classList.add("hide");}}
 }
 function title(slug){return jobs.find(x=>x.slug===slug)?.title||slug||"Sin vacante";}
@@ -484,8 +484,44 @@ $("search").addEventListener("input",renderCandidates);$("filter-stage").addEven
 /* App navigation, pipeline and internal conversations */
 const appViews={
  inicio:"Centro de operaciones",vacantes:"Vacantes",candidatos:"Candidatos",pipeline:"Pipeline de reclutamiento",
- conversaciones:"Mensajes y atención humana",seguimientos:"Seguimientos",fly:"Andy · Compás Fly",ajustes:"Configuración"
+ conversaciones:"Mensajes y atención humana",seguimientos:"Seguimientos",fly:"Andy · Compás Fly",marketing:"Marketing y campañas",ajustes:"Configuración"
 };
+
+/* Marketing: métricas de expedientes cargados, sin simulaciones ni píxel. */
+(()=>{
+ const sidebar=document.querySelector('.nav-item[data-nav="ajustes"]');
+ if(sidebar&&!document.querySelector('[data-nav="marketing"]')){
+  const button=document.createElement("button");button.type="button";button.className="nav-item";button.dataset.nav="marketing";
+  button.innerHTML='<span class="nav-icon" aria-hidden="true">▥</span> Marketing y campañas';sidebar.before(button);
+ }
+ const actions=document.querySelector("#view-ajustes .settings-actions");
+ if(actions){const b=document.createElement("button");b.type="button";b.className="btn ghost";b.dataset.go="marketing";b.textContent="▥ Marketing y campañas";actions.append(b);}
+ const settings=$("view-ajustes");
+ if(settings){
+  const view=document.createElement("section");view.className="app-view hide";view.dataset.view="marketing";view.id="view-marketing";
+  view.innerHTML='<div class="page-intro"><div><span class="tag">CAPTACIÓN Y PUBLICIDAD</span><h2>Marketing y campañas</h2><p>Conoce el origen de las postulaciones y su etapa actual.</p></div></div>'+
+   '<section class="panel"><h2>Rendimiento de reclutamiento</h2><p class="small">Datos de hasta 500 expedientes recientes del CRM. Periodo según fecha de registro original. No son estadísticas de clics ni de Meta Ads.</p><label class="label" for="marketing-period">Periodo</label><select id="marketing-period" class="field"><option value="30">Últimos 30 días</option><option value="7">Últimos 7 días</option><option value="all">Todos los expedientes cargados</option></select><div id="marketing-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:12px;margin-top:18px" aria-live="polite"></div></section>'+
+   '<section class="panel"><h2>Resultados por campaña</h2><p class="small">Última atribución registrada en cada expediente; no representa conversiones verificadas por Meta.</p><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;text-align:left"><thead><tr><th scope="col">Canal</th><th scope="col">Campaña</th><th scope="col">Anuncio</th><th scope="col">Postulantes</th><th scope="col">Entrevista</th><th scope="col">Contratados</th></tr></thead><tbody id="marketing-rows"></tbody></table></div></section>'+
+   '<section class="panel"><h2>Métricas publicitarias pendientes</h2><p>Visitas a la landing, conversaciones iniciadas sin postulación, inversión, costo por candidato y conversiones de Meta Ads requieren una fuente de datos adicional. No se muestran valores ficticios.</p><a class="btn ghost" href="../vacantes/guardias-de-seguridad/?utm_source=facebook&amp;utm_medium=paid_social&amp;utm_campaign=guardias_seguridad&amp;utm_content=anuncio_01" target="_blank" rel="noopener noreferrer">Abrir landing de campaña ↗</a></section>';
+  settings.before(view);$("marketing-period").addEventListener("change",renderMarketing);
+ }
+})();
+function renderMarketing(){
+ const panel=$("marketing-kpis"),body=$("marketing-rows");if(!panel||!body)return;
+ const period=$("marketing-period").value;
+ const cutoff=period==="all"?0:Date.now()-Number(period)*86400000;
+ const data=candidates.filter(c=>new Date(c.created_at).getTime()>=cutoff);
+ const attributed=c=>{const a=c.campaign_attribution;return a&&typeof a==="object"&&Object.keys(a).length>0;};
+ const counts=[["Postulantes",data.length],["Con origen registrado",data.filter(attributed).length],["En entrevista",data.filter(c=>c.stage==="interview").length],["Contratados",data.filter(c=>c.stage==="hired").length]];
+ panel.replaceChildren();
+ for(const [name,value] of counts){const card=document.createElement("div");card.style.cssText="border:1px solid #dce6f1;border-radius:12px;padding:15px";const label=document.createElement("div");label.className="small";label.textContent=name;const n=document.createElement("strong");n.style.cssText="font-size:1.8rem;display:block;color:#092645";n.textContent=String(value);card.append(label,n);panel.append(card);}
+ const groups=new Map();
+ for(const c of data){const a=c.campaign_attribution||{};const parts=[a.utm_source||"Sin atribución",a.utm_campaign||a.campana||"—",a.utm_content||"—"];const key=JSON.stringify(parts);if(!groups.has(key))groups.set(key,{parts,total:0,interview:0,hired:0});const group=groups.get(key);group.total++;if(c.stage==="interview")group.interview++;if(c.stage==="hired")group.hired++;}
+ body.replaceChildren();
+ for(const g of [...groups.values()].sort((a,b)=>b.total-a.total)){const tr=document.createElement("tr");for(const value of [...g.parts,g.total,g.interview,g.hired]){const td=document.createElement("td");td.style.cssText="padding:10px 8px;border-top:1px solid #e0e8f0";td.textContent=String(value);tr.append(td);}body.append(tr);}
+ if(!groups.size){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=6;td.textContent="No hay postulaciones en este periodo.";tr.append(td);body.append(tr);}
+}
+
 let activeView="inicio",threads=[],messages=[],activeConversationId=null,conversationsLoadError=false;
 const routeBase=new window.URL("./",document.baseURI);
 function viewFromLocation(){
@@ -522,6 +558,7 @@ function navigate(view,candidateId=null,fromHistory=false){
  if(view==="conversaciones")renderInbox();
  if(view==="inicio"){renderHome();renderFlyAgents();}
  if(view==="fly")renderFlyAgents();
+ if(view==="marketing")renderMarketing();
  if(view==="ajustes")$("settings-user").textContent=(user?.email||"Cuenta autorizada")+" · "+(staffRole||"");
  document.title=appViews[view]+" · Conexión Laboral 360";
  window.scrollTo({top:0,behavior:"auto"});
