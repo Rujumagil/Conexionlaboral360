@@ -1,0 +1,34 @@
+{
+  "name": "Conexión Laboral 360 · CRM de Astrid",
+  "short_name": "CL360 CRM",
+  "description": "CRM privado de reclutamiento y conversaciones de Conexión Laboral 360",
+  "start_url": "./",
+  "scope": "./",
+  "id": "./",
+  "display": "standalone",
+  "background_color": "#f3f7fb",
+  "theme_color": "#092645",
+  "lang": "es-MX",
+  "icons": [
+    {
+      "src": "../assets/logo-oficial.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Mensajes",
+      "short_name": "Mensajes",
+      "url": "./conversaciones/",
+      "description": "Abrir conversaciones de candidatos"
+    },
+    {
+      "name": "Seguimientos",
+      "short_name": "Agenda",
+      "url": "./seguimientos/",
+      "description": "Revisar tareas pendientes"
+    }
+  ]
+}
