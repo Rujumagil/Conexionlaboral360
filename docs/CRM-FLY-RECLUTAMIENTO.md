@@ -187,3 +187,11 @@ La app independiente CL360 Mensajes tiene dos acciones cuando el personal autori
 El canal de candidatos cl360-candidate-chat verifica un UUID de sesión aleatorio asociado a una postulación autorizada; nunca acepta el teléfono o ID de candidato como credencial. La sesión caduca a los 30 días de la última postulación. Se limita el envío del candidato a 30 mensajes por hora. La función de ingreso de mensajes de candidatos solo puede ejecutarla service_role desde el servidor. Los expedientes antiguos sin sesión consentida no adquieren acceso al canal automáticamente.
 
 **Limitaciones:** todavía no hay notificaciones push, sincronización WhatsApp ni historial disponible al cambiar de dispositivo o cerrar la sesión del navegador. El contenido anterior al registro guiado que no se guardó no se puede reconstruir. Este chat es un canal de seguimiento, no una plataforma de mensajería universal.
+
+## Dashboard de prioridades y seguimiento rápido · 24/nov/2026
+
+En **Inicio** el CRM presenta ahora prioridades basadas en los registros cargados: hasta cinco tareas vencidas, tres próximas a vencer dentro de 24 horas y seis expedientes en etapa `new` que aún no tienen seguimiento pendiente. Cada fila permite abrir el expediente y, cuando existe un candidato asociado, **programar el siguiente contacto** directamente desde Inicio. La tarea solo se crea si una persona autorizada confirma una acción de al menos 3 caracteres y una fecha futura; se guarda en `cl360_followups` con su cuenta como `created_by` y `assigned_user_id`. No se crean recordatorios ni contactos externos automáticamente.
+
+La tarjeta **Próximos seguimientos** muestra las primeras cinco tareas abiertas ordenadas por fecha. Si la agenda está vacía, el dashboard explica cómo crear una tarea; se evita confundir «candidatos sin contactar» con «seguimientos programados». El indicador que antes decía «Calificados» ahora muestra **Preentrevistas registradas** y cuenta expedientes con datos de preentrevista, sin emitir juicios sobre aptitud laboral.
+
+**Alcance y límites:** las alertas se actualizan al cargar/refrescar el CRM; no son notificaciones push. El listado usa los primeros 500 candidatos y 500 seguimientos cargados del workspace. Las pruebas móviles simulan candidatos y tareas ficticias, comprueban navegación y programación, y no escriben registros de prueba en producción.
