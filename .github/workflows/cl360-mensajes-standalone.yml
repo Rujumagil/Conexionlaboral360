@@ -34,14 +34,14 @@ jobs:
             if(icon.status()!==200)throw Error('Icono no disponible');
             const mockCode=`
               const candidate={id:'c1111111-1111-4111-8111-111111111111',full_name:'Candidata ficticia',phone:'3312345678',job_slug:'obra-sutaj',stage:'new'};
-              const thread={id:'d1111111-1111-4111-8111-111111111111',candidate_id:candidate.id,status:'waiting',handler_id:null,last_message_at:'2026-11-24T12:00:00Z'};
+              const thread={id:'d1111111-1111-4111-8111-111111111111',candidate_id:candidate.id,status:'waiting',handler_id:null,fly_session_hash:'test-session-hash',live_chat_enabled:true,last_message_at:'2026-11-24T12:00:00Z'};
               const msgs=[{id:'m1',source:'candidate',body:'Pregunta ficticia',created_at:'2026-11-24T12:00:00Z'},{id:'m2',source:'fly',body:'Respuesta de Andy',created_at:'2026-11-24T12:01:00Z'}];
-              window.__writes=0;
+              window.__writes=0; window.__directSends=0;
               window.supabase={createClient(){return {
                 auth:{getUser:async()=>({data:{user:{id:'a78ef7ff-0389-4587-92b2-8e442973888b'}}}),signOut:async()=>({}),signInWithPassword:async()=>({error:null})},
                 from(name){const rows={cl360_conversations:[thread],cl360_candidates:[candidate],cl360_jobs:[{slug:'obra-sutaj',title:'Obra Sutaj'}],cl360_chat_messages:msgs};
                   const q={select(){return q},eq(){return q},order(){return q},limit(){return Promise.resolve({data:rows[name]||[],error:null})},maybeSingle(){return Promise.resolve({data:{role:'owner',status:'active'},error:null})},insert(){window.__writes++;return Promise.resolve({error:null})}};return q;},
-                rpc:async(name,args)=>{if(name==='cl360_take_conversation'){thread.status=args.p_action==='take'?'human':'waiting';thread.handler_id=thread.status==='human'?'a78ef7ff-0389-4587-92b2-8e442973888b':null;}return {data:thread.status,error:null};}
+                rpc:async(name,args)=>{if(name==='cl360_take_conversation'){thread.status=args.p_action==='take'?'human':'waiting';thread.handler_id=thread.status==='human'?'a78ef7ff-0389-4587-92b2-8e442973888b':null;}if(name==='cl360_staff_send_candidate_message'){window.__directSends++;msgs.push({id:'staff-msg',source:'staff',visibility:'candidate',body:args.p_body,created_at:'2026-11-24T12:02:00Z'});}return {data:thread.status,error:null};}
               }}};
             `;
             await page.route('https://cdn.jsdelivr.net/**',route=>route.fulfill({status:200,contentType:'application/javascript',body:mockCode}));
@@ -58,6 +58,12 @@ jobs:
             if(!link?.startsWith('https://wa.me/523312345678?text=')||!link.includes('Revisemos'))throw Error('WhatsApp sin mensaje de prueba');
             const writes=await page.evaluate(()=>window.__writes);
             if(writes!==0)throw Error('Se registró un envío que no ocurrió');
+            if(!await page.locator('#send-inapp').isEnabled())throw Error('Enviar aquí no disponible con sesión consentida');
+            await page.locator('#send-inapp').click();
+            await page.getByText('Astrid · enviado en el chat').waitFor({state:'visible'});
+            const count=await page.evaluate(()=>window.__directSends);
+            if(count!==1)throw Error('No se registró el envío directo al chat interno');
+            console.log('Ambas opciones: mensaje interno enviado mediante RPC, enlace WhatsApp sin envío automático: OK');
             if(errors.length)throw Error('JavaScript: '+errors.join('; '));
             console.log('OK: PWA Mensajes independiente, login simulado, toma humana y WhatsApp manual');
             await browser.close();
