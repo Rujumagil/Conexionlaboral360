@@ -82,3 +82,22 @@ La ruta `/asistente/` ahora presenta una charla más natural: mensajes individua
 El motor actual sigue siendo **guiado y determinista**: responde a preguntas comunes (sueldos, beneficios, turnos, ubicación, experiencia, privacidad y proceso) mediante reglas basadas en datos confirmados. Para preguntas fuera de cobertura, deriva la aclaración a la Lic. Astrid Araiza. No se afirma que exista una IA generativa conectada: Fly Recruiter sigue deshabilitado y su conexión real permanece pendiente en el issue #305.
 
 Se conserva el requisito de consentimiento, la validación server-side del cuestionario, el guardado en el CRM y la entrega de WhatsApp **solo tras registrar la postulación**. No se toman decisiones automatizadas de rechazo ni contratación. La guía conversacional no equivale a una verificación de identidad, referencia o aptitud laboral.
+
+## Adaptador Fly Recruiter contextual v1 — 23/nov/2026
+
+**Infraestructura creada y desplegada:** Edge Function `cl360-fly-chat` (`supabase/functions/cl360-fly-chat/index.ts`) en el mismo proyecto `compas-one`; no se creó una segunda base. La ruta `/asistente/` comprueba la salud del adaptador y utiliza respuestas de un modelo generativo para preguntas libres solo si el servicio confirma `ready:true`, la persona marca el consentimiento específico y existe una vacante seleccionada. Si no, conserva respuestas guiadas sin afirmar que un proveedor respondió.
+
+**Modelo previsto:** Gemini, configurado mediante el perfil `public.ai_agent_profiles` del workspace Conexión Laboral 360. Las credenciales se leen exclusivamente en Edge. El catálogo del prompt se consulta en el servidor de `cl360_jobs` (solo nombre, área, zona y turno, sin sueldos ni detalles sensibles). El historial de preguntas libres se conserva solo en memoria del navegador durante la sesión; no se escribe el texto en la tabla de candidatos ni se transmite su expediente completo al proveedor. Se redaccionan formatos de correos y teléfonos antes de enviarlos. Se solicita `store:false` para no crear registros voluntarios de consultas en el proveedor; falta validarlo con una solicitud real tras configurar el secreto.
+
+**Guardrails del servidor:** origen de GitHub Pages, consentimiento explícito, tamaño máximo de entrada, historial acotado, token de sesión, validación server-side de vacante y perfil, prohibición de inventar salario o contratación, no decisiones de selección, sólo respuestas informativas. Se usa `cl360_fly_chat_limits` (RLS sin permisos públicos) y RPC privado: máximo 12 solicitudes/hora por huella de IP, 20/día por sesión, 40/día global y 60/mes global. Estos límites controlan el volumen, **no garantizan un máximo exacto de facturación**. No existen herramientas de escritura habilitadas para Fly Recruiter.
+
+**Comprobación real:** GitHub Actions `CL360 · Verificación segura del adaptador Fly` obtuvo HTTP 200 con `ok:true`, `providerConfigured:false` y `ready:false`. Por lo tanto, **la conversación generativa aún no funciona**. El perfil está `operating_mode='supervised'`, `enabled=false`, con presupuesto de configuración 15 MXN y cuota 60; no se activa antes de probar el proveedor, el consentimiento y el control financiero.
+
+**Activación necesaria para piloto supervisado:**
+1. Agregar el secreto `GEMINI_API_KEY` desde Supabase Dashboard → proyecto `compas-one` → Edge Functions → Secrets. No almacenar claves en GitHub, frontend, documentos ni este chat. Ver [documentación oficial de secretos](https://supabase.com/docs/guides/functions/secrets).
+2. Ejecutar el health check y confirmar `providerConfigured:true`; el perfil aún devolverá `ready:false` hasta que se habilite.
+3. Verificar la política de tratamiento de datos del proveedor, revisar aviso de privacidad definitivo y validar parámetros del modelo con preguntas sintéticas.
+4. Habilitar `enabled=true` sólo para el workspace de Conexión Laboral 360, manteniendo `supervised` y `allowed_tools=[]`. Verificar una respuesta contextual autorizada y el retorno seguro a la conversación guiada ante fallas.
+5. Probar el recorrido hasta `cl360-apply` y la entrega de WhatsApp únicamente tras persistir el registro. No automatizar mensajes ni contratación.
+
+**Nota:** la implementación y los límites pueden evolucionar, pero no debe presentarse como una IA operativa hasta superar la prueba real con el secreto configurado.
