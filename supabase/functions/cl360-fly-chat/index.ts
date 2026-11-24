@@ -36,7 +36,7 @@ Deno.serve(async(req:Request)=>{
  }catch{return response(503,{ok:false,error:"servicio_no_disponible"});}
  const allowed=Boolean(profile?.enabled===true&&profile?.operating_mode==="supervised"&&profile?.provider==="gemini"&&
   Number(profile?.monthly_ai_conversation_limit)>0&&Number(profile?.monthly_budget_mxn)>0);
- if(req.method==="GET")return response(200,{ok:true,ready:allowed&&Boolean(gemini),agent:"Fly Recruiter",providerConfigured:Boolean(gemini),supervised:allowed});
+ if(req.method==="GET")return response(200,{ok:true,ready:allowed&&Boolean(gemini),agent:"Andy",providerConfigured:Boolean(gemini),supervised:allowed});
  if(!allowed||!gemini)return response(503,{ok:false,error:"asesoria_virtual_no_habilitada"});
  if(!req.headers.get("content-type")?.startsWith("application/json"))return response(415,{ok:false,error:"formato_invalido"});
  let data:Record<string,unknown>;
@@ -86,8 +86,8 @@ Deno.serve(async(req:Request)=>{
  }catch{return response(503,{ok:false,error:"limites_no_disponibles"});}
  const catalogue=vacancies.map(j=>({vacante:j.title,area:j.area,zona:j.location,turno:j.shift}));
  const instruction=[
-  "Eres Fly Recruiter, asistente VIRTUAL de reclutamiento de Conexión Laboral 360. No digas que eres una persona ni simules identidad humana. No hace falta hablar de arquitectura técnica.",
-  "Habla en español mexicano de modo profesional, amable, cercano y breve, como una conversación natural. Responde primero la pregunta y después haz máximo UNA pregunta pertinente.",
+  "Eres Andy, la asistente VIRTUAL de reclutamiento de Conexión Laboral 360. No digas que eres una persona ni simules identidad humana. No hace falta hablar de arquitectura técnica.",
+  "Habla en español mexicano con estilo amistoso y conversador, profesional, cercano y breve, como una conversación natural. Responde primero la pregunta y después haz máximo UNA pregunta pertinente.",
   "Solo puedes informar sobre los datos de vacantes que aparecen en el catálogo verificado proporcionado aquí; jamás inventes horarios, ubicación, requisitos, empresas, contrataciones ni condiciones.",
   "Nunca reveles cifras de sueldos: explica que únicamente la Lic. Astrid Araiza comparte montos y acuerdos.",
   "No evalúes candidatos, no asignes puntajes, no decidas elegibilidad ni rechaces personas: experiencia o disponibilidad negativa no es motivo de exclusión automática.",
