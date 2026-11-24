@@ -119,3 +119,15 @@ body{background:#edf2f8}
 .fly-home-actions{display:flex;flex-wrap:wrap;gap:8px}
 @media(max-width:850px){.fly-agent-grid{grid-template-columns:1fr}.fly-agent-grid>.fly-agent:last-child{grid-column:auto}.fly-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:480px){.fly-action-row{align-items:flex-start;flex-direction:column}.fly-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.fly-agent-toolbar{flex-wrap:wrap}}
+
+
+/* Bandeja privada: toma humana y WhatsApp manual */
+.wa-handoff{padding:16px;border-top:1px solid var(--line);background:#f8fbfe;display:flex;flex-direction:column;gap:9px}
+.wa-handoff>strong{color:var(--ink);font-size:.99rem}
+.wa-handoff p{margin:0;line-height:1.5}
+.wa-handoff textarea{width:100%;min-height:84px;resize:vertical}
+.wa-handoff .chat-actions{align-items:center}
+.disabled-link{pointer-events:none;opacity:.52}
+.crm-quick-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+#install-crm-status{max-width:230px;line-height:1.3}
+@media(max-width:700px){.crm-quick-actions{width:100%}.crm-quick-actions .btn{flex:1}.wa-handoff .btn{flex:1;min-width:150px}}
