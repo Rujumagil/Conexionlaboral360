@@ -175,7 +175,7 @@ async function showJobs(){
 }
 async function selectJob(job,fromLink=false){
  selected=job;
- flyHistory=[];flySession=crypto.randomUUID();flyUsedWithConsent=false;
+ // Conserva el contexto y las preguntas autorizadas anteriores a la elección.
  answers.experience_level="";answers.experience="";answers.availability="";answers.preferred_zone="";
  if(!fromLink)say("Me interesa "+job.title+".");
  const text="¡Buena elección! "+job.title+" está en "+job.location+" y el turno anunciado es "+job.shift+".\n\n¿Te gustaría postularte o primero quieres aclarar algo del puesto?";
@@ -286,7 +286,7 @@ async function submit(){
   const message="Hola, Lic. Astrid Araiza. Terminé mi preentrevista en Conexión Laboral 360. Soy "+answers.name+" y me interesa la vacante "+selected.title+". Me gustaría continuar mi postulación.";
   const a=document.createElement("a");a.className="action gold";a.href=WA+"?text="+encodeURIComponent(message);a.target="_blank";a.rel="noopener noreferrer";
   a.textContent="Hablar con Astrid por WhatsApp";$("controls").append(a);
-  option("Revisar otra vacante",()=>{selected=null;showJobs();});
+  option("Revisar otra vacante",()=>{selected=null;flySession=crypto.randomUUID();flyHistory=[];flyUsedWithConsent=false;showJobs();});
  }catch(error){$("send-error").textContent=error.message||"Ocurrió un error. Puedes intentarlo de nuevo.";buttons.forEach(b=>b.disabled=false);}
  finally{busy=false;}
 }
@@ -331,6 +331,12 @@ async function handleNaturalMessage(message){
  const q=normalizeQuestion(message);
  if(!jobs.length&&phase==="loading"){await reply("Estoy consultando las vacantes. Puedes intentar de nuevo en un momento.");return;}
  const found=matchJob(message);
+ if(!selected&&found&&/\?|^(que|cual|como|donde|cuanto)\b/.test(q)&&/(turno|horario|zona|donde|ubicacion)/.test(q)&&!/me interesa|postular|quiero registrarme/.test(q)){
+   if(/turno|horario/.test(q))await reply("El horario publicado para "+found.title+" es "+found.shift+". ¿Te gustaría conocer la zona o postularte?");
+   else await reply(found.title+" se encuentra en "+found.location+". ¿Te gustaría conocer el turno o postularte?");
+   suggestOptions([["Me interesa "+found.title,()=>selectJob(found),true],["Ver vacantes",showJobs,false]]);
+   return;
+ }
  if(!selected&&(found||/^\s*\d{1,2}\s*$/.test(q))){
    const n=Number(q),job=found||jobs[n-1];
    if(job){await selectJob(job,true);return;}
@@ -362,7 +368,7 @@ async function handleNaturalMessage(message){
   await reply(filtered.length?"Encontré estas vacantes en esa zona:\n"+filtered.map(j=>j.title+" — "+j.location).join("\n")+"\n\n¿Cuál te interesa?":"No veo una coincidencia exacta en esa zona. Te muestro las opciones que sí están publicadas.");
   showJobChoices();return;
  }
- if(!selected||!flyReady||!$("fly-consent").checked){
+ if(!flyReady||!$("fly-consent").checked){
   await reply(answerQuestion(message));showContextChoices();return;
  }
  await replyToOpenQuestion(message);
@@ -380,7 +386,7 @@ async function replyToOpenQuestion(question){
  const input=$("candidate-question"),submit=$("question-form").querySelector('button[type="submit"]');
  const msgError=$("fly-question-error");
  msgError.textContent="";
- if(!flyReady||!selected){
+ if(!flyReady){
   await reply(answerQuestion(question));showContextChoices();
   return;
  }
@@ -395,7 +401,7 @@ async function replyToOpenQuestion(question){
   const r=await fetch(API+"/functions/v1/cl360-fly-chat",{
    method:"POST",
    headers:{"content-type":"application/json",apikey:KEY},
-   body:JSON.stringify({sessionId:flySession,jobSlug:selected.slug,message:question,history:flyHistory.slice(-8),consent:true})
+   body:JSON.stringify({sessionId:flySession,jobSlug:selected?.slug||"",message:question,history:flyHistory.slice(-8),consent:true})
   });
   const data=await r.json().catch(()=>({}));
   if(!r.ok||data.ok!==true||typeof data.reply!=="string"||!data.reply.trim())throw Error(data.error||"respuesta_no_disponible");
@@ -404,6 +410,7 @@ async function replyToOpenQuestion(question){
   flyUsedWithConsent=true;
   flyHistory.push({role:"user",text:question},{role:"assistant",text:data.reply.trim().slice(0,650)});
   flyHistory=flyHistory.slice(-8);
+  showContextChoices();
  }catch(error){
   indicator.remove();
   if(String(error?.message||"").includes("limite"))msgError.textContent="Llegamos al límite de preguntas por ahora. Puedes seguir con tu postulación y consultar con Astrid.";
