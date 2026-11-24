@@ -49,6 +49,34 @@ jobs:
               if(!visible||!appScript||errors.length)bad++;
               await page.close();
             }
+            // Ensayo de navegación autenticada: respuestas simuladas, sin acceso a expedientes reales.
+            const page=await browser.newPage({viewport:{width:390,height:844}});
+            await page.route('https://cdn.jsdelivr.net/**',route=>route.fulfill({
+              status:200,contentType:'application/javascript',
+              body:`window.supabase={createClient(){return {
+                auth:{getUser:async()=>({data:{user:{id:'a78ef7ff-0389-4587-92b2-8e442973888b',email:'cuenta-prueba@example.invalid'}}}),signOut:async()=>({}),signInWithPassword:async()=>({error:null})},
+                from(name){const q={select(){return q},eq(){return q},order(){return q},limit(){return Promise.resolve({data:[],error:null})},maybeSingle(){return Promise.resolve({data:{role:'owner',status:'active'},error:null})}};return q},
+                rpc:async()=>({error:null})
+              }}};`
+            }));
+            await page.route('https://qwxydjotwhniahaovrff.supabase.co/functions/v1/cl360-fly-chat',route=>route.fulfill({
+              status:200,contentType:'application/json',body:JSON.stringify({ok:true,ready:false,providerConfigured:false})
+            }));
+            const changes=[];
+            page.on('framenavigated',f=>{if(f===page.mainFrame())changes.push(f.url())});
+            await page.goto('http://127.0.0.1:8765/Conexionlaboral360/crm/',{waitUntil:'domcontentloaded'});
+            await page.locator('#dashboard').waitFor({state:'visible',timeout:15000});
+            const initialNavigations=changes.length;
+            await page.locator('.mobile-nav [data-nav="vacantes"]').click();
+            await page.locator('#view-vacantes').waitFor({state:'visible'});
+            await page.locator('.mobile-nav [data-nav="candidatos"]').click();
+            await page.locator('#view-candidatos').waitFor({state:'visible'});
+            await page.locator('.mobile-nav [data-nav="inicio"]').click();
+            await page.locator('#view-inicio').waitFor({state:'visible'});
+            const stillLoggedIn=await page.locator('#dashboard').isVisible()&&!await page.locator('#auth-screen').isVisible();
+            console.log(JSON.stringify({navigationWithoutReload:changes.length===initialNavigations,stillLoggedIn,latestPath:new URL(page.url()).pathname}));
+            if(changes.length!==initialNavigations||!stillLoggedIn)bad++;
+            await page.close();
             await browser.close();
             if(bad)process.exit(1);
           })().catch(e=>{console.error(e);process.exit(1)});
