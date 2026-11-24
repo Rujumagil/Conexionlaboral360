@@ -35,7 +35,7 @@ jobs:
             const mockCode=`
               const candidate={id:'c1111111-1111-4111-8111-111111111111',full_name:'Candidata ficticia',phone:'3312345678',job_slug:'obra-sutaj',stage:'new'};
               const thread={id:'d1111111-1111-4111-8111-111111111111',candidate_id:candidate.id,status:'waiting',handler_id:null,fly_session_hash:'test-session-hash',live_chat_enabled:true,last_message_at:'2026-11-24T12:00:00Z'};
-              const msgs=[{id:'m1',source:'candidate',body:'Pregunta ficticia',created_at:'2026-11-24T12:00:00Z'},{id:'m2',source:'fly',body:'Respuesta de Andy',created_at:'2026-11-24T12:01:00Z'}];
+              const msgs=[{id:'m1',source:'candidate',body:'Pregunta ficticia',created_at:'2026-11-24T12:00:00Z',conversation_id:thread.id},{id:'m2',source:'fly',body:'Respuesta de Andy',created_at:'2026-11-24T12:01:00Z',conversation_id:thread.id},{id:'m3',source:'system',body:'Resumen de preentrevista ficticio',created_at:'2026-11-24T12:01:30Z',conversation_id:thread.id}];
               window.__writes=0; window.__directSends=0;
               window.supabase={createClient(){return {
                 auth:{getUser:async()=>({data:{user:{id:'a78ef7ff-0389-4587-92b2-8e442973888b'}}}),signOut:async()=>({}),signInWithPassword:async()=>({error:null})},
@@ -47,8 +47,21 @@ jobs:
             await page.route('https://cdn.jsdelivr.net/**',route=>route.fulfill({status:200,contentType:'application/javascript',body:mockCode}));
             await page.goto(base,{waitUntil:'domcontentloaded'});
             await page.locator('#app').waitFor({state:'visible',timeout:15000});
+            if(!await page.locator('.filter-chip[data-filter="all"]').isVisible())throw Error('Faltan filtros estilo app');
+            await page.locator('[data-filter="waiting"]').click();
+            if(await page.locator('.thread').count()!==1)throw Error('Filtro pendientes no muestra el caso');
+            await page.locator('[data-filter="human"]').click();
+            if(await page.locator('.thread').count()!==0)throw Error('Mis chats muestra conversaciones ajenas');
+            await page.locator('[data-filter="all"]').click();
+            if(!await page.getByText('Pregunta ficticia').first().isVisible())throw Error('Falta vista previa del chat');
             await page.locator('.thread').first().click();
-            await page.getByText('Pregunta ficticia').waitFor({state:'visible'});
+            await page.getByText('Pregunta ficticia').last().waitFor({state:'visible'});
+            if(await page.locator('.timeline').getByText('Resumen de preentrevista ficticio').count())throw Error('Resumen del sistema ocupa el chat');
+            await page.locator('#info-toggle').click();
+            await page.locator('#context-details').getByText('Preentrevista y eventos').click();
+            await page.locator('#context-details').getByText('Resumen de preentrevista ficticio').waitFor({state:'visible'});
+            await page.locator('#info-close').click();
+            if(!await page.locator('#context-panel').isHidden())throw Error('No se cerró la ficha de candidato');
             if(await page.locator('#reply').isEnabled())throw Error('Campo habilitado sin toma humana');
             await page.getByRole('button',{name:'Tomar conversación'}).click();
             await page.locator('#reply').waitFor({state:'visible'});
@@ -61,11 +74,13 @@ jobs:
             if(!await page.locator('#send-inapp').isEnabled())throw Error('Enviar aquí no disponible con sesión consentida');
             await page.locator('#send-inapp').click();
             await page.getByText('Astrid · enviado en el chat').waitFor({state:'visible'});
+            await page.locator('[data-filter="human"]').click();
+            if(await page.locator('.thread').count()!==1)throw Error('Mis chats debe incluir caso tomado');
             const count=await page.evaluate(()=>window.__directSends);
             if(count!==1)throw Error('No se registró el envío directo al chat interno');
             console.log('Ambas opciones: mensaje interno enviado mediante RPC, enlace WhatsApp sin envío automático: OK');
             if(errors.length)throw Error('JavaScript: '+errors.join('; '));
-            console.log('OK: PWA Mensajes independiente, login simulado, toma humana y WhatsApp manual');
+            console.log('OK: nueva interfaz CL360 Mensajes, filtros rápidos, ficha del candidato y doble respuesta');
             await browser.close();
           })().catch(err=>{console.error(err);process.exit(1)});
           JS
