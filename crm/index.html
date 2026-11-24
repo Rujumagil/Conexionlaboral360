@@ -265,7 +265,7 @@ async function load(){
  $("last-updated").textContent="Actualizado "+new Date().toLocaleTimeString("es-MX");
  renderCandidates();renderFollowups();renderJobManagement();
  renderHome();renderPipeline();await loadConversations();
- if(selected){const still=candidates.find(x=>x.id===selected);if(still)renderDetail(still);else{selected=null;$("detail").classList.add("hide");}}
+ if(selected){const still=candidates.find(x=>x.id===selected);if(still&&activeView==="candidatos")renderDetail(still);else if(!still){selected=null;$("detail").classList.add("hide");}}
 }
 function title(slug){return jobs.find(x=>x.slug===slug)?.title||slug||"Sin vacante";}
 function renderJobManagement(){
