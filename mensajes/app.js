@@ -100,28 +100,63 @@ function updateComposer(){
   !direct&&whatsApp?"Esta postulación no tiene chat interno vinculado. Puedes responder por WhatsApp.":
   direct?"Enviar aquí entrega la respuesta al chat vinculado del candidato. WhatsApp abre otra aplicación y debes pulsar Enviar allí.":"No hay un canal de respuesta habilitado.";
 }
-async function openConversation(id,changeLayout=true){
+async function openConversation(id,changeLayout=true,preserveDraft=false){
  const t=threads.find(x=>x.id===id);if(!t)return;
+ const draft=preserveDraft?$("reply").value:"";
+ const oldScroll=preserveDraft?$("timeline").scrollTop:0;
+ const oldHeight=preserveDraft?$("timeline").scrollHeight:0;
  activeId=id;renderThreads();
  const c=candidate(t.candidate_id);
+ $("chat-avatar").textContent=(c?.full_name||"C").charAt(0).toUpperCase();
  $("person").textContent=c?.full_name||"Candidato";
  $("meta").textContent=job(c?.job_slug)+(c?.phone?" · "+c.phone:"");
  $("state").textContent=statusNames[t.status]||t.status;
  $("timeline").textContent="Cargando historial…";
- $("reply").value="";updateComposer();
+ $("reply").value=draft;updateComposer();
  if(changeLayout){$("conversation-section").classList.remove("hidden-mobile");$("inbox-section").classList.add("hidden-mobile");}
  const {data,error}=await db.from("cl360_chat_messages").select("id,source,visibility,body,created_at").eq("workspace_id",WS).eq("conversation_id",id).order("created_at",{ascending:true}).limit(150);
  if(activeId!==id)return;
  const timeline=$("timeline");timeline.replaceChildren();
- if(error||!data?.length){const p=document.createElement("p");p.className="empty";p.textContent=error?"No se pudo consultar el historial.":"Todavía no hay mensajes guardados en este expediente.";timeline.append(p);}
+ if(error||!data?.length){const p=document.createElement("p");p.className="conversation-empty";p.textContent=error?"No se pudo consultar el historial.":"Todavía no hay mensajes guardados en este expediente.";timeline.append(p);}
+ else if(!data.some(m=>m.source!=="system")){
+  const p=document.createElement("p");p.className="conversation-empty";
+  p.textContent="Este expediente solo contiene eventos del sistema. Consulta el resumen en ⓘ o utiliza WhatsApp para continuar. El historial que no se guardó anteriormente no puede recuperarse.";
+  timeline.append(p);
+ }
  else data.forEach(m=>{
+  if(m.source==="system")return;
   const bubble=document.createElement("div");bubble.className="bubble "+(m.source==="fly"?"andy":m.source==="candidate"?"candidate":m.source==="staff"?"staff":"system");
+  if(m.source==="staff"&&m.visibility==="internal")bubble.classList.add("internal-note");
   const author=document.createElement("b");author.textContent=({fly:"Andy",candidate:"Candidato",staff:m.visibility==="candidate"?"Astrid · enviado en el chat":"Nota interna",system:"Sistema"})[m.source]||"Mensaje";
   const text=document.createElement("p");text.textContent=m.body;
   const date=document.createElement("small");date.textContent=fmt(m.created_at);
   bubble.append(author,text,date);timeline.append(bubble);
  });
- timeline.scrollTop=timeline.scrollHeight;renderActions(t);
+ if(preserveDraft&&oldHeight>0&&oldHeight-oldScroll>timeline.clientHeight+75)timeline.scrollTop=oldScroll;
+ else timeline.scrollTop=timeline.scrollHeight;
+ renderActions(t);
+ renderContext(t,data||[]);
+}
+function renderContext(t,messages){
+ const panel=$("context-details");panel.replaceChildren();
+ const c=candidate(t.candidate_id);
+ const rows=[["Nombre",c?.full_name||"No informado"],["Vacante",job(c?.job_slug)],
+  ["Teléfono",c?.phone||"Sin teléfono"],["Estado",statusNames[t.status]||t.status],
+  ["Chat interno",t.live_chat_enabled?"Autorizado":"No habilitado en este expediente"]];
+ for(const [label,value] of rows){
+  const row=document.createElement("div");row.className="context-row";
+  const name=document.createElement("small");name.textContent=label;
+  const content=document.createElement("strong");content.textContent=value;
+  row.append(name,content);panel.append(row);
+ }
+ const system=messages.filter(m=>m.source==="system");
+ if(system.length){
+  const detail=document.createElement("details");detail.className="context-system";
+  const summary=document.createElement("summary");summary.textContent="Preentrevista y eventos ("+system.length+")";
+  detail.append(summary);
+  for(const m of system){const entry=document.createElement("article");entry.textContent=m.body;detail.append(entry);}
+  panel.append(detail);
+ }
 }
 function renderActions(t){
  const wrap=$("human-controls");wrap.replaceChildren();
