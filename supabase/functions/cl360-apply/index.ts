@@ -27,8 +27,9 @@ Deno.serve(async (request: Request) => {
   // El historial generado por Fly solo se vincula con consentimiento y un UUID de sesión.
   // No se acepta una transcripción proporcionada por el cliente: se usa el registro del servidor.
   const flyConsent = body.flyConsent === true;
+  const liveChatConsent = body.liveChatConsent === true;
   const flySessionId = typeof body.flySessionId==="string" ? body.flySessionId.trim() : "";
-  if(flyConsent && !/^[a-f0-9-]{36}$/i.test(flySessionId))
+  if((flyConsent || liveChatConsent) && !/^[a-f0-9-]{36}$/i.test(flySessionId))
     return response(400,{ok:false,error:"sesion_de_agente_invalida"});
   const screening = (body.screening && typeof body.screening === "object" && !Array.isArray(body.screening)) ? body.screening as Record<string, unknown> : null;
   const levels = ["si", "no", "prefiero_comentarlo"];
@@ -68,8 +69,9 @@ Deno.serve(async (request: Request) => {
     return response(503, {ok:false,error:"no_se_pudo_registrar"});
   }
   let flyHistoryLinked = false;
+  let liveChatReady = false;
   let flyHistoryCount = 0;
-  if(flyConsent && flySessionId){
+  if((flyConsent || liveChatConsent) && flySessionId){
     try{
       const candidateId = await upstream.json();
       if(typeof candidateId==="string"&&/^[a-f0-9-]{36}$/i.test(candidateId)){
@@ -82,6 +84,7 @@ Deno.serve(async (request: Request) => {
           signal:AbortSignal.timeout(7000)
         });
         if(joined.ok){
+          liveChatReady=liveChatConsent;
           const count=await joined.json();
           flyHistoryLinked=Number.isInteger(count)&&count>0;
           flyHistoryCount=Number.isInteger(count)?count:0;
@@ -89,5 +92,5 @@ Deno.serve(async (request: Request) => {
       }
     }catch(error){console.error("cl360_fly_attach_unavailable",{kind:error instanceof Error?error.name:"unknown"});}
   }
-  return response(201, {ok:true,flyHistoryLinked,flyHistoryCount});
+  return response(201, {ok:true,flyHistoryLinked,flyHistoryCount,liveChatReady});
 });
