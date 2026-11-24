@@ -340,23 +340,25 @@ async function handleNaturalMessage(message){
   if(/otra|otras|cambiar|ver (mas|vacantes)/.test(q)){await showJobs();return;}
   if(/postular|inscrib|registr|adelante|empez|continu|\bsi\b|me interesa/.test(q)){await askExperience();return;}
  }
- if(phase==="experience"&&!isInformational(q)){
-  const choice=yesNo(q);
-  if(choice){answers.experience_level=choice;await askDetails();return;}
+ if(phase==="experience"&&!/\?|^(como|cual|cuanto|donde|que requisitos|que horario|por que)\b/.test(q)){
+  if(/\b(no|nunca|sin experiencia|ninguna)\b/.test(q)){answers.experience_level="no";await askDetails();return;}
   if(/prefiero|comentar|luego/.test(q)){answers.experience_level="prefiero_comentarlo";await askDetails();return;}
+  if(/\b(si|claro|tengo|trabaje|trabajado|experiencia)\b/.test(q)){answers.experience_level="si";await askDetails();return;}
  }
- if(phase==="details"&&!isInformational(q)&&message.trim().length>=2){
+ if(phase==="details"&&!/\?|^(como|cual|cuanto|donde|que horario|que requisitos)\b/.test(q)&&message.trim().length>=2){
   answers.experience=message.trim().slice(0,900);await askAvailability();return;
  }
- if(phase==="availability"){
+ if(phase==="availability"&&!/\?|^(que|cual|como|donde|cuanto)\b/.test(q)){
   if(/revisar|consultar|depende|confirmar/.test(q)){answers.availability="consultar";await askZone();return;}
-  if(!isInformational(q)){const choice=yesNo(q);if(choice){answers.availability=choice;await askZone();return;}}
+  if(/\b(no|imposible|no puedo|no me sirve)\b/.test(q)){answers.availability="no";await askZone();return;}
+  if(/\b(si|claro|me funciona|disponible|me queda bien|puedo)\b/.test(q)){answers.availability="si";await askZone();return;}
  }
- if(phase==="zone"&&!isInformational(q)&&message.length<=120){
+ if(phase==="zone"&&!/\?|^(que|cual|como|donde|cuanto)\b/.test(q)&&message.length<=120){
   answers.preferred_zone=message.trim();await askContact();return;
  }
  if(!selected&&/\b(zapopan|guadalajara|tlaquepaque|tonala|centro|norte|sur|miravalle|san agustin)\b/.test(q)){
-  const filtered=jobs.filter(job=>normalizeQuestion(job.location).includes(q));
+  const areaMatch=q.match(/\b(zapopan|guadalajara|tlaquepaque|tonala|centro|norte|sur|miravalle|san agustin)\b/);
+  const filtered=jobs.filter(job=>normalizeQuestion(job.location).includes(areaMatch?.[0]||""));
   await reply(filtered.length?"Encontré estas vacantes en esa zona:\n"+filtered.map(j=>j.title+" — "+j.location).join("\n")+"\n\n¿Cuál te interesa?":"No veo una coincidencia exacta en esa zona. Te muestro las opciones que sí están publicadas.");
   showJobChoices();return;
  }
