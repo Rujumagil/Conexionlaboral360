@@ -58,14 +58,16 @@ function setFilter(value){
  renderThreads();
 }
 function renderThreads(){
- const q=$("search").value.trim().toLocaleLowerCase("es-MX"),filter=$("filter").value;
+ const q=$("search").value.trim().toLocaleLowerCase("es-MX"),digits=q.replace(/\D/g,""),filter=$("filter").value;
  const filtered=threads.filter(t=>{
   const c=candidate(t.candidate_id);
   const allowed=filter==="all"||filter==="human"?(filter==="all"||(t.status==="human"&&t.handler_id===user?.id)):t.status===filter;
-  return allowed&&(!q||String(c?.full_name||"").toLocaleLowerCase("es-MX").includes(q)||job(c?.job_slug).toLocaleLowerCase("es-MX").includes(q));
- });
+  return allowed&&(!q||String(c?.full_name||"").toLocaleLowerCase("es-MX").includes(q)||job(c?.job_slug).toLocaleLowerCase("es-MX").includes(q)||(digits.length>=3&&String(c?.phone||"").replace(/\D/g,"").includes(digits)));
+ }).sort((a,b)=>{const priority=t=>t.status==="waiting"?0:t.status==="human"&&t.handler_id===user?.id?1:t.status==="bot"?2:t.status==="human"?3:4;return priority(a)-priority(b)||new Date(b.last_message_at||0)-new Date(a.last_message_at||0);});
  $("count").textContent=filtered.length+" "+(filtered.length===1?"conversación":"conversaciones");
  const waiting=threads.filter(t=>t.status==="waiting").length;
+ const counts={all:threads.length,waiting,human:threads.filter(t=>t.status==="human"&&t.handler_id===user?.id).length,bot:threads.filter(t=>t.status==="bot").length,closed:threads.filter(t=>t.status==="closed").length};
+ document.querySelectorAll("[data-filter]").forEach(button=>{const type=button.dataset.filter;const name={all:"Todos",waiting:"Pendientes",human:"Mis chats",bot:"Andy",closed:"Cerrados"}[type];if(name)button.textContent=name+" ("+counts[type]+")";});
  $("inbox-badge").hidden=!waiting;$("inbox-badge").textContent=String(waiting);
  $("inbox-subtitle").textContent=waiting?waiting+" pendiente"+(waiting===1?"":"s")+" de atención":"Atención a candidatos";
  const list=$("thread-list");list.replaceChildren();
