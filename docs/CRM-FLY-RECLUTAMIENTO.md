@@ -154,3 +154,15 @@ Andy ofrece un enlace a WhatsApp que **abre un mensaje preparado**, sin enviarlo
 - «¿Tienen un puesto solo para mujeres/hombres?» → no filtrar ni excluir por género; comentar funciones y requisitos laborales confirmados y remitir dudas a Astrid.
 
 **Registro de pruebas:** la integridad JS/TS y la prueba de navegador móvil se ejecutan mediante GitHub Actions; nunca incluir datos personales reales en pruebas automatizadas.
+
+## Asistentes internos del CRM · Noviembre de 2026
+
+Dentro de **Compás Fly** se integraron tres asistentes operativos que trabajan sobre los registros existentes de Supabase y se actualizan al cargar o refrescar el CRM. No son modelos Gemini independientes ni emiten mensajes a candidatos.
+
+- **Revisión de candidatos:** muestra expedientes en etapa `new` por antigüedad, detalles relevantes de preentrevista y enlaces para que Astrid revise. No emite un veredicto de aptitud, puntuación ni orden por idoneidad laboral.
+- **Pendientes y vencimientos:** detecta seguimientos con estado `pending` y `due_at` anterior a la hora actual; muestra también los que vencen en las próximas 24 horas. Los enlaces abren el expediente o la agenda. Las alertas aparecen **dentro del CRM**, no son notificaciones push, SMS, WhatsApp ni correos.
+- **Rendimiento operativo:** cuenta registros ingresados en los últimos 7 y 30 días, etapas del pipeline, seguimientos pendientes, terminados y vencidos. Las cifras son del CRM compartido, no pueden atribuirse a una persona específica sin auditar asignaciones y eventos. Los totales están limitados a los primeros 500 expedientes/tareas cargados; no reflejan actividad externa ni fecha real de contratación.
+
+El acceso mantiene Supabase Auth + membresía de workspace + políticas RLS. Las ocho rutas estáticas del CRM usan la misma interfaz. El sistema **no descarta ni contrata automáticamente**. El control de contacto humano y de seguimiento se mantiene en las acciones de Astrid. Se valida la función determinista con datos ficticios en GitHub Actions.
+
+**Mejoras futuras:** notificaciones externas programadas (con autorización de Astrid), productividad por reclutador con trazabilidad de tareas/eventos y una interfaz de consulta en lenguaje natural que sintetice métricas, sin automatizar decisiones laborales.
