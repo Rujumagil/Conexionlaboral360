@@ -1,0 +1,41 @@
+name: CL360 · Verificación segura del adaptador Fly
+on:
+  push:
+    paths:
+      - .github/workflows/cl360-fly-health.yml
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Consultar endpoint sin enviar datos personales
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import urllib.request
+          import urllib.error
+          url="https://qwxydjotwhniahaovrff.supabase.co/functions/v1/cl360-fly-chat"
+          req=urllib.request.Request(url,headers={"Origin":"https://rujumagil.github.io","Accept":"application/json"},method="GET")
+          try:
+              with urllib.request.urlopen(req,timeout=20) as response:
+                  data=json.loads(response.read(4096))
+                  print("HTTP:",response.status)
+                  print("Backend operativo:",bool(data.get("ok")))
+                  print("Credencial de modelo disponible:",bool(data.get("providerConfigured")))
+                  print("Fly Recruiter listo:",bool(data.get("ready")))
+                  print("Modo supervisado:",bool(data.get("supervised")))
+          except urllib.error.HTTPError as e:
+              print("HTTP:",e.code)
+              try:
+                  body=json.loads(e.read(1024))
+                  print("Código de error:",body.get("error","unknown"))
+              except Exception:
+                  print("El endpoint no devolvió un JSON válido.")
+              raise SystemExit(1)
+          except Exception as e:
+              print("Fallo de conexión:",type(e).__name__)
+              raise SystemExit(1)
+          PY
