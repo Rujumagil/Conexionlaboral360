@@ -118,7 +118,7 @@ async function load(){
  $("m-total").textContent=candidates.length;
  $("m-new").textContent=candidates.filter(x=>x.stage==="new").length;
  $("m-active").textContent=candidates.filter(x=>active.has(x.stage)).length;
- $("m-qualified").textContent=candidates.filter(x=>x.stage==="qualified").length;
+ $("m-qualified").textContent=candidates.filter(x=>x.screening_data&&typeof x.screening_data==="object"&&Object.keys(x.screening_data).length>0).length;
  $("m-overdue").textContent=followups.filter(x=>x.status==="pending"&&new Date(x.due_at).getTime()<now).length;
  $("last-updated").textContent="Actualizado "+new Date().toLocaleTimeString("es-MX");
  renderCandidates();renderFollowups();renderJobManagement();renderFlyAgents();
@@ -232,16 +232,81 @@ function renderFlyAgents(){
  disclaimer.textContent="Indicadores calculados sobre los registros cargados del CRM (hasta 500 candidatos y 500 tareas). No mide llamadas, mensajes externos ni la fecha real de contratación.";
  performance.append(disclaimer);
  home.replaceChildren();
- const message=document.createElement("p");
- message.textContent=r.overdue.length?
-   "Hay "+r.overdue.length+" seguimiento(s) vencido(s), "+r.dueSoon.length+" por vencer en 24 horas y "+r.newCandidates.length+" expediente(s) sin contactar.":
-   "No hay seguimientos vencidos. Hay "+r.dueSoon.length+" próximos en 24 horas y "+r.newCandidates.length+" expediente(s) sin contactar.";
- home.append(message);
- const actions=document.createElement("div");actions.className="fly-home-actions";
- if(r.overdue.length||r.dueSoon.length){const btn=document.createElement("button");btn.className="btn ghost";btn.textContent="Revisar seguimientos";btn.addEventListener("click",()=>navigate("seguimientos"));actions.append(btn);}
- if(r.newCandidates.length){const btn=document.createElement("button");btn.className="btn ghost";btn.textContent="Ver candidatos";btn.addEventListener("click",()=>navigate("candidatos"));actions.append(btn);}
- home.append(actions);
+ const heading=document.createElement("p");heading.className="priority-intro";
+ heading.textContent="Las postulaciones sin contactar y las tareas con fecha vencida son asuntos diferentes. Puedes abrir el expediente o programar una acción desde aquí.";
+ home.append(heading);
+ const priorityItems=[
+  ...r.overdue.slice(0,5).map(f=>({kind:"overdue",candidate:candidates.find(c=>c.id===f.candidate_id),task:f})),
+  ...r.dueSoon.slice(0,3).map(f=>({kind:"soon",candidate:candidates.find(c=>c.id===f.candidate_id),task:f})),
+  ...r.newCandidates.filter(c=>!followups.some(f=>f.candidate_id===c.id&&f.status==="pending")).slice(0,6).map(c=>({kind:"new",candidate:c}))
+ ];
+ if(!priorityItems.length){
+  const empty=document.createElement("div");empty.className="priority-empty";
+  const message=document.createElement("strong");message.textContent="Sin acciones inmediatas detectadas";
+  const text=document.createElement("p");text.textContent="No hay seguimientos vencidos, próximos en 24 horas ni expedientes nuevos sin una tarea pendiente.";
+  empty.append(message,text);home.append(empty);
+ }
+ for(const item of priorityItems){
+  const row=document.createElement("div");row.className="priority-item "+item.kind;
+  const icon=document.createElement("span");icon.className="priority-icon";icon.textContent=item.kind==="overdue"?"!":item.kind==="soon"?"◷":"♙";
+  const info=document.createElement("div");info.className="priority-copy";
+  const name=document.createElement("strong");name.textContent=item.candidate?.full_name||"Candidato sin datos cargados";
+  const detail=document.createElement("p");
+  detail.textContent=item.kind==="new"?title(item.candidate.job_slug)+" · Falta primer contacto":
+    (item.task.title||"Seguimiento")+" · "+fmt(item.task.due_at);
+  const label=document.createElement("span");label.className="priority-label";
+  label.textContent=item.kind==="new"?"Sin contactar":item.kind==="overdue"?"Seguimiento vencido":"Próximas 24 horas";
+  info.append(name,detail,label);
+  const actions=document.createElement("div");actions.className="priority-actions";
+  if(item.candidate){
+   const open=document.createElement("button");open.type="button";open.className="btn ghost";
+   open.textContent="Expediente";open.addEventListener("click",()=>openCandidate(item.candidate.id));actions.append(open);
+   const schedule=document.createElement("button");schedule.type="button";schedule.className="btn";
+   schedule.textContent="Programar";schedule.addEventListener("click",()=>showQuickFollowup(row,item.candidate));actions.append(schedule);
+  }else{
+   const open=document.createElement("button");open.type="button";open.className="btn ghost";
+   open.textContent="Ver agenda";open.addEventListener("click",()=>navigate("seguimientos"));actions.append(open);
+  }
+  row.append(icon,info,actions);home.append(row);
+ }
+ if(r.newCandidates.length>6||r.overdue.length>5||r.dueSoon.length>3){
+  const all=document.createElement("button");all.className="btn ghost";all.textContent="Ver todos los pendientes";all.addEventListener("click",()=>navigate("fly"));home.append(all);
+ }
  $("fly-agents-updated").textContent="Actualizado "+new Date(current).toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"});
+}
+function showQuickFollowup(row,candidate){
+ document.querySelectorAll(".priority-quick-form").forEach(x=>x.remove());
+ const form=document.createElement("form");form.className="priority-quick-form";
+ const top=document.createElement("strong");top.textContent="Programar siguiente contacto · "+candidate.full_name;
+ const actions=document.createElement("div");actions.className="priority-form-fields";
+ const label=document.createElement("label");label.textContent="Acción";
+ const titleInput=document.createElement("input");titleInput.type="text";titleInput.maxLength=200;titleInput.required=true;
+ titleInput.placeholder="Ej. Llamar para confirmar disponibilidad";titleInput.setAttribute("aria-label","Acción de seguimiento");
+ label.append(titleInput);
+ const dateLabel=document.createElement("label");dateLabel.textContent="Fecha y hora";
+ const when=document.createElement("input");when.type="datetime-local";when.required=true;
+ const now=new Date();const localNow=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,16);
+ when.min=localNow;when.setAttribute("aria-label","Fecha y hora del seguimiento");
+ dateLabel.append(when);
+ const controls=document.createElement("div");controls.className="priority-form-actions";
+ const save=document.createElement("button");save.type="submit";save.className="btn yellow";save.textContent="Guardar tarea";
+ const cancel=document.createElement("button");cancel.type="button";cancel.className="btn ghost";cancel.textContent="Cancelar";cancel.addEventListener("click",()=>form.remove());
+ const feedback=document.createElement("p");feedback.className="small";feedback.setAttribute("role","status");
+ controls.append(save,cancel);actions.append(label,dateLabel,controls);form.append(top,actions,feedback);
+ form.addEventListener("submit",async event=>{
+  event.preventDefault();const task=titleInput.value.trim(),date=new Date(when.value);
+  if(task.length<3||!Number.isFinite(date.getTime())||date.getTime()<=Date.now()){
+   feedback.textContent="Escribe una acción válida y selecciona una fecha futura.";return;
+  }
+  save.disabled=true;feedback.textContent="Guardando seguimiento…";
+  const {error}=await db.from("cl360_followups").insert({
+   workspace_id:WS,candidate_id:candidate.id,title:task,due_at:date.toISOString(),
+   status:"pending",created_by:user.id,assigned_user_id:user.id
+  });
+  if(error){save.disabled=false;feedback.textContent="No se pudo programar la tarea. Verifica tus permisos e inténtalo otra vez.";return;}
+  await load();
+ });
+ row.append(form);titleInput.focus();
 }
 function renderFollowups(){
  const pending=followups.filter(f=>f.status==="pending").slice(0,20);
@@ -392,9 +457,29 @@ function renderHome(){
  $("home-open-jobs").textContent=jobs.filter(j=>j.status==="active").length;
  $("home-waiting").textContent=threads.filter(t=>t.status==="waiting").length;
  $("home-human").textContent=threads.filter(t=>t.status==="human").length;
- const pending=followups.filter(f=>f.status==="pending").slice(0,5);
- $("home-followups").innerHTML=pending.length?pending.map(f=>'<div class="followup-row"><div><b>'+safe(f.title)+'</b><div class="small">'+safe(candidates.find(c=>c.id===f.candidate_id)?.full_name||"Candidato")+' · '+safe(fmt(f.due_at))+'</div></div><button class="mini-btn" data-open-candidate="'+safe(f.candidate_id)+'">Abrir</button></div>').join(""):'<p class="empty">No hay tareas pendientes. Aquí aparecerán los próximos contactos programados.</p>';
- document.querySelectorAll("[data-open-candidate]").forEach(btn=>btn.addEventListener("click",()=>openCandidate(btn.dataset.openCandidate)));
+ const pending=followups.filter(f=>f.status==="pending")
+  .sort((a,b)=>new Date(a.due_at).getTime()-new Date(b.due_at).getTime()).slice(0,5);
+ const box=$("home-followups");box.replaceChildren();
+ if(!pending.length){
+  const text=document.createElement("p");text.className="home-empty";
+  text.textContent="Todavía no hay tareas programadas. Puedes crear una desde las prioridades de atención o desde un expediente.";
+  box.append(text);
+ }else{
+  pending.forEach(f=>{
+   const row=document.createElement("div");row.className="followup-row";
+   const info=document.createElement("div");
+   const title=document.createElement("b");title.textContent=f.title;
+   const caption=document.createElement("div");caption.className="small";
+   const c=candidates.find(x=>x.id===f.candidate_id);
+   caption.textContent=(c?.full_name||"Candidato")+" · "+fmt(f.due_at);
+   const overdue=new Date(f.due_at).getTime()<Date.now();
+   if(overdue){const warning=document.createElement("span");warning.className="priority-label";warning.textContent="Vencida";info.append(warning);}
+   info.append(title,caption);row.append(info);
+   const open=document.createElement("button");open.type="button";open.className="mini-btn";open.textContent="Ver";
+   open.addEventListener("click",()=>c?openCandidate(c.id):navigate("seguimientos"));
+   row.append(open);box.append(row);
+  });
+ }
 }
 function openCandidate(id){
  const c=candidates.find(x=>x.id===id);
