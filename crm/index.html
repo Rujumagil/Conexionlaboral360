@@ -67,27 +67,139 @@ html{scroll-padding-top:18px}
  #fly-health-badge{align-self:flex-start}
  .detail-actions a{flex:1 1 auto;text-align:center}
 }
+
+/* Conexión 360 · App Shell */
+body{background:#edf2f8}
+.workspace{display:grid;grid-template-columns:244px minmax(0,1fr);min-height:calc(100vh - 72px);width:100%;max-width:none}
+.app-sidebar{background:#071e36;color:#fff;min-width:0;padding:22px 14px;display:flex;flex-direction:column;gap:11px;border-right:1px solid #173453}
+.side-logo{display:flex;gap:10px;align-items:center;padding:5px 10px 22px;border-bottom:1px solid #24415c}
+.side-logo img{width:43px;height:43px;border-radius:12px;background:#fff}
+.side-logo b{display:block;white-space:nowrap;font-size:.95rem}
+.side-logo small{display:block;color:#adbfce;font-size:.71rem}
+.nav-subtitle{font-weight:800;letter-spacing:.12em;font-size:.62rem;color:#91a8be;padding:13px 12px 0}
+.app-menu{display:grid;gap:4px}
+.nav-item{display:flex;align-items:center;gap:11px;text-align:left;border:0;border-radius:11px;background:none;color:#cad8e4;padding:13px 13px;font-weight:700;font-size:.89rem;width:100%;cursor:pointer}
+.nav-item:hover{background:#173a57;color:#fff}.nav-item.active{background:#f7d253;color:#092643}
+.nav-icon{font-size:1.15rem;width:24px;text-align:center;line-height:1}.nav-count{margin-left:auto;background:#e5edf5;color:#22445b;border-radius:99px;min-width:24px;padding:2px 5px;text-align:center;font-size:.72rem}
+.nav-item.active .nav-count{background:#fff6cd}
+.sidebar-foot{display:flex;gap:9px;align-items:center;margin-top:auto;border-top:1px solid #24415c;padding:18px 6px 4px;font-size:.77rem}.sidebar-foot b{display:block}.sidebar-foot small{color:#91a8be}.user-dot{width:37px;height:37px;display:grid;place-items:center;border-radius:10px;background:#234866;font-weight:900}
+.app-main{min-width:0}.app-toolbar{background:#fff;border-bottom:1px solid var(--line);padding:19px clamp(15px,2.5vw,36px);display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap}.app-toolbar h1{margin:3px 0 0;font-size:clamp(1.25rem,2vw,1.55rem);letter-spacing:-.02em}.eyebrow{font-size:.66rem;letter-spacing:.12em;font-weight:900;color:#71849a;margin:0}
+.toolbar-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.app-content{max-width:1500px;padding:24px clamp(15px,2.5vw,36px) 40px;margin:auto}.app-view{min-width:0}.app-view>.panel{margin:15px 0 0}.page-intro{display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap;margin-bottom:20px}.page-intro h2{font-size:clamp(1.5rem,2.5vw,2rem);margin:6px 0 4px}.page-intro p{margin:0;color:var(--muted)}.tag{font-size:.68rem;font-weight:900;letter-spacing:.09em;color:#2875ad}
+.welcome-banner{background:linear-gradient(115deg,#082743,#115986);border-radius:19px;padding:25px 28px;color:white;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}.welcome-banner h2{font-size:clamp(1.4rem,2.5vw,2rem);margin:8px 0;letter-spacing:-.025em}.welcome-banner p{color:#c5dded;margin:0}.banner-overline{font-size:.68rem;letter-spacing:.12em;font-weight:900;color:#ffd85a}.metrics{margin-top:19px;grid-template-columns:repeat(5,minmax(0,1fr))}.metric{display:flex;flex-direction:column;gap:5px;padding:17px}.metric .metric-icon{font-size:1.15rem;color:#207bb5}.metric strong{font-size:1.85rem;line-height:1.2}
+.home-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.75fr);gap:17px}.home-grid .panel{min-width:0}.section-title{display:flex;align-items:center;justify-content:space-between;gap:12px}.section-title h2{margin:4px 0 16px;font-size:1.15rem}.text-button{border:0;background:none;color:#16699b;font-weight:800;cursor:pointer}.quick-card{display:flex;justify-content:space-between;gap:8px;padding:12px 4px;border-bottom:1px solid #e5edf5}.quick-card strong{font-size:1.15rem}
+.controls{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:17px}.controls input{flex:2;min-width:190px;max-width:none}.controls select{flex:1;min-width:150px;max-width:none}.candidate-table{min-width:620px}.job-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.form-block{border-top:1px solid var(--line);padding-top:20px;margin-top:20px}.form-block h3{margin:0 0 4px}.form-block .btn{margin-top:14px}
+.pipeline-board{display:flex;gap:12px;align-items:stretch;overflow:auto;padding:0 0 17px;scrollbar-width:thin;min-height:370px}.pipeline-column{flex:0 0 245px;background:#e6edf5;border-radius:15px;padding:11px;display:flex;flex-direction:column;gap:10px}.pipeline-column-header{display:flex;justify-content:space-between;align-items:center;font-size:.91rem;font-weight:900;gap:9px}.pipeline-column-header span{border-radius:50px;background:#fff;padding:3px 9px;color:#536982;font-size:.76rem}.pipeline-card{background:#fff;border:1px solid #d6e2ed;border-radius:12px;text-align:left;padding:13px;box-shadow:0 4px 12px #102e4409;color:var(--ink);cursor:pointer}.pipeline-card:hover{border-color:#4d94bd}.pipeline-card b{display:block}.pipeline-card .small{display:block;margin-top:6px}.pipeline-card .pill{margin-top:9px;display:inline-block}.pipeline-empty{font-size:.82rem;text-align:center;color:#788c9f;padding:40px 8px}
+.inbox-layout{display:grid;grid-template-columns:minmax(245px,.76fr) minmax(0,1.65fr);background:#fff;border:1px solid var(--line);border-radius:18px;overflow:hidden;min-height:560px}.inbox-list{min-width:0;border-right:1px solid var(--line);background:#f8fbfe}.inbox-heading{padding:15px;display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid var(--line)}.inbox-heading select{min-width:110px;max-width:145px;border:1px solid var(--line);border-radius:8px;padding:8px;background:white}.inbox-item{padding:15px;border:0;border-bottom:1px solid #e5edf5;background:transparent;width:100%;display:block;text-align:left;color:var(--ink);cursor:pointer}.inbox-item.active,.inbox-item:hover{background:#eaf4ff}.inbox-item .inbox-name{display:flex;justify-content:space-between;gap:6px;font-weight:850}.inbox-item .small{display:block;margin:5px 0}.inbox-item .pill{display:inline-block;margin-top:6px}.chat-pane{display:flex;flex-direction:column;min-width:0;min-height:560px}.chat-header{padding:16px;border-bottom:1px solid var(--line);display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap}.chat-header h3{margin:0 0 4px}.chat-header p{margin:0}.chat-actions{display:flex;gap:7px;flex-wrap:wrap}.chat-timeline{background:#f4f8fc;flex:1;padding:18px;overflow-y:auto;max-height:440px;min-height:240px}.message{max-width:88%;border-radius:12px;background:#fff;border:1px solid #dce5ef;padding:12px;margin-bottom:10px;font-size:.9rem;white-space:pre-wrap;overflow-wrap:anywhere}.message.staff{margin-left:auto;background:#eaf4ff;border-color:#cfe2f4}.message.system{background:#edf0f3;color:#617287;font-size:.82rem;margin:9px auto;text-align:center}.message small{display:block;color:#788c9f;margin-top:6px}.message-form{padding:16px;border-top:1px solid var(--line)}.message-form textarea{resize:vertical;min-height:75px}.message-form .btn{margin-top:8px}.inbox-hint{font-size:.81rem;color:var(--muted);margin:12px 0}.inbox-status{font-size:.75rem;font-weight:850;color:#3a6984}.candidate-mini{border-top:1px solid var(--line);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:.84rem}.candidate-mini span{color:var(--muted)}
+.detail{max-width:100%;margin-top:17px!important}.detail.hide{display:none!important}.fly-rules{margin-top:16px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;color:#345774;font-size:.9rem}.fly-rules>div{padding:12px;border:1px solid var(--line);border-radius:10px;background:#f8fbfe}
+.mobile-nav{display:none}.top{display:none} .auth-page{min-height:100vh}.auth-page~.workspace.hide{display:none}
+@media(max-width:1180px){.metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.home-grid{grid-template-columns:1fr}}
+@media(max-width:900px){.workspace{grid-template-columns:minmax(0,1fr)}.app-sidebar{display:none}.app-content{padding:17px 16px 105px}.app-toolbar{padding:17px}.mobile-nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));position:fixed;bottom:0;left:0;right:0;z-index:25;background:#fff;border-top:1px solid var(--line);box-shadow:0 -7px 20px #10203014;padding:7px 4px calc(8px + env(safe-area-inset-bottom,0px));gap:2px}.mobile-nav button{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 1px;border:0;border-radius:9px;background:none;color:#697d92;gap:3px;font-size:.64rem;font-weight:800}.mobile-nav button span{font-size:1.3rem;line-height:1.15}.mobile-nav button.active{background:#eaf3fb;color:#0b5684}}
+@media(max-width:700px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.metric{padding:14px}.metric strong{font-size:1.65rem}.welcome-banner{padding:19px}.welcome-banner .btn{width:100%}.toolbar-actions .stamp{display:none}.toolbar-actions{width:100%}.toolbar-actions .btn{flex:1;text-align:center;padding:10px 7px}.controls{display:grid;grid-template-columns:1fr}.controls input,.controls select{max-width:none;width:100%;min-width:0}.candidate-table{min-width:0}.candidate-table thead,.jobs-table thead{display:none}.candidate-table,.jobs-table{min-width:0;display:block}.candidate-table tbody,.jobs-table tbody{display:grid;gap:10px}.candidate-table tbody tr,.jobs-table tbody tr{display:block;border:1px solid var(--line);border-radius:12px;background:#fbfdff}.candidate-table td,.jobs-table td{display:grid;grid-template-columns:92px minmax(0,1fr);gap:10px;overflow-wrap:anywhere}.candidate-table td::before,.jobs-table td::before{content:attr(data-label);font-size:.72rem;color:var(--muted);font-weight:800}.candidate-table td[colspan]::before{display:none}.candidate-table td[colspan]{display:block}.job-form-grid,.fly-rules{grid-template-columns:1fr}.inbox-layout{grid-template-columns:1fr}.inbox-list{max-height:270px;overflow:auto;border-right:0;border-bottom:1px solid var(--line)}.chat-pane{min-height:460px}.chat-timeline{max-height:290px}.chat-actions .btn{font-size:.8rem;padding:9px}.pipeline-column{flex-basis:215px}.app-view>.panel{margin-top:12px}}
 </style></head>
 <body>
 <header class="top"><div class="top-inner"><div class="brand"><img src="../assets/logo-oficial.svg" alt=""><div><b>Conexión Laboral 360</b><small>CRM privado de reclutamiento</small></div></div><div class="top-right"><a href="../">Ver sitio público</a><span class="signed" id="signed"></span><button id="signout" class="hide">Cerrar sesión</button></div></div></header>
 <section id="auth-screen" class="auth-page"><form class="auth-card" id="login-form"><h1>Acceso al CRM</h1><p>Ingreso exclusivo para el equipo autorizado de Conexión Laboral 360.</p><label class="label" for="email">Correo electrónico</label><input class="field" id="email" type="email" autocomplete="username" required><label class="label" for="password">Contraseña</label><input class="field" id="password" type="password" autocomplete="current-password" required><button class="btn yellow" type="submit">Entrar</button><p class="error" id="login-error" role="alert"></p><p class="notice">Tus credenciales se verifican con Supabase Auth. El CRM y la información de postulantes están protegidos mediante permisos por espacio de trabajo.</p></form></section>
-<main id="dashboard" class="app hide"><div class="intro"><div><h1>Panel de candidatos</h1><p>Gestiona postulaciones, seguimientos y vacantes desde un solo lugar.</p></div><div class="stamp" id="last-updated">Última actualización —</div></div>
-<nav class="crm-quicknav" aria-label="Ir a sección del CRM"><a href="#candidates-section">Candidatos</a><a href="#followups-section">Seguimientos</a><a href="#vacancy-management">Vacantes</a><a href="#fly-management">Compás Fly</a></nav>
-<section class="metrics" aria-label="Indicadores de reclutamiento"><div class="metric"><strong id="m-total">—</strong><span>Postulantes</span></div><div class="metric"><strong id="m-new">—</strong><span>Sin contactar</span></div><div class="metric"><strong id="m-active">—</strong><span>En proceso</span></div><div class="metric"><strong id="m-qualified">—</strong><span>Calificados</span></div><div class="metric"><strong id="m-overdue">—</strong><span>Seguimientos vencidos</span></div></section>
-<div class="twocol"><section class="panel" id="candidates-section"><div class="panel-head"><h2>Candidatos <span class="count" id="result-count"></span></h2><div class="controls"><input type="search" id="search" placeholder="Buscar nombre, teléfono o vacante" aria-label="Buscar candidatos"><select id="filter-stage" aria-label="Filtrar por etapa"><option value="">Todas las etapas</option><option value="new">Sin contactar</option><option value="contacted">Contactado</option><option value="screening">Filtrado</option><option value="interview">Entrevista</option><option value="qualified">Calificado</option><option value="hired">Contratado</option><option value="rejected">No seleccionado</option><option value="archived">Archivado</option></select><select id="filter-turno" aria-label="Filtrar por disponibilidad"><option value="">Todos los turnos</option><option value="si">Turno disponible</option><option value="revisar">Revisar disponibilidad</option><option value="none">Por confirmar</option></select><button id="refresh" class="btn ghost">Actualizar</button></div></div><div class="table-wrap"><table class="candidate-table"><thead><tr><th>Candidato</th><th>Vacante</th><th>Etapa</th><th>Preentrevista</th><th>Registro</th></tr></thead><tbody id="candidate-rows"><tr><td colspan="5">Cargando…</td></tr></tbody></table></div></section>
-<section class="panel detail hide" id="detail" aria-label="Expediente del candidato"></section></div>
-<section class="panel" id="followups-section"><div class="panel-head"><h2>Agenda de seguimientos</h2><span class="small">Pendientes por fecha</span></div><div id="followups"><p class="empty">Sin seguimientos programados.</p></div></section>
-<section class="panel" id="vacancy-management"><div class="panel-head"><h2>Catálogo de vacantes</h2><span class="small">Sin publicar salarios</span></div><div id="job-management-list" class="table-wrap"></div>
-<form id="new-job-form" class="hide" style="margin-top:20px;border-top:1px solid var(--line);padding-top:18px">
-<h3 style="margin:0 0 8px">Agregar vacante de otra área</h3><p class="small">Se guardará pausada; solo se publicará al activarla desde el listado.</p>
-<div class="job-form-grid">
-<div><label class="label" for="job-title">Nombre del puesto o servicio</label><input class="field" id="job-title" maxlength="160" required></div>
-<div><label class="label" for="job-area">Área laboral</label><input class="field" id="job-area" maxlength="80" placeholder="Seguridad, administración, almacén…" required></div>
-<div><label class="label" for="job-location">Ubicación</label><input class="field" id="job-location" required></div>
-<div><label class="label" for="job-shift">Turno / horario</label><input class="field" id="job-shift" required></div></div>
-<label class="label" for="job-details">Información de la vacante (un punto por línea)</label><textarea class="field" id="job-details" placeholder="Funciones y datos confirmados del puesto" maxlength="1200"></textarea>
-<button type="submit" class="btn yellow" style="margin-top:10px">Guardar vacante pausada</button><p id="job-error" class="error" role="alert"></p></form></section>
-<section class="panel" id="fly-management"><div class="panel-head"><h2>Agente de reclutamiento · Compás Fly</h2><span id="fly-health-badge" class="pill">Verificando conexión</span></div><div class="fly"><div class="fly-icon">✦</div><div><strong>Fly Recruiter · Atención supervisada</strong><p id="fly-health-detail">El asistente público realiza la preentrevista y guarda las respuestas en el CRM. Consultando disponibilidad de la conversación generativa…</p><p class="small">La decisión de entrevista o contratación es humana. No se publican sueldos ni se envían mensajes automáticos por WhatsApp.</p></div></div></section>
+
+<main id="dashboard" class="workspace hide">
+ <aside class="app-sidebar">
+  <div class="side-logo"><img src="../assets/logo-oficial.svg" alt=""><div><b>Conexión 360</b><small>Recruitment Hub</small></div></div>
+  <div class="nav-subtitle">OPERACIÓN</div>
+  <nav class="app-menu" aria-label="Módulos del CRM">
+   <button class="nav-item active" data-nav="inicio"><span class="nav-icon">▦</span> Inicio</button>
+   <button class="nav-item" data-nav="vacantes"><span class="nav-icon">▤</span> Vacantes</button>
+   <button class="nav-item" data-nav="candidatos"><span class="nav-icon">♙</span> Candidatos</button>
+   <button class="nav-item" data-nav="pipeline"><span class="nav-icon">☷</span> Pipeline</button>
+   <button class="nav-item" data-nav="conversaciones"><span class="nav-icon">◉</span> Conversaciones <span id="nav-inbox-count" class="nav-count">0</span></button>
+  </nav>
+  <div class="nav-subtitle">GESTIÓN</div>
+  <nav class="app-menu" aria-label="Herramientas de gestión">
+   <button class="nav-item" data-nav="seguimientos"><span class="nav-icon">▣</span> Seguimientos</button>
+   <button class="nav-item" data-nav="fly"><span class="nav-icon">✦</span> Compás Fly</button>
+   <button class="nav-item" data-nav="ajustes"><span class="nav-icon">⚙</span> Ajustes</button>
+  </nav>
+  <div class="sidebar-foot"><div class="user-dot">CL</div><div><b>Equipo de reclutamiento</b><small>Acceso protegido</small></div></div>
+ </aside>
+ <div class="app-main">
+ <div class="app-toolbar">
+   <div><p class="eyebrow">CONEXIÓN LABORAL 360 · CRM</p><h1 id="view-title">Centro de operaciones</h1></div>
+   <div class="toolbar-actions"><span id="last-updated" class="stamp">Última actualización —</span><button class="btn ghost" id="global-refresh" type="button">↻ Actualizar</button><a class="btn yellow" href="../asistente/" target="_blank" rel="noopener noreferrer">Ver asistente ↗</a></div>
+ </div>
+ <div class="app-content">
+  <section class="app-view" data-view="inicio" id="view-inicio">
+   <div class="welcome-banner"><div><span class="banner-overline">PANEL GENERAL</span><h2>Tu operación de reclutamiento, en un solo lugar.</h2><p>Vacantes, candidatos, conversaciones y seguimientos organizados para el equipo.</p></div><button class="btn yellow" data-go="vacantes">Administrar vacantes</button></div>
+   <div class="metrics" aria-label="Indicadores de reclutamiento">
+    <div class="metric"><span class="metric-icon">♙</span><strong id="m-total">—</strong><span>Postulantes</span></div>
+    <div class="metric"><span class="metric-icon">✧</span><strong id="m-new">—</strong><span>Sin contactar</span></div>
+    <div class="metric"><span class="metric-icon">↗</span><strong id="m-active">—</strong><span>En proceso</span></div>
+    <div class="metric"><span class="metric-icon">✓</span><strong id="m-qualified">—</strong><span>Calificados</span></div>
+    <div class="metric"><span class="metric-icon">▣</span><strong id="m-overdue">—</strong><span>Seguimientos vencidos</span></div>
+   </div>
+   <div class="home-grid">
+    <section class="panel"><div class="section-title"><div><span class="tag">ACTIVIDAD</span><h2>Próximas acciones</h2></div><button class="text-button" data-go="seguimientos">Ver agenda →</button></div><div id="home-followups" class="home-mini"><div class="empty">Sin seguimientos pendientes.</div></div></section>
+    <section class="panel"><div class="section-title"><div><span class="tag">RESUMEN</span><h2>Tu equipo de reclutamiento</h2></div></div>
+     <div class="quick-card"><span>Vacantes publicadas</span><strong id="home-open-jobs">—</strong></div>
+     <div class="quick-card"><span>Casos por atender</span><strong id="home-waiting">—</strong></div>
+     <div class="quick-card"><span>Conversaciones tomadas</span><strong id="home-human">—</strong></div>
+     <button class="btn ghost" data-go="conversaciones" style="width:100%;margin-top:10px">Abrir bandeja de conversaciones</button>
+    </section>
+   </div>
+  </section>
+  <section class="app-view hide" data-view="vacantes" id="view-vacantes">
+   <div class="page-intro"><div><span class="tag">CATÁLOGO DE OPORTUNIDADES</span><h2>Vacantes</h2><p>Publica puestos de distintas áreas sin mostrar sueldos.</p></div><button class="btn yellow" id="job-add-shortcut">+ Nueva vacante</button></div>
+   <section class="panel" id="vacancy-management"><div class="panel-head"><h2>Vacantes registradas</h2><span class="small">Solo las activas se publican en la web</span></div><div id="job-management-list" class="table-wrap"></div>
+    <form id="new-job-form" class="hide form-block">
+    <h3>Agregar nueva vacante</h3><p class="small">La vacante se guardará pausada. Actívala tras verificar su información.</p>
+    <div class="job-form-grid">
+      <div><label class="label" for="job-title">Puesto o servicio</label><input class="field" id="job-title" maxlength="160" required></div>
+      <div><label class="label" for="job-area">Área laboral</label><input class="field" id="job-area" maxlength="80" placeholder="Administración, seguridad…" required></div>
+      <div><label class="label" for="job-location">Ubicación</label><input class="field" id="job-location" required></div>
+      <div><label class="label" for="job-shift">Turno / horario</label><input class="field" id="job-shift" required></div>
+    </div>
+    <label class="label" for="job-details">Información confirmada (un punto por línea)</label><textarea class="field" id="job-details" maxlength="1200" placeholder="Funciones y requisitos objetivos"></textarea>
+    <button type="submit" class="btn yellow">Guardar vacante pausada</button><p class="error" id="job-error" role="alert"></p>
+    </form></section>
+  </section>
+  <section class="app-view hide" data-view="candidatos" id="view-candidatos">
+   <div class="page-intro"><div><span class="tag">BASE DE TALENTO</span><h2>Candidatos <span class="count" id="result-count"></span></h2><p>Consulta registros, preentrevistas y próximas acciones.</p></div><button class="btn ghost" id="refresh">↻ Actualizar</button></div>
+   <section class="panel" id="candidates-section"><div class="controls"><input type="search" id="search" placeholder="Buscar candidato, teléfono o vacante" aria-label="Buscar candidatos"><select id="filter-stage" aria-label="Filtrar por etapa">
+    <option value="">Todas las etapas</option><option value="new">Sin contactar</option><option value="contacted">Contactado</option><option value="screening">Filtrado</option><option value="interview">Entrevista</option><option value="qualified">Calificado</option><option value="hired">Contratado</option><option value="rejected">No seleccionado</option><option value="archived">Archivado</option></select>
+    <select id="filter-turno" aria-label="Filtrar disponibilidad"><option value="">Todos los turnos</option><option value="si">Turno disponible</option><option value="revisar">Revisar disponibilidad</option><option value="none">Por confirmar</option></select></div>
+    <div class="table-wrap"><table class="candidate-table"><thead><tr><th>Candidato</th><th>Vacante</th><th>Etapa</th><th>Preentrevista</th><th>Registro</th></tr></thead><tbody id="candidate-rows"><tr><td colspan="5">Cargando…</td></tr></tbody></table></div>
+   </section>
+  </section>
+  <section class="app-view hide" data-view="pipeline" id="view-pipeline">
+   <div class="page-intro"><div><span class="tag">SEGUIMIENTO VISUAL</span><h2>Pipeline de reclutamiento</h2><p>Cambia la etapa de cada candidato desde su tarjeta. No hay descartes automáticos.</p></div></div>
+   <div class="pipeline-board" id="pipeline-board" aria-label="Tablero de candidatos por etapa"></div>
+  </section>
+  <section class="app-view hide" data-view="conversaciones" id="view-conversaciones">
+   <div class="page-intro"><div><span class="tag">BANDEJA DE ATENCIÓN</span><h2>Conversaciones</h2><p>Historial del caso, notas internas, toma humana y contacto por WhatsApp.</p></div><button id="conversation-refresh" class="btn ghost">↻ Actualizar</button></div>
+   <div class="inbox-layout">
+    <section class="inbox-list"><div class="inbox-heading"><strong>Bandeja</strong><select id="inbox-filter" aria-label="Filtrar conversaciones"><option value="all">Todas</option><option value="waiting">Pendientes</option><option value="human">Tomadas</option><option value="bot">Asistente</option><option value="closed">Cerradas</option></select></div><div id="inbox-threads"><p class="empty">Sin conversaciones todavía.</p></div></section>
+    <section class="chat-pane" id="chat-pane"><div class="empty">Selecciona una conversación para ver el caso y sus notas internas.</div></section>
+   </div>
+   <p class="inbox-hint">Los mensajes escritos aquí son notas internas del equipo. No se envían al candidato. La integración de mensajes reales de WhatsApp y transcripciones completas del asistente todavía está pendiente.</p>
+  </section>
+  <section class="app-view hide" data-view="seguimientos" id="view-seguimientos">
+    <div class="page-intro"><div><span class="tag">TAREAS</span><h2>Agenda de seguimientos</h2><p>Controla las siguientes llamadas, entrevistas y contactos.</p></div></div>
+    <section class="panel"><div class="panel-head"><h2>Próximas tareas</h2><span class="small">Ordenadas por fecha</span></div><div id="followups"><p class="empty">Sin seguimientos programados.</p></div></section>
+  </section>
+  <section class="app-view hide" data-view="fly" id="view-fly">
+   <div class="page-intro"><div><span class="tag">AUTOMATIZACIÓN SUPERVISADA</span><h2>Compás Fly Recruiter</h2><p>Atención inicial virtual y revisión humana antes de la contratación.</p></div></div>
+   <section class="panel"><div class="panel-head"><h2>Estado del asistente</h2><span id="fly-health-badge" class="pill">Verificando conexión</span></div>
+    <div class="fly"><div class="fly-icon">✦</div><div><strong>Fly Recruiter · Atención supervisada</strong><p id="fly-health-detail">Consultando disponibilidad de la conversación contextual.</p>
+    <p class="small">La decisión de entrevista y contratación corresponde a personas. No se publican sueldos ni se envían mensajes automáticos por WhatsApp.</p></div></div>
+    <div class="fly-rules"><div>✓ Vacantes verificadas</div><div>✓ Sin rechazo automático</div><div>✓ WhatsApp mediante acción humana</div><div>◌ Conversación generativa pendiente de credencial</div></div>
+   </section>
+  </section>
+  <section class="app-view hide" data-view="ajustes" id="view-ajustes">
+   <div class="page-intro"><div><span class="tag">ADMINISTRACIÓN</span><h2>Ajustes del CRM</h2><p>Configuración y permisos del espacio de Conexión Laboral 360.</p></div></div>
+   <section class="panel"><h2>Tu acceso</h2><p id="settings-user">Cuenta autorizada</p><p>Permisos por espacio de trabajo, gestionados desde Supabase Auth.</p><hr><h3>Enlaces de operación</h3><p><a href="../" target="_blank" rel="noopener noreferrer">Página pública de vacantes ↗</a></p><p><a href="../asistente/" target="_blank" rel="noopener noreferrer">Asistente de reclutamiento ↗</a></p><p><a href="../aviso-candidatos.html" target="_blank" rel="noopener noreferrer">Información de privacidad ↗</a></p><button type="button" class="btn ghost" id="settings-signout">Cerrar sesión</button></section>
+  </section>
+  <section class="panel detail hide" id="detail" aria-label="Expediente del candidato"></section>
+ </div></div>
+ <nav class="mobile-nav" aria-label="Pestañas principales">
+   <button data-nav="inicio" class="active"><span>▦</span>Inicio</button><button data-nav="vacantes"><span>▤</span>Vacantes</button><button data-nav="candidatos"><span>♙</span>Candidatos</button><button data-nav="pipeline"><span>☷</span>Pipeline</button><button data-nav="conversaciones"><span>◉</span>Chats</button><button data-nav="ajustes"><span>☰</span>Más</button>
+ </nav>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.min.js"></script>
 <script>
@@ -129,7 +241,7 @@ async function checkAuth(){
   if(error||!membership||!["owner","admin","manager","sales","support"].includes(membership.role)){
     await db.auth.signOut();authScreen(true);$("login-error").textContent="Tu cuenta todavía no tiene acceso a este CRM.";return;
   }
-  user=activeUser;staffRole=membership.role;canLoad=true;void checkFlyAvailability();$("signed").textContent=activeUser.email||"";authScreen(false);await load();
+  user=activeUser;staffRole=membership.role;canLoad=true;navigate((location.hash||"#inicio").slice(1));void checkFlyAvailability();$("signed").textContent=activeUser.email||"";authScreen(false);await load();
 }
 async function load(){
  if(!canLoad)return;
@@ -151,6 +263,7 @@ async function load(){
  $("m-overdue").textContent=followups.filter(x=>x.status==="pending"&&new Date(x.due_at).getTime()<now).length;
  $("last-updated").textContent="Actualizado "+new Date().toLocaleTimeString("es-MX");
  renderCandidates();renderFollowups();renderJobManagement();
+ renderHome();renderPipeline();await loadConversations();
  if(selected){const still=candidates.find(x=>x.id===selected);if(still)renderDetail(still);else{selected=null;$("detail").classList.add("hide");}}
 }
 function title(slug){return jobs.find(x=>x.slug===slug)?.title||slug||"Sin vacante";}
@@ -201,6 +314,7 @@ function renderFollowups(){
 async function renderDetail(candidate){
  if(!candidate)return;
  $("detail").classList.remove("hide");
+ $("detail").scrollIntoView({behavior:"smooth",block:"start"});
  const phone=String(candidate.phone).replace(/[^+0-9]/g,"");
  const dateOptions=Object.entries(stageNames).map(([v,t])=>'<option value="'+v+'" '+(candidate.stage===v?"selected":"")+'>'+safe(t)+'</option>').join("");
  $("detail").innerHTML='<h3>'+safe(candidate.full_name)+'</h3><p class="detail-sub">'+safe(title(candidate.job_slug))+' · '+safe(candidate.area)+' · Registrado '+safe(fmt(candidate.created_at))+'</p>'+
@@ -249,6 +363,193 @@ $("login-form").addEventListener("submit",async e=>{
 });
 $("signout").addEventListener("click",async()=>{await db?.auth.signOut();canLoad=false;user=null;staffRole=null;authScreen(true);});
 $("search").addEventListener("input",renderCandidates);$("filter-stage").addEventListener("change",renderCandidates);$("filter-turno").addEventListener("change",renderCandidates);$("refresh").addEventListener("click",load);
+
+/* App navigation, pipeline and internal conversations */
+const appViews={
+ inicio:"Centro de operaciones",vacantes:"Vacantes",candidatos:"Candidatos",pipeline:"Pipeline de reclutamiento",
+ conversaciones:"Centro de conversaciones",seguimientos:"Seguimientos",fly:"Compás Fly",ajustes:"Configuración"
+};
+let activeView="inicio",threads=[],messages=[],activeConversationId=null,conversationsLoadError=false;
+function navigate(view){
+ if(!appViews[view])view="inicio";
+ activeView=view;
+ document.querySelectorAll("[data-view]").forEach(el=>el.classList.toggle("hide",el.dataset.view!==view));
+ document.querySelectorAll("[data-nav]").forEach(btn=>{
+  const active=btn.dataset.nav===view;
+  btn.classList.toggle("active",active);
+  btn.setAttribute("aria-current",active?"page":"false");
+ });
+ $("view-title").textContent=appViews[view];
+ if(view==="candidatos"&&selected){const c=candidates.find(x=>x.id===selected);if(c)renderDetail(c);}
+ if(view==="pipeline")renderPipeline();
+ if(view==="conversaciones")renderInbox();
+ if(view==="inicio")renderHome();
+ if(view==="ajustes")$("settings-user").textContent=(user?.email||"Cuenta autorizada")+" · "+(staffRole||"");
+ document.title=appViews[view]+" · Conexión Laboral 360";
+ if(location.hash!=="#"+view)history.replaceState(null,"","#"+view);
+ window.scrollTo({top:0,behavior:"auto"});
+}
+document.querySelectorAll("[data-nav]").forEach(btn=>btn.addEventListener("click",()=>navigate(btn.dataset.nav)));
+document.querySelectorAll("[data-go]").forEach(btn=>btn.addEventListener("click",()=>navigate(btn.dataset.go)));
+$("global-refresh").addEventListener("click",async()=>{await load();await loadConversations();});
+$("job-add-shortcut").addEventListener("click",()=>{
+ if(!["owner","admin","manager"].includes(staffRole))return err({message:"Tu perfil no tiene permiso para administrar vacantes."});
+ $("new-job-form").classList.remove("hide");
+ $("new-job-form").scrollIntoView({behavior:"smooth",block:"start"});
+ $("job-title").focus({preventScroll:true});
+});
+$("conversation-refresh").addEventListener("click",loadConversations);
+$("inbox-filter").addEventListener("change",renderInbox);
+$("settings-signout").addEventListener("click",()=> $("signout").click());
+function renderHome(){
+ $("home-open-jobs").textContent=jobs.filter(j=>j.status==="active").length;
+ $("home-waiting").textContent=threads.filter(t=>t.status==="waiting").length;
+ $("home-human").textContent=threads.filter(t=>t.status==="human").length;
+ const pending=followups.filter(f=>f.status==="pending").slice(0,5);
+ $("home-followups").innerHTML=pending.length?pending.map(f=>'<div class="followup-row"><div><b>'+safe(f.title)+'</b><div class="small">'+safe(candidates.find(c=>c.id===f.candidate_id)?.full_name||"Candidato")+' · '+safe(fmt(f.due_at))+'</div></div><button class="mini-btn" data-open-candidate="'+safe(f.candidate_id)+'">Abrir</button></div>').join(""):'<p class="empty">No hay tareas pendientes. Aquí aparecerán los próximos contactos programados.</p>';
+ document.querySelectorAll("[data-open-candidate]").forEach(btn=>btn.addEventListener("click",()=>openCandidate(btn.dataset.openCandidate)));
+}
+function openCandidate(id){
+ const c=candidates.find(x=>x.id===id);
+ if(!c)return;
+ selected=id;
+ navigate("candidatos");
+ renderDetail(c);
+ $("detail").scrollIntoView({behavior:"smooth",block:"start"});
+}
+const pipelineStages=["new","contacted","screening","interview","qualified","hired","rejected","archived"];
+function renderPipeline(){
+ const board=$("pipeline-board");
+ board.replaceChildren();
+ pipelineStages.forEach(stage=>{
+  const col=document.createElement("section");col.className="pipeline-column";
+  const header=document.createElement("div");header.className="pipeline-column-header";
+  const name=document.createElement("b");name.textContent=stageNames[stage]||stage;
+  const count=document.createElement("span");const items=candidates.filter(c=>c.stage===stage);count.textContent=items.length;
+  header.append(name,count);col.append(header);
+  if(!items.length){const empty=document.createElement("p");empty.className="pipeline-empty";empty.textContent="Sin candidatos";col.append(empty);}
+  items.forEach(c=>{
+   const b=document.createElement("button");b.type="button";b.className="pipeline-card";
+   const name=document.createElement("b");name.textContent=c.full_name;
+   const job=document.createElement("span");job.className="small";job.textContent=title(c.job_slug);
+   const when=document.createElement("span");when.className="small";when.textContent="Registrado: "+fmt(c.created_at);
+   const tag=document.createElement("span");tag.className="pill";
+   tag.textContent=c.screening_data?.availability==="si"?"Turno disponible":c.screening_data?.availability==="no"?"Revisar turno":"Disponibilidad por confirmar";
+   b.append(name,job,when,tag);b.addEventListener("click",()=>openCandidate(c.id));col.append(b);
+  });
+  board.append(col);
+ });
+}
+function conversationLabel(s){return({waiting:"Pendiente",bot:"Asistente virtual",human:"Tomada por humano",closed:"Cerrada"})[s]||s;}
+function conversationCandidate(t){return candidates.find(c=>c.id===t.candidate_id);}
+async function loadConversations(){
+ if(!canLoad)return;
+ const {data,error}=await db.from("cl360_conversations")
+  .select("id,candidate_id,status,handler_id,taken_at,last_message_at,created_at")
+  .eq("workspace_id",WS).order("last_message_at",{ascending:false}).limit(300);
+ if(error){conversationsLoadError=true;console.error("No se pudo consultar la bandeja.");return;}
+ conversationsLoadError=false;threads=data||[];
+ $("nav-inbox-count").textContent=threads.filter(t=>t.status==="waiting").length;
+ renderHome();renderInbox();
+}
+function renderInbox(){
+ const list=$("inbox-threads");
+ const filter=$("inbox-filter").value;
+ const matched=threads.filter(t=>filter==="all"||t.status===filter);
+ list.replaceChildren();
+ if(conversationsLoadError){list.innerHTML='<p class="empty">No pudimos cargar la bandeja. Intenta actualizar.</p>';return;}
+ if(!matched.length){list.innerHTML='<p class="empty">No hay conversaciones en esta sección todavía.</p>';return;}
+ matched.forEach(t=>{
+  const c=conversationCandidate(t);
+  const button=document.createElement("button");button.type="button";
+  button.className="inbox-item"+(activeConversationId===t.id?" active":"");
+  const heading=document.createElement("div");heading.className="inbox-name";
+  const name=document.createElement("span");name.textContent=c?.full_name||"Candidato";
+  const when=document.createElement("small");when.className="small";when.textContent=fmt(t.last_message_at);
+  heading.append(name,when);
+  const job=document.createElement("span");job.className="small";job.textContent=c?title(c.job_slug):"Postulación";
+  const state=document.createElement("span");state.className="pill";state.textContent=conversationLabel(t.status);
+  button.append(heading,job,state);
+  button.addEventListener("click",()=>openConversation(t.id));
+  list.append(button);
+ });
+}
+async function openConversation(id){
+ activeConversationId=id;
+ renderInbox();
+ const current=threads.find(t=>t.id===id);
+ if(!current)return;
+ const c=conversationCandidate(current);
+ const panel=$("chat-pane");
+ panel.innerHTML='<div class="loading">Cargando historial interno…</div>';
+ const {data,error}=await db.from("cl360_chat_messages")
+  .select("id,source,visibility,body,sender_id,created_at")
+  .eq("workspace_id",WS).eq("conversation_id",id).order("created_at",{ascending:true}).limit(150);
+ if(activeConversationId!==id)return;
+ if(error){panel.innerHTML='<p class="empty">No pudimos consultar el historial. Vuelve a intentar.</p>';return;}
+ messages=data||[];
+ const header=document.createElement("div");header.className="chat-header";
+ const info=document.createElement("div");
+ const name=document.createElement("h3");name.textContent=c?.full_name||"Candidato";
+ const subtitle=document.createElement("p");subtitle.className="small";
+ subtitle.textContent=(c?title(c.job_slug)+" · "+c.phone:"Postulación")+" · "+conversationLabel(current.status);
+ info.append(name,subtitle);
+ const actions=document.createElement("div");actions.className="chat-actions";
+ const take=(txt,action,variant="ghost")=>{
+  const btn=document.createElement("button");btn.className="btn "+variant;btn.type="button";btn.textContent=txt;
+  btn.addEventListener("click",()=>changeConversationStatus(id,action));actions.append(btn);
+ };
+ if(current.status==="human"&&current.handler_id===user?.id)take("Dejar pendiente","release","ghost");
+ if(current.status!=="human"&&current.status!=="closed")take("Tomar conversación","take","yellow");
+ if(current.status==="closed")take("Reabrir","reopen","ghost");
+ if(current.status!=="closed")take("Cerrar caso","close","ghost");
+ if(c?.phone){
+  const wa=document.createElement("a");wa.className="btn yellow";
+  wa.target="_blank";wa.rel="noopener noreferrer";
+  wa.href="https://wa.me/"+c.phone.replace(/[^0-9]/g,"")+"?text="+encodeURIComponent("Hola, soy del equipo de Conexión Laboral 360. Revisamos tu postulación para "+title(c.job_slug)+" y nos gustaría continuar tu proceso.");
+  wa.textContent="WhatsApp ↗";actions.append(wa);
+ }
+ header.append(info,actions);
+ const timeline=document.createElement("div");timeline.className="chat-timeline";timeline.id="internal-timeline";
+ if(!messages.length)timeline.innerHTML='<p class="empty">Aún no hay notas ni mensajes de seguimiento registrados.</p>';
+ else messages.forEach(m=>{
+  const box=document.createElement("div");box.className="message "+m.source;
+  const label=document.createElement("b");label.textContent=m.source==="staff"?"Nota del equipo":m.source==="candidate"?"Candidato":m.source==="fly"?"Fly":"Sistema";
+  const body=document.createElement("div");body.textContent=m.body;
+  const date=document.createElement("small");date.textContent=fmt(m.created_at);
+  box.append(label,body,date);timeline.append(box);
+ });
+ const mini=document.createElement("div");mini.className="candidate-mini";
+ const summary=document.createElement("div");const label=document.createElement("strong");label.textContent="Expediente";
+ const desc=document.createElement("span");desc.textContent=" "+(c?.screening_data?.preferred_zone||"Zona por confirmar");
+ summary.append(label,desc);
+ const open=document.createElement("button");open.type="button";open.className="mini-btn";open.textContent="Ver candidato →";
+ open.addEventListener("click",()=>{if(c)openCandidate(c.id);});
+ mini.append(summary,open);
+ const form=document.createElement("form");form.className="message-form";
+ const field=document.createElement("textarea");field.className="field";field.maxLength=1500;field.required=true;field.placeholder="Escribe una nota interna de seguimiento. No se envía al candidato.";field.setAttribute("aria-label","Nota interna");
+ const footer=document.createElement("div");footer.className="chat-actions";
+ const add=document.createElement("button");add.className="btn";add.type="submit";add.textContent="Guardar nota interna";
+ const hint=document.createElement("span");hint.className="small";hint.textContent="Visible solo para el equipo del CRM";
+ footer.append(add,hint);form.append(field,footer);
+ form.addEventListener("submit",async(e)=>{
+  e.preventDefault();
+  const body=field.value.trim();if(!body)return;
+  add.disabled=true;
+  const {error}=await db.from("cl360_chat_messages").insert({workspace_id:WS,conversation_id:id,source:"staff",visibility:"internal",sender_id:user.id,body});
+  add.disabled=false;if(error)return err(error);
+  field.value="";await openConversation(id);
+ });
+ panel.replaceChildren(header,timeline,mini,form);
+ timeline.scrollTop=timeline.scrollHeight;
+}
+async function changeConversationStatus(id,action){
+ const {error}=await db.rpc("cl360_take_conversation",{p_conversation:id,p_action:action});
+ if(error){err(error);return;}
+ await loadConversations();
+ await openConversation(id);
+}
+
 checkAuth().catch(error=>{$("login-error").textContent="Error de conexión. Actualiza la página.";console.error(error?.message||"Error");});
 })();
 </script>
