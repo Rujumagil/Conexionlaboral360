@@ -39,6 +39,8 @@ jobs:
             });
             await page.goto('http://127.0.0.1:8765/Conexionlaboral360/asistente/',{waitUntil:'domcontentloaded'});
             await page.locator('#controls .action').first().waitFor({state:'visible',timeout:15000});
+            await page.locator('.bubble.assistant').filter({hasText:"¿Con quién tengo el gusto"}).waitFor({timeout:15000});
+            console.log("Andy pregunta el nombre al iniciar: OK");
             const type=async(text)=>{
               await page.locator('#candidate-question').fill(text);
               await page.locator('#question-form button[type="submit"]').click();
@@ -68,6 +70,36 @@ jobs:
             await page.locator('.bubble.assistant').filter({hasText:"no tengo una cifra confirmada"}).waitFor({timeout:15000});
             if(await page.locator('#controls a[href*="wa.me/523319708528"]').count()<1)throw Error("Falta derivación para sueldo sin confirmar");
             console.log("Derivación de sueldo no confirmado: OK");
+            const other=await browser.newPage({viewport:{width:390,height:844}});
+            await other.route('https://qwxydjotwhniahaovrff.supabase.co/**',async route=>{
+              const u=route.request().url();
+              if(u.includes('/cl360_jobs?'))return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(jobs)});
+              if(u.includes('/functions/v1/cl360-fly-chat'))return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,ready:true})});
+              return route.fulfill({status:404,contentType:'application/json',body:'{}'});
+            });
+            await other.goto('http://127.0.0.1:8765/Conexionlaboral360/asistente/',{waitUntil:'domcontentloaded'});
+            await other.locator('.bubble.assistant').filter({hasText:"¿Con quién tengo el gusto"}).waitFor({timeout:15000});
+            const otherType=async(value)=>{await other.locator('#candidate-question').fill(value);await other.locator('#question-form button[type="submit"]').click();};
+            await otherType("Me llamo María López");
+            await other.locator('.bubble.assistant').filter({hasText:"Mucho gusto, María"}).waitFor({timeout:15000});
+            await otherType("Mi número es 3312345678");
+            await other.locator('.bubble.assistant').filter({hasText:"no he guardado el número en el CRM"}).waitFor({timeout:15000});
+            await other.locator('.bubble.assistant').filter({hasText:"Coto Magnolias"}).waitFor({timeout:15000});
+            await otherType("Coto Magnolias");
+            await other.locator('.bubble.assistant').filter({hasText:"¡Buena elección, María!"}).waitFor({timeout:15000});
+            await otherType("Quiero postularme");
+            await other.locator('.bubble.assistant').filter({hasText:"¿has trabajado antes"}).waitFor({timeout:15000});
+            await otherType("No tengo experiencia");
+            await other.locator('.bubble.assistant').filter({hasText:"¿En qué has trabajado"}).waitFor({timeout:15000});
+            await otherType("Atendí clientes en tienda");
+            await other.locator('.bubble.assistant').filter({hasText:"¿Cómo te quedaría?"}).waitFor({timeout:15000});
+            await otherType("Sí me funciona");
+            await other.locator('.bubble.assistant').filter({hasText:"¿Por qué zona"}).waitFor({timeout:15000});
+            await otherType("Zapopan");
+            await other.locator('#intake-form').waitFor({timeout:15000});
+            if(await other.locator('#full-name').inputValue()!=="María López" || await other.locator('#phone').inputValue()!=="3312345678")throw Error("Andy no conservó nombre y teléfono hasta la confirmación");
+            console.log("Nombre y teléfono opcional se conservan sin duplicar preguntas: OK");
+            await other.close();
             if(errors.length)throw Error('Errores de JavaScript: '+errors.join('; '));
             console.log("Experiencia, disponibilidad y zona por texto: OK");
             console.log("Formulario de consentimiento visible: OK");
