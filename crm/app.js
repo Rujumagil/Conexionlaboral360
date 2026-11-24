@@ -82,7 +82,7 @@ async function load(){
  const [c,j,f]=await Promise.all([
   db.from("cl360_candidates").select("id,full_name,phone,job_slug,area,experience,screening_data,stage,source,consent_at,assigned_user_id,last_contact_at,next_followup_at,created_at,submission_count").eq("workspace_id",WS).order("created_at",{ascending:false}).limit(500),
   db.from("cl360_jobs").select("id,slug,title,area,location,shift,details,status").eq("workspace_id",WS).order("title"),
-  db.from("cl360_followups").select("id,candidate_id,title,due_at,status,assigned_user_id").eq("workspace_id",WS).order("due_at").limit(500)
+  db.from("cl360_followups").select("id,candidate_id,title,due_at,status,assigned_user_id,created_at,updated_at").eq("workspace_id",WS).order("due_at").limit(500)
  ]);
  $("refresh").disabled=false;
  if(c.error){working("No se pudo cargar la lista.");err(c.error);return;}
@@ -97,7 +97,7 @@ async function load(){
  $("m-qualified").textContent=candidates.filter(x=>x.stage==="qualified").length;
  $("m-overdue").textContent=followups.filter(x=>x.status==="pending"&&new Date(x.due_at).getTime()<now).length;
  $("last-updated").textContent="Actualizado "+new Date().toLocaleTimeString("es-MX");
- renderCandidates();renderFollowups();renderJobManagement();
+ renderCandidates();renderFollowups();renderJobManagement();renderFlyAgents();
  renderHome();renderPipeline();await loadConversations();
  if(selected){const still=candidates.find(x=>x.id===selected);if(still&&activeView==="candidatos")renderDetail(still);else if(!still){selected=null;$("detail").classList.add("hide");}}
 }
@@ -137,6 +137,87 @@ function renderCandidates(){
   row.addEventListener("click",open);
   row.addEventListener("keydown",event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();open();}});
  });
+}
+
+function flyInsightsAt(now=Date.now()){
+ const validDue=f=>Number.isFinite(new Date(f.due_at).getTime());
+ const pending=followups.filter(f=>f.status==="pending"&&validDue(f));
+ const overdue=pending.filter(f=>new Date(f.due_at).getTime()<now).sort((a,b)=>new Date(a.due_at)-new Date(b.due_at));
+ const dueSoon=pending.filter(f=>new Date(f.due_at).getTime()>=now&&new Date(f.due_at).getTime()<=now+86400000).sort((a,b)=>new Date(a.due_at)-new Date(b.due_at));
+ const newCandidates=candidates.filter(c=>c.stage==="new").sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+ const within=days=>candidates.filter(c=>{const created=new Date(c.created_at).getTime();return Number.isFinite(created)&&created>=now-days*86400000&&created<=now;}).length;
+ return {overdue,dueSoon,newCandidates,pendingCount:followups.filter(f=>f.status==="pending").length,doneCount:followups.filter(f=>f.status==="done").length,
+  registered7:within(7),registered30:within(30),hiredCount:candidates.filter(c=>c.stage==="hired").length,
+  activeCount:candidates.filter(c=>["contacted","screening","interview"].includes(c.stage)).length};
+}
+function flyActionRow(heading,description,action,label){
+ const row=document.createElement("div");row.className="fly-action-row";
+ const info=document.createElement("div");
+ const name=document.createElement("strong");name.textContent=heading;
+ const detail=document.createElement("div");detail.className="small";detail.textContent=description;
+ info.append(name,detail);row.append(info);
+ if(action){const button=document.createElement("button");button.type="button";button.className="btn ghost";button.textContent=label;button.addEventListener("click",action);row.append(button);}
+ return row;
+}
+function renderFlyAgents(){
+ if(!canLoad)return;
+ const current=Date.now(),r=flyInsightsAt(current);
+ const review=$("fly-review-list"),tasks=$("fly-followup-list"),performance=$("fly-performance"),home=$("fly-home-alerts");
+ if(!review||!tasks||!performance||!home)return;
+ $("fly-review-count").textContent=r.newCandidates.length+" por revisar";
+ review.replaceChildren();
+ if(!r.newCandidates.length)review.append(flyActionRow("Sin registros nuevos pendientes","Astrid puede consultar el historial de candidatos."));
+ r.newCandidates.slice(0,10).forEach(c=>{
+  const notes=candidateReviewNotes(c);
+  const detail=title(c.job_slug)+" · "+fmt(c.created_at)+(notes.length?" · "+notes.join(" "):" · Validar requisitos y siguiente paso.");
+  review.append(flyActionRow(c.full_name,detail,()=>openCandidate(c.id),"Ver expediente"));
+ });
+ if(r.newCandidates.length>10)review.append(flyActionRow("Más registros pendientes","Hay "+(r.newCandidates.length-10)+" expedientes adicionales.",()=>navigate("candidatos"),"Ver todos"));
+ $("fly-followup-count").textContent=r.overdue.length+" vencidos";
+ tasks.replaceChildren();
+ if(!r.overdue.length&&!r.dueSoon.length)tasks.append(flyActionRow("Sin vencimientos detectados","No se encontraron tareas vencidas ni programadas para las próximas 24 horas."));
+ r.overdue.slice(0,8).forEach(f=>{
+  const c=candidates.find(x=>x.id===f.candidate_id);
+  tasks.append(flyActionRow("Vencido: "+f.title,(c?.full_name||"Candidato")+" · Debió atenderse "+fmt(f.due_at),()=>c?openCandidate(c.id):navigate("seguimientos"),"Abrir"));
+ });
+ r.dueSoon.slice(0,6).forEach(f=>{
+  const c=candidates.find(x=>x.id===f.candidate_id);
+  tasks.append(flyActionRow("Próximo: "+f.title,(c?.full_name||"Candidato")+" · Programado "+fmt(f.due_at),()=>c?openCandidate(c.id):navigate("seguimientos"),"Abrir"));
+ });
+ if(r.overdue.length>8||r.dueSoon.length>6)tasks.append(flyActionRow("Más tareas","Consulta la agenda para revisar todos los seguimientos.",()=>navigate("seguimientos"),"Ver agenda"));
+ performance.replaceChildren();
+ const metrics=[
+  ["Postulaciones · últimos 7 días",r.registered7],
+  ["Postulaciones · últimos 30 días",r.registered30],
+  ["Expedientes sin contactar",r.newCandidates.length],
+  ["Candidatos en proceso",r.activeCount],
+  ["Contrataciones registradas · total actual",r.hiredCount],
+  ["Tareas pendientes · total",r.pendingCount],
+  ["Seguimientos vencidos",r.overdue.length],
+  ["Seguimientos completados · total registrado",r.doneCount]
+ ];
+ const grid=document.createElement("div");grid.className="fly-metric-grid";
+ metrics.forEach(([label,value])=>{
+  const item=document.createElement("div");item.className="fly-mini-metric";
+  const number=document.createElement("strong");number.textContent=String(value);
+  const caption=document.createElement("span");caption.textContent=label;
+  item.append(number,caption);grid.append(item);
+ });
+ performance.append(grid);
+ const disclaimer=document.createElement("p");disclaimer.className="small";
+ disclaimer.textContent="Indicadores calculados sobre los registros cargados del CRM (hasta 500 candidatos y 500 tareas). No mide llamadas, mensajes externos ni la fecha real de contratación.";
+ performance.append(disclaimer);
+ home.replaceChildren();
+ const message=document.createElement("p");
+ message.textContent=r.overdue.length?
+   "Hay "+r.overdue.length+" seguimiento(s) vencido(s), "+r.dueSoon.length+" por vencer en 24 horas y "+r.newCandidates.length+" expediente(s) sin contactar.":
+   "No hay seguimientos vencidos. Hay "+r.dueSoon.length+" próximos en 24 horas y "+r.newCandidates.length+" expediente(s) sin contactar.";
+ home.append(message);
+ const actions=document.createElement("div");actions.className="fly-home-actions";
+ if(r.overdue.length||r.dueSoon.length){const btn=document.createElement("button");btn.className="btn ghost";btn.textContent="Revisar seguimientos";btn.addEventListener("click",()=>navigate("seguimientos"));actions.append(btn);}
+ if(r.newCandidates.length){const btn=document.createElement("button");btn.className="btn ghost";btn.textContent="Ver candidatos";btn.addEventListener("click",()=>navigate("candidatos"));actions.append(btn);}
+ home.append(actions);
+ $("fly-agents-updated").textContent="Actualizado "+new Date(current).toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"});
 }
 function renderFollowups(){
  const pending=followups.filter(f=>f.status==="pending").slice(0,20);
@@ -251,7 +332,8 @@ function navigate(view,candidateId=null,fromHistory=false){
  if(view==="candidatos"&&selected){const c=candidates.find(x=>x.id===selected);if(c)renderDetail(c);}
  if(view==="pipeline")renderPipeline();
  if(view==="conversaciones")renderInbox();
- if(view==="inicio")renderHome();
+ if(view==="inicio"){renderHome();renderFlyAgents();}
+ if(view==="fly")renderFlyAgents();
  if(view==="ajustes")$("settings-user").textContent=(user?.email||"Cuenta autorizada")+" · "+(staffRole||"");
  document.title=appViews[view]+" · Conexión Laboral 360";
  window.scrollTo({top:0,behavior:"auto"});
@@ -275,6 +357,7 @@ $("job-add-shortcut").addEventListener("click",()=>{
  $("job-title").focus({preventScroll:true});
 });
 $("conversation-refresh").addEventListener("click",loadConversations);
+$("fly-agents-refresh").addEventListener("click",load);
 $("inbox-filter").addEventListener("change",renderInbox);
 $("settings-signout").addEventListener("click",()=> $("signout").click());
 function renderHome(){
@@ -330,7 +413,7 @@ async function loadConversations(){
  if(error){conversationsLoadError=true;console.error("No se pudo consultar la bandeja.");return;}
  conversationsLoadError=false;threads=data||[];
  $("nav-inbox-count").textContent=threads.filter(t=>t.status==="waiting").length;
- renderHome();renderInbox();
+ renderHome();renderInbox();renderFlyAgents();
 }
 function renderInbox(){
  const list=$("inbox-threads");
