@@ -1,0 +1,89 @@
+name: CL360 · PWA y toma humana de mensajes
+on:
+  push:
+    paths:
+      - crm/**
+      - .github/workflows/cl360-pwa-mensajes-smoke.yml
+  workflow_dispatch:
+jobs:
+  mobile:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preparar navegador
+        run: npm install --no-save --no-package-lock --ignore-scripts playwright-core@1.56.1
+      - name: Probar instalación y bandeja sin datos reales
+        shell: bash
+        run: |
+          ln -s "$GITHUB_WORKSPACE" /tmp/Conexionlaboral360
+          cd /tmp
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/cl360-messages-http.log 2>&1 &
+          sleep 2
+          NODE_PATH="$GITHUB_WORKSPACE/node_modules" node <<'JS'
+          const {chromium}=require('playwright-core');
+          (async()=>{
+           const browser=await chromium.launch({headless:true,executablePath:'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
+           const page=await browser.newPage({viewport:{width:390,height:844}});
+           const origin='http://127.0.0.1:8765/Conexionlaboral360/crm/';
+           const errors=[];page.on('pageerror',err=>errors.push(err.message));
+           const manifest=await (await page.request.get(origin+'manifest.webmanifest')).json();
+           if(manifest.display!=='standalone'||manifest.scope!=='./'||!manifest.icons.some(i=>i.sizes==='192x192')||!manifest.icons.some(i=>i.sizes==='512x512'))throw Error('Manifest PWA incompleto');
+           for(const icon of ['icon-192.png','icon-512.png']){
+             const img=await page.request.get(origin+icon);
+             if(img.status()!==200||!(await img.body()).subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))throw Error('Icono PNG inválido: '+icon);
+           }
+           console.log('Manifest e iconos 192/512: OK');
+           const owner='a78ef7ff-0389-4587-92b2-8e442973888b';
+           await page.route('https://cdn.jsdelivr.net/**',route=>route.fulfill({
+             status:200,contentType:'application/javascript',
+             body:`(function(){
+               const owner='a78ef7ff-0389-4587-92b2-8e442973888b';
+               const candidate={id:'c1111111-1111-4111-8111-111111111111',full_name:'Candidato de prueba',phone:'3312345678',job_slug:'coto-magnolias',area:'Seguridad',experience:'Experiencia ficticia',stage:'new',created_at:'2026-11-24T12:00:00Z',screening_data:{availability:'consultar',experience_level:'no',preferred_zone:'Zapopan'}};
+               const thread={id:'d1111111-1111-4111-8111-111111111111',candidate_id:candidate.id,status:'waiting',handler_id:null,last_message_at:'2026-11-24T12:00:00Z'};
+               const transcript=[
+                 {id:'e1111111-1111-4111-8111-111111111111',source:'candidate',visibility:'internal',body:'Pregunta ficticia sobre el turno',created_at:'2026-11-24T12:00:00Z'},
+                 {id:'e2222222-2222-4222-8222-222222222222',source:'fly',visibility:'internal',body:'Respuesta ficticia verificada',created_at:'2026-11-24T12:01:00Z'}
+               ];
+               window.__mockMessages=transcript;
+               window.__mockOutgoing=0;
+               window.supabase={createClient(){return {
+                 auth:{getUser:async()=>({data:{user:{id:owner,email:'cuenta-prueba@example.invalid'}}}),signOut:async()=>({}),signInWithPassword:async()=>({error:null})},
+                 from(name){const rows={cl360_candidates:[candidate],cl360_jobs:[{slug:'coto-magnolias',title:'Coto Magnolias',area:'Seguridad',location:'San Agustín',shift:'12x12',status:'active'}],cl360_followups:[],cl360_conversations:[thread],cl360_chat_messages:transcript};
+                   const query={select(){return query},eq(){return query},order(){return query},limit(){return Promise.resolve({data:rows[name]||[],error:null})},maybeSingle(){return Promise.resolve({data:{role:'owner',status:'active'},error:null})},
+                    insert(){window.__mockOutgoing++;return Promise.resolve({data:null,error:null})},
+                    update(){return query},then(resolve){return Promise.resolve({data:rows[name]||[],error:null}).then(resolve)}};
+                   return query;
+                 },
+                 rpc:async(method,params)=>{if(method==='cl360_take_conversation'){
+                   thread.status=params.p_action==='take'?'human':params.p_action==='release'?'waiting':params.p_action==='close'?'closed':'waiting';
+                   thread.handler_id=thread.status==='human'?owner:null;
+                 }return {data:'human',error:null};}
+               }}};
+             })();`
+           }));
+           await page.route('https://qwxydjotwhniahaovrff.supabase.co/functions/v1/cl360-fly-chat',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,ready:true})}));
+           await page.goto(origin,{waitUntil:'domcontentloaded'});
+           await page.locator('#dashboard').waitFor({state:'visible',timeout:15000});
+           if(!await page.locator('#install-crm').isVisible())throw Error('No aparece Instalar app');
+           const inline=page.locator('link[rel="manifest"]');if(await inline.count()!==1)throw Error('Falta vínculo al manifest');
+           await page.locator('.mobile-nav [data-nav="conversaciones"]').click();
+           await page.locator('#view-conversaciones').waitFor({state:'visible'});
+           await page.locator('#inbox-threads button').first().click();
+           await page.locator('.chat-timeline').filter({hasText:'Pregunta ficticia sobre el turno'}).waitFor({state:'visible'});
+           if(await page.locator('.wa-handoff textarea').count()!==0)throw Error('Respuestas habilitadas sin toma humana');
+           await page.getByRole('button',{name:'Tomar conversación'}).click();
+           const textarea=page.locator('.wa-handoff textarea');
+           await textarea.waitFor({state:'visible'});
+           await textarea.fill('Hola, soy Astrid. Continuemos tu proceso.');
+           const wa=page.getByRole('link',{name:/Abrir respuesta en WhatsApp/});
+           const href=await wa.getAttribute('href');
+           if(!href||!href.startsWith('https://wa.me/523312345678?text=')||!href.includes('Continuemos'))throw Error('Respuesta WhatsApp no preparada');
+           const sent=await page.evaluate(()=>window.__mockOutgoing);
+           if(sent!==0)throw Error('CRM guardó falsamente una respuesta como enviada');
+           console.log('Bandeja: toma humana, texto WhatsApp preparado sin envío ni registro ficticio: OK');
+           if(errors.length)throw Error('Errores JS: '+errors.join('; '));
+           await browser.close();
+          })().catch(error=>{console.error(error);process.exit(1)});
+          JS
