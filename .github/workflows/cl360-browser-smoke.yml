@@ -94,12 +94,24 @@ jobs:
             console.log('Dashboard: prioridad y programación de tarea confirmada');
             await page.evaluate(()=>document.querySelector('button[data-nav="fly"]').click());
             await page.locator('#view-fly').waitFor({state:'visible'});
+            await page.locator('#fly-history-period').selectOption('7');
+            const historical=page.locator('#fly-history-summary .historical-stat');
+            if(await historical.count()!==4)throw Error('Faltan métricas históricas');
+            if(await page.locator('#fly-history-chart .historical-bar-item').count()!==7)throw Error('Faltan barras del histórico');
+            await page.locator('#fly-history-period').selectOption('90');
+            if(await page.locator('#fly-history-chart .historical-bar-item').count()!==13)throw Error('El filtro histórico no se actualiza');
+            console.log('Histórico: 7 y 90 días correctos');
             for(const id of ['fly-review-list','fly-followup-list','fly-performance']){
               if(!await page.locator('#'+id).isVisible())throw Error('Falta panel interno '+id);
             }
             await page.locator('#fly-agents-refresh').click();
             await page.locator('#fly-agents-updated').waitFor({state:'visible'});
             console.log('Tres asistentes Fly visibles y actualizables sin recargar sesión');
+            await page.locator('#crm-alerts-toggle').click();
+            if(!await page.locator('#crm-alerts-panel').isVisible())throw Error('Campanita no abre alertas');
+            await page.locator('#crm-alerts-close').click();
+            if(!await page.locator('#crm-alerts-panel').isHidden())throw Error('Panel de alertas no se cierra');
+            console.log('Campanita de alertas: abrir y cerrar OK');
             const stillLoggedIn=await page.locator('#dashboard').isVisible()&&!await page.locator('#auth-screen').isVisible();
             const navigationWithoutReload=await page.evaluate(()=>window.__crmSessionProbe==='same-document-session');
             console.log(JSON.stringify({navigationWithoutReload,stillLoggedIn,historyEvents:changes.length-initialNavigations,latestPath:new URL(page.url()).pathname}));
