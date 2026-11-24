@@ -57,3 +57,20 @@ Perfil `Fly Recruiter · Conexión Laboral 360` creado en `ai_agent_profiles`, *
 ## Alcance no implementado
 
 Conector operativo Fly, autoseguimiento de mensajes reales, sincronización oficial WhatsApp/Messenger, importación automática de conversaciones externas, notificaciones push de seguimiento, reportes PDF y filtro avanzado de CV. No anunciar estas funciones como disponibles.
+
+
+## Nuevo recorrido: preentrevista antes de WhatsApp (23/nov/2026)
+
+**Ruta pública:** `/asistente/`. Los botones principales de la landing apuntan a este recorrido, conservando el contacto humano para consultas de accesibilidad y privacidad.
+
+1. La persona elige una vacante **activa** desde el catálogo del workspace.
+2. El asistente guiado informa área, ubicación, turno y respuestas frecuentes; no publica montos ni inventa condiciones.
+3. Pregunta por experiencia previa, descripción libre de experiencia, disponibilidad para el turno y zona preferida. Una respuesta negativa **no elimina ni bloquea** la postulación.
+4. Solicita nombre, teléfono y autorización de tratamiento. Antes de enviarla muestra un resumen para revisión.
+5. La Edge Function `cl360-apply` valida el cuestionario y llama al RPC privado `cl360_submit_screened_application`. Registra las respuestas en `cl360_candidates.screening_data`, junto con el texto de experiencia, sin puntajes ni decisiones automatizadas.
+6. **Solo tras la confirmación de guardado**, muestra el enlace de WhatsApp para la Lic. Astrid Araiza. No se envía ningún mensaje automáticamente.
+7. El CRM muestra los datos declarados y deja las decisiones sobre contacto, entrevista y contratación al equipo humano.
+
+**Estado real:** la experiencia conversacional actual es **guiada y determinista**, no un modelo generativo de IA en funcionamiento. Compás Fly Recruiter sigue desactivado y pendiente de conexión verificada, conforme al issue [#305](https://github.com/Rujumagil/compas-evolution/issues/305). No se deben presentar sus respuestas como IA generativa hasta completar conexión, trazabilidad, control de costos, supervisión, pruebas de discriminación y consentimiento.
+
+**Seguridad:** el RPC de registro con cuestionario no está disponible para `anon`; se ejecuta solo desde Edge con rol de servicio y sus credenciales no aparecen en GitHub Pages. La casilla de consentimiento es obligatoria. Falta una prueba completa de registro desde navegador usando datos de una persona que autorice expresamente el ensayo, y validar el aviso de privacidad definitivo antes de campañas masivas.
