@@ -58,7 +58,7 @@ Deno.serve(async(req:Request)=>{
  if(history.some(x=>x.text.length>650))return response(400,{ok:false,error:"datos_invalidos"});
  let vacancies:Array<{slug:string,title:string,area:string,location:string,shift:string,details:unknown}>=[];
  try{
-  vacancies=await rest("cl360_jobs?select=slug,title,area,location,shift,details&workspace_id=eq."+WS+"&status=eq.active&order=created_at.asc&limit=25");
+  vacancies=await rest("cl360_jobs?select=slug,title,area,location,shift&workspace_id=eq."+WS+"&status=eq.active&order=created_at.asc&limit=25");
  }catch{return response(503,{ok:false,error:"vacantes_no_disponibles"});}
  const job=vacancies.find(v=>v.slug===jobSlug);
  if(!job)return response(400,{ok:false,error:"vacante_no_disponible"});
@@ -75,7 +75,7 @@ Deno.serve(async(req:Request)=>{
    return response(503,{ok:false,error:"limites_no_disponibles"});
   }
  }catch{return response(503,{ok:false,error:"limites_no_disponibles"});}
- const catalogue=vacancies.map(j=>({vacante:j.title,area:j.area,zona:j.location,turno:j.shift,detalles:Array.isArray(j.details)?j.details.slice(0,6):[]}));
+ const catalogue=vacancies.map(j=>({vacante:j.title,area:j.area,zona:j.location,turno:j.shift}));
  const instruction=[
   "Eres Fly Recruiter, asistente VIRTUAL de reclutamiento de Conexión Laboral 360. No digas que eres una persona ni simules identidad humana. No hace falta hablar de arquitectura técnica.",
   "Habla en español mexicano de modo profesional, amable, cercano y breve, como una conversación natural. Responde primero la pregunta y después haz máximo UNA pregunta pertinente.",
