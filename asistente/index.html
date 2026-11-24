@@ -209,7 +209,7 @@ async function askDetails(){
 }
 async function askAvailability(){
  const response=answers.experience_level==="si"?"Gracias por contarme.":"Gracias por compartirlo conmigo.";
- await stage("availability",response+" El horario anunciado es "+selected.shift+". ¿Cómo te quedaría?",()=>{
+ await stage("availability",response+" El horario anunciado es "+selected.shift+". ¿Cómo te quedaría? Si no te acomoda, Astrid puede revisar otras opciones contigo.",()=>{
   [["Me funciona el turno","si"],["Por ahora no puedo","no"],["Necesito revisarlo","consultar"]].forEach(([text,value])=>
    option(text,()=>{answers.availability=value;say(text);askZone();})
   );
@@ -259,6 +259,7 @@ async function askReview(){
   const error=errorLine();error.id="send-error";
   option("Sí, enviar mi postulación",submit,"gold");
   option("Quiero corregir mis datos",askContact);
+  addAstridWhatsApp();
  });
 }
 async function submit(){
@@ -282,7 +283,7 @@ async function submit(){
   setPhase("done");
   await reply("¡Listo, "+firstName()+"! 🎉 Tu postulación se registró correctamente. Gracias por platicar conmigo.");
   if(flyUsedWithConsent&&!data.flyHistoryLinked)await reply("Tu registro se guardó. No pude adjuntar las preguntas libres; Astrid sí podrá consultar el resumen de tu preentrevista.");
-  await reply("Ahora sí, puedes continuar directamente con la Lic. Astrid Araiza por WhatsApp. Ella revisará tus respuestas y te compartirá los detalles del puesto. La contratación aún no está confirmada.");
+  await reply(humanReviewReasons().length?"Tu registro ya está guardado. Estos puntos merecen revisión con Astrid: "+humanReviewReasons().join("; ")+". Puedes continuar con ella por WhatsApp. La contratación aún no está confirmada.":"Tu registro ya está guardado. Puedes continuar con Astrid por WhatsApp para revisar los detalles y siguientes pasos. La contratación aún no está confirmada.");
   const message="Hola, Lic. Astrid Araiza. Terminé mi preentrevista en Conexión Laboral 360. Soy "+answers.name+" y me interesa la vacante "+selected.title+". Me gustaría continuar mi postulación.";
   const a=document.createElement("a");a.className="action gold";a.href=WA+"?text="+encodeURIComponent(message);a.target="_blank";a.rel="noopener noreferrer";
   a.textContent="Hablar con Astrid por WhatsApp";$("controls").append(a);
@@ -291,7 +292,7 @@ async function submit(){
  finally{busy=false;}
 }
 const faq={
- salary:"El sueldo y las condiciones de contratación los explica directamente la Lic. Astrid Araiza cuando concluyas tu registro. Prefiero que te comparta los datos confirmados.",
+ salary:"Con gusto te ayudo con esa duda, pero no tengo una cifra confirmada para darte. Astrid puede aclarar el sueldo y las condiciones de esta vacante. Si quieres, te comparto su WhatsApp.",
  benefits:"En las vacantes actuales de seguridad se anuncian prestaciones de ley, pago semanal, sin semana de fondo y pagos puntuales. Los detalles específicos los confirma Astrid; otras áreas pueden tener condiciones diferentes.",
  process:"Primero platicamos sobre la vacante, tu experiencia, disponibilidad y zona preferida. Con tu permiso guardamos la postulación; después podrás hablar por WhatsApp con Astrid. Ella realiza el seguimiento y la evaluación.",
  privacy:"Tus datos se guardan en un CRM privado cuando nos autorizas. Puedes consultar los detalles en el aviso de privacidad y solicitar ayuda o el ejercicio de tus derechos a través del contacto indicado.",
@@ -327,8 +328,32 @@ function showContextChoices(){
  else if(!selected&&phase==="choose")showJobChoices();
 }
 function yesNo(q){if(/\b(si|claro|adelante|me interesa|quiero|vamos|continuar|postularme)\b/.test(q))return "si";if(/\b(no|otra|otras|diferente|cambiar)\b/.test(q))return "no";return null;}
+function humanReviewReasons(){
+ const reasons=[];
+ if(answers.availability==="no")reasons.push("el turno anunciado no coincide con tu disponibilidad");
+ if(answers.availability==="consultar")reasons.push("necesitas confirmar el horario");
+ if(answers.experience_level==="prefiero_comentarlo")reasons.push("prefieres comentar tu experiencia personalmente");
+ return reasons;
+}
+function addAstridWhatsApp(){
+ const a=document.createElement("a");
+ a.className="action secondary";a.target="_blank";a.rel="noopener noreferrer";
+ a.href=WA+"?text="+encodeURIComponent("Hola, Lic. Astrid Araiza. Me comunico desde Conexión Laboral 360"+(selected?" por la vacante "+selected.title:" para consultar sus vacantes")+". ¿Me puede orientar, por favor?");
+ a.textContent="Hablar con Astrid por WhatsApp ↗";
+ $("controls").append(a);
+}
+async function referToAstrid(){
+ await reply("¡Claro! Te puedo comunicar con la Lic. Astrid Araiza. Su WhatsApp es 33 1970 8528. El enlace prepara un mensaje que tú decides enviar; el chat de WhatsApp no se sincroniza automáticamente con esta conversación.");
+ addAstridWhatsApp();
+ if(selected&&phase==="choose")option("Continuar mi postulación",askExperience);
+ else if(!selected)option("Seguir viendo vacantes",showJobs);
+}
 async function handleNaturalMessage(message){
  const q=normalizeQuestion(message);
+ if(/(astrid|hablar con (una )?persona|atencion humana|reclutadora|asesora|whatsapp|telefono de contacto|numero de contacto)/.test(q)&&
+    /(hablar|platicar|contactar|whatsapp|telefono|numero|persona|humana|asesora|reclutadora|astrid)/.test(q)){
+   await referToAstrid();return;
+ }
  if(!jobs.length&&phase==="loading"){await reply("Estoy consultando las vacantes. Puedes intentar de nuevo en un momento.");return;}
  const found=matchJob(message);
  if(!selected&&found&&/\?|^(que|cual|como|donde|cuanto)\b/.test(q)&&/(turno|horario|zona|donde|ubicacion)/.test(q)&&!/me interesa|postular|quiero registrarme/.test(q)){
@@ -369,7 +394,10 @@ async function handleNaturalMessage(message){
   showJobChoices();return;
  }
  if(!flyReady||!$("fly-consent").checked){
-  await reply(answerQuestion(message));showContextChoices();return;
+  await reply(answerQuestion(message));
+  if(/sueldo|salario|cuanto pagan|pagan|dinero|remuneracion|requisitos|documentos/.test(q))addAstridWhatsApp();
+  else showContextChoices();
+  return;
  }
  await replyToOpenQuestion(message);
 }
