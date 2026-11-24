@@ -38,7 +38,13 @@
  <div class="app-main">
  <div class="app-toolbar">
    <div><p class="eyebrow">CONEXIÓN LABORAL 360 · CRM</p><h1 id="view-title">Centro de operaciones</h1></div>
-   <div class="toolbar-actions"><button class="btn ghost" id="install-crm" type="button">⬇ Instalar app</button><span id="install-crm-status" class="small" role="status"></span><span id="last-updated" class="stamp">Última actualización —</span><button class="btn ghost" id="global-refresh" type="button">↻ Actualizar</button><a class="btn yellow" href="../asistente/" target="_blank" rel="noopener noreferrer">Ver asistente ↗</a></div>
+   <div class="toolbar-actions"><button class="btn ghost" id="install-crm" type="button">⬇ Instalar app</button><span id="install-crm-status" class="small" role="status"></span><button type="button" class="btn ghost alerts-button" id="crm-alerts-toggle" aria-expanded="false" aria-controls="crm-alerts-panel">🔔 Alertas <span id="crm-alerts-count" class="alerts-count" hidden>0</span></button><span id="last-updated" class="stamp">Última actualización —</span><button class="btn ghost" id="global-refresh" type="button">↻ Actualizar</button><a class="btn yellow" href="../asistente/" target="_blank" rel="noopener noreferrer">Ver asistente ↗</a></div>
+ </div>
+ <div class="crm-alerts-panel hide" id="crm-alerts-panel" aria-label="Centro de alertas">
+  <div class="alerts-head"><div><strong>Alertas de seguimiento</strong><p>Avisos de tareas vencidas y próximas</p></div><button type="button" class="btn ghost" id="crm-alerts-close">Cerrar</button></div>
+  <div id="crm-alerts-list" aria-live="polite">Consultando agenda…</div>
+  <button type="button" class="btn ghost" id="crm-enable-notifications">Activar avisos del navegador</button>
+  <p id="crm-notification-status" class="small">Los avisos del navegador funcionan mientras esta app está abierta. No son notificaciones push con la app cerrada.</p>
  </div>
  <div class="app-content">
   <section class="app-view" data-view="inicio" id="view-inicio">
@@ -126,7 +132,10 @@
      <div id="fly-followup-list" class="fly-agent-results" aria-live="polite"><p class="empty">Consultando agenda…</p></div>
     </section>
     <section class="panel fly-agent">
-     <div class="panel-head"><div><span class="tag">ASISTENTE 3 · RENDIMIENTO</span><h2>Indicadores de Astrid</h2></div></div>
+     <div class="panel-head"><div><span class="tag">ASISTENTE 3 · RENDIMIENTO</span><h2>Histórico de reclutamiento</h2></div>
+     <label class="historical-period-label">Período <select id="fly-history-period"><option value="7">7 días</option><option value="30" selected>30 días</option><option value="90">90 días</option></select></label></div>
+     <div id="fly-history-summary" class="historical-summary" aria-live="polite"></div>
+     <div id="fly-history-chart" class="historical-chart" role="img" aria-label="Postulaciones por semana"></div>
      <p class="small">Muestra actividad operativa del CRM. Los resultados reflejan solo registros en el sistema, no toda la actividad de llamadas o WhatsApp.</p>
      <div id="fly-performance" class="fly-agent-results" aria-live="polite"><p class="empty">Calculando indicadores…</p></div>
     </section>
