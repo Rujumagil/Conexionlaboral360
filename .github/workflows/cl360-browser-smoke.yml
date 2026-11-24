@@ -75,6 +75,15 @@ jobs:
             await page.locator('#view-candidatos').waitFor({state:'visible'});
             await page.locator('.mobile-nav [data-nav="inicio"]').click();
             await page.locator('#view-inicio').waitFor({state:'visible'});
+            await page.locator('#fly-home-alerts').waitFor({state:'visible'});
+            await page.evaluate(()=>document.querySelector('button[data-nav="fly"]').click());
+            await page.locator('#view-fly').waitFor({state:'visible'});
+            for(const id of ['fly-review-list','fly-followup-list','fly-performance']){
+              if(!await page.locator('#'+id).isVisible())throw Error('Falta panel interno '+id);
+            }
+            await page.locator('#fly-agents-refresh').click();
+            await page.locator('#fly-agents-updated').waitFor({state:'visible'});
+            console.log('Tres asistentes Fly visibles y actualizables sin recargar sesión');
             const stillLoggedIn=await page.locator('#dashboard').isVisible()&&!await page.locator('#auth-screen').isVisible();
             const navigationWithoutReload=await page.evaluate(()=>window.__crmSessionProbe==='same-document-session');
             console.log(JSON.stringify({navigationWithoutReload,stillLoggedIn,historyEvents:changes.length-initialNavigations,latestPath:new URL(page.url()).pathname}));
