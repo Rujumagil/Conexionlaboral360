@@ -96,5 +96,8 @@ jobs:
             serve(handler:(request:Request)=>Response|Promise<Response>):void;
           };
           TS
-          ./node_modules/.bin/tsc --noEmit --skipLibCheck --lib ES2022,DOM --target ES2022 --module esnext --strict false /tmp/cl360-deno-globals.d.ts supabase/functions/cl360-fly-chat/index.ts supabase/functions/cl360-apply/index.ts
+          for fn in cl360-fly-chat cl360-apply; do
+            ./node_modules/.bin/tsc --noEmit --skipLibCheck --lib ES2022,DOM --target ES2022 --module esnext --strict false /tmp/cl360-deno-globals.d.ts "supabase/functions/$fn/index.ts"
+            echo "TypeScript correcto: $fn"
+          done
           echo "Backend TypeScript correcto"
