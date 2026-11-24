@@ -21,7 +21,7 @@ jobs:
           cd /tmp
           python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/cl360-chat-http.log 2>&1 &
           sleep 2
-          node <<'JS'
+          NODE_PATH="$GITHUB_WORKSPACE/node_modules" node <<'JS'
           const {chromium}=require('playwright-core');
           (async()=>{
             const browser=await chromium.launch({headless:true,executablePath:'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
