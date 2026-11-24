@@ -1,0 +1,67 @@
+name: CL360 · Conversación natural móvil
+on:
+  push:
+    paths:
+      - asistente/index.html
+      - .github/workflows/cl360-natural-chat-smoke.yml
+  workflow_dispatch:
+jobs:
+  conversational-flow:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preparar prueba de navegador móvil
+        run: npm install --no-save --no-package-lock --ignore-scripts playwright-core@1.56.1
+      - name: Probar conversación, vacantes y preentrevista sin datos reales
+        shell: bash
+        run: |
+          ln -s "$GITHUB_WORKSPACE" /tmp/Conexionlaboral360
+          cd /tmp
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/cl360-chat-http.log 2>&1 &
+          sleep 2
+          node <<'JS'
+          const {chromium}=require('playwright-core');
+          (async()=>{
+            const browser=await chromium.launch({headless:true,executablePath:'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
+            const page=await browser.newPage({viewport:{width:390,height:844}});
+            const errors=[];page.on('pageerror',e=>errors.push(e.message));
+            const jobs=[
+              {slug:"coto-magnolias",title:"Coto Magnolias",area:"Seguridad",location:"San Agustín",shift:"12x12"},
+              {slug:"coto-la-cima",title:"Coto La Cima",area:"Seguridad",location:"Miravalle",shift:"24x24"}
+            ];
+            await page.route('https://qwxydjotwhniahaovrff.supabase.co/**',async route=>{
+              const u=route.request().url();
+              if(u.includes('/cl360_jobs?'))return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(jobs)});
+              if(u.includes('/functions/v1/cl360-fly-chat'))return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,ready:true})});
+              return route.fulfill({status:404,contentType:'application/json',body:'{}'});
+            });
+            await page.goto('http://127.0.0.1:8765/Conexionlaboral360/asistente/',{waitUntil:'domcontentloaded'});
+            await page.locator('#controls .action').first().waitFor({state:'visible',timeout:15000});
+            const type=async(text)=>{
+              await page.locator('#candidate-question').fill(text);
+              await page.locator('#question-form button[type="submit"]').click();
+            };
+            await type("¿Qué vacantes tienes?");
+            await page.locator('.bubble.assistant').filter({hasText:"Coto Magnolias"}).waitFor({timeout:15000});
+            console.log("Lista contextual de vacantes: OK");
+            await type("Me interesa Coto Magnolias");
+            await page.locator('.bubble.assistant').filter({hasText:"¡Buena elección!"}).waitFor({timeout:15000});
+            console.log("Selección libre de vacante: OK");
+            await type("Quiero postularme");
+            await page.locator('.bubble.assistant').filter({hasText:"¿has trabajado antes"}).waitFor({timeout:15000});
+            await type("No tengo experiencia");
+            await page.locator('.bubble.assistant').filter({hasText:"¿En qué has trabajado"}).waitFor({timeout:15000});
+            await type("Trabajé en una tienda atendiendo clientes");
+            await page.locator('.bubble.assistant').filter({hasText:"¿Cómo te quedaría?"}).waitFor({timeout:15000});
+            await type("Sí me funciona el turno");
+            await page.locator('.bubble.assistant').filter({hasText:"¿Por qué zona"}).waitFor({timeout:15000});
+            await type("Zapopan");
+            await page.locator('#intake-form').waitFor({state:'visible',timeout:15000});
+            if(errors.length)throw Error('Errores de JavaScript: '+errors.join('; '));
+            console.log("Experiencia, disponibilidad y zona por texto: OK");
+            console.log("Formulario de consentimiento visible: OK");
+            await browser.close();
+          })().catch(err=>{console.error(err);process.exit(1)});
+          JS
