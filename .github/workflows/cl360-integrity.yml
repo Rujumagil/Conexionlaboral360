@@ -6,6 +6,7 @@ on:
       - crm/**
       - asistente/index.html
       - supabase/functions/cl360-fly-chat/index.ts
+      - supabase/functions/cl360-apply/index.ts
   workflow_dispatch:
 jobs:
   check:
@@ -80,6 +81,11 @@ jobs:
           if(!chat.includes('await reply(answerQuestion(question))'))throw Error('Falta respaldo guiado');
           if(!edge.includes('store:false'))throw Error('Falta solicitud de no almacenamiento');
           if(!edge.includes('cl360_fly_take_turn'))throw Error('Falta límite del servidor');
+          if(!edge.includes('cl360_fly_record_turn')||!edge.includes('cl360_fly_session_state'))
+            throw Error('Falta historial Fly autenticado o control de toma humana');
+          const apply=fs.readFileSync('supabase/functions/cl360-apply/index.ts','utf8');
+          if(!apply.includes('cl360_fly_attach_session')||!chat.includes('flyConsent:flyUsedWithConsent'))
+            throw Error('Falta vínculo entre entrevista Fly y candidato');
           console.log('Reglas básicas del contrato: correctas');
           JS
       - name: Compilar función TypeScript sin ejecutarla
@@ -90,5 +96,5 @@ jobs:
             serve(handler:(request:Request)=>Response|Promise<Response>):void;
           };
           TS
-          ./node_modules/.bin/tsc --noEmit --skipLibCheck --lib ES2022,DOM --target ES2022 --module esnext --strict false /tmp/cl360-deno-globals.d.ts supabase/functions/cl360-fly-chat/index.ts
+          ./node_modules/.bin/tsc --noEmit --skipLibCheck --lib ES2022,DOM --target ES2022 --module esnext --strict false /tmp/cl360-deno-globals.d.ts supabase/functions/cl360-fly-chat/index.ts supabase/functions/cl360-apply/index.ts
           echo "Backend TypeScript correcto"
