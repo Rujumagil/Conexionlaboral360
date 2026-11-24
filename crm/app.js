@@ -122,7 +122,7 @@ async function load(){
  $("m-overdue").textContent=followups.filter(x=>x.status==="pending"&&new Date(x.due_at).getTime()<now).length;
  $("last-updated").textContent="Actualizado "+new Date().toLocaleTimeString("es-MX");
  renderCandidates();renderFollowups();renderJobManagement();renderFlyAgents();
- renderHome();renderPipeline();await loadConversations();
+ renderHome();renderPipeline();renderCrmAlerts();maybeNotifyOverdue();await loadConversations();
  if(selected){const still=candidates.find(x=>x.id===selected);if(still&&activeView==="candidatos")renderDetail(still);else if(!still){selected=null;$("detail").classList.add("hide");}}
 }
 function title(slug){return jobs.find(x=>x.slug===slug)?.title||slug||"Sin vacante";}
@@ -183,6 +183,99 @@ function flyActionRow(heading,description,action,label){
  if(action){const button=document.createElement("button");button.type="button";button.className="btn ghost";button.textContent=label;button.addEventListener("click",action);row.append(button);}
  return row;
 }
+// Métricas históricas derivadas exclusivamente de fechas registradas en el CRM.
+function historicalStats(days,now=Date.now(),people=candidates,tasks=followups){
+ const range=Number(days),start=now-range*86400000;
+ const windowed=people.filter(c=>{const d=Date.parse(c.created_at);return Number.isFinite(d)&&d>=start&&d<=now;});
+ const contacts=people.filter(c=>{const d=Date.parse(c.last_contact_at);return Number.isFinite(d)&&d>=start&&d<=now;});
+ const created=tasks.filter(t=>{const d=Date.parse(t.created_at);return Number.isFinite(d)&&d>=start&&d<=now;});
+ const completed=tasks.filter(t=>t.status==="done"&&Date.parse(t.updated_at)>=start&&Date.parse(t.updated_at)<=now);
+ const count=range===7?7:range===30?5:13;
+ const step=range*86400000/count;
+ const buckets=Array.from({length:count},(_,i)=>{
+  const from=start+i*step,to=i===count-1?now:start+(i+1)*step;
+  const n=windowed.filter(c=>{const d=Date.parse(c.created_at);return d>=from&&(i===count-1?d<=to:d<to);}).length;
+  const label=new Date(from).toLocaleDateString("es-MX",{day:"numeric",month:"short"});
+  return {label,count:n};
+ });
+ return {range,registrations:windowed.length,contacts:contacts.length,tasksCreated:created.length,
+  currentlyDone:completed.length,buckets};
+}
+function renderHistory(){
+ const select=$("fly-history-period"),summary=$("fly-history-summary"),chart=$("fly-history-chart");
+ if(!select||!summary||!chart)return;
+ const n=historicalStats(Number(select.value));summary.replaceChildren();chart.replaceChildren();
+ const stats=[
+  ["Postulaciones recibidas",n.registrations],
+  ["Candidatos con contacto registrado",n.contacts],
+  ["Tareas creadas",n.tasksCreated],
+  ["Tareas marcadas como completadas",n.currentlyDone]
+ ];
+ for(const [label,value] of stats){
+  const block=document.createElement("div");block.className="historical-stat";
+  const digit=document.createElement("strong");digit.textContent=String(value);
+  const caption=document.createElement("span");caption.textContent=label;
+  block.append(digit,caption);summary.append(block);
+ }
+ const max=Math.max(1,...n.buckets.map(b=>b.count));
+ for(const b of n.buckets){
+  const item=document.createElement("div");item.className="historical-bar-item";
+  const count=document.createElement("span");count.textContent=String(b.count);
+  const bar=document.createElement("div");bar.className="historical-bar";
+  bar.style.height=Math.max(3,Math.round(110*b.count/max))+"px";
+  bar.setAttribute("title",b.count+" postulaciones desde "+b.label);
+  const label=document.createElement("small");label.textContent=b.label;
+  item.append(count,bar,label);chart.append(item);
+ }
+ const foot=document.createElement("p");foot.className="small historical-foot";
+ foot.textContent="Actividad histórica del CRM. Los contactos se basan en la última fecha registrada por candidato; las tareas completadas usan su última actualización. No representa llamadas de WhatsApp ni tiempos exactos de contratación. Máximo 500 candidatos y 500 tareas cargadas.";
+ chart.after(foot);const previous=chart.parentElement.querySelectorAll(".historical-foot");
+ for(const element of [...previous].slice(0,-1))element.remove();
+}
+let browserReminderEnabled=false,alertTimer=null,previousReminderSignature="";
+function alertItems(now=Date.now(),tasks=followups){
+ return tasks.filter(t=>t.status==="pending"&&Number.isFinite(Date.parse(t.due_at))&&Date.parse(t.due_at)<now)
+  .sort((a,b)=>Date.parse(a.due_at)-Date.parse(b.due_at));
+}
+function renderCrmAlerts(){
+ const overdue=alertItems();
+ const badge=$("crm-alerts-count"),list=$("crm-alerts-list");
+ badge.hidden=!overdue.length;badge.textContent=String(overdue.length);
+ list.replaceChildren();
+ if(!overdue.length){const p=document.createElement("p");p.className="small";p.textContent="Sin seguimientos vencidos registrados.";list.append(p);return;}
+ for(const f of overdue.slice(0,10)){
+  const c=candidates.find(x=>x.id===f.candidate_id);
+  const row=document.createElement("div");row.className="alert-task";
+  const info=document.createElement("div");const title=document.createElement("strong");title.textContent=f.title;
+  const time=document.createElement("small");time.textContent=(c?.full_name||"Candidato")+" · "+fmt(f.due_at);
+  info.append(title,time);const button=document.createElement("button");button.className="btn ghost";button.type="button";button.textContent="Revisar";
+  button.addEventListener("click",()=>{if(c)openCandidate(c.id);else navigate("seguimientos");$("crm-alerts-panel").classList.add("hide");});
+  row.append(info,button);list.append(row);
+ }
+ if(overdue.length>10){const note=document.createElement("p");note.className="small";note.textContent="Hay "+(overdue.length-10)+" vencimientos adicionales. Revisa la agenda.";list.append(note);}
+}
+function maybeNotifyOverdue(){
+ if(!browserReminderEnabled||!canLoad||!window.Notification||Notification.permission!=="granted")return;
+ const items=alertItems().filter(t=>!t.assigned_user_id||t.assigned_user_id===user?.id);
+ if(!items.length){previousReminderSignature="";return;}
+ const signature=items.map(t=>t.id+":"+t.due_at).sort().join("|");
+ if(signature===previousReminderSignature)return;
+ previousReminderSignature=signature;
+ try{const notification=new Notification("Conexión Laboral 360 · Seguimientos",{body:items.length+" tarea(s) vencida(s) requieren revisión en el CRM.",tag:"cl360-overdue",renotify:false});
+  notification.onclick=()=>{window.focus();$("crm-alerts-panel").classList.remove("hide");notification.close();};
+ }catch{ $("crm-notification-status").textContent="Tu navegador bloqueó el aviso. Los pendientes siguen visibles en el CRM."; }
+}
+async function pollDueTasks(){
+ if(!canLoad||document.hidden)return;
+ const {data,error}=await db.from("cl360_followups").select("id,candidate_id,title,due_at,status,assigned_user_id,created_at,updated_at")
+  .eq("workspace_id",WS).eq("status","pending").order("due_at").limit(500);
+ if(error)return;
+ followups=[...followups.filter(t=>t.status!=="pending"),...(data||[])];
+ renderCrmAlerts();maybeNotifyOverdue();
+ if(activeView==="inicio"){renderFlyAgents();renderHome();$("m-overdue").textContent=alertItems().length;}
+ if(activeView==="fly")renderFlyAgents();
+ if(activeView==="seguimientos")renderFollowups();
+}
 function renderFlyAgents(){
  if(!canLoad)return;
  const current=Date.now(),r=flyInsightsAt(current);
@@ -231,6 +324,7 @@ function renderFlyAgents(){
  const disclaimer=document.createElement("p");disclaimer.className="small";
  disclaimer.textContent="Indicadores calculados sobre los registros cargados del CRM (hasta 500 candidatos y 500 tareas). No mide llamadas, mensajes externos ni la fecha real de contratación.";
  performance.append(disclaimer);
+ renderHistory();
  home.replaceChildren();
  const heading=document.createElement("p");heading.className="priority-intro";
  heading.textContent="Las postulaciones sin contactar y las tareas con fecha vencida son asuntos diferentes. Puedes abrir el expediente o programar una acción desde aquí.";
@@ -447,6 +541,21 @@ $("job-add-shortcut").addEventListener("click",()=>{
 });
 $("conversation-refresh").addEventListener("click",loadConversations);
 $("fly-agents-refresh").addEventListener("click",load);
+$("fly-history-period").addEventListener("change",renderHistory);
+$("crm-alerts-toggle").addEventListener("click",()=>{
+ const panel=$("crm-alerts-panel"),open=panel.classList.toggle("hide")===false;
+ $("crm-alerts-toggle").setAttribute("aria-expanded",String(open));if(open)renderCrmAlerts();
+});
+$("crm-alerts-close").addEventListener("click",()=>{$("crm-alerts-panel").classList.add("hide");$("crm-alerts-toggle").setAttribute("aria-expanded","false");});
+$("crm-enable-notifications").addEventListener("click",async()=>{
+ if(!("Notification" in window)){ $("crm-notification-status").textContent="Este navegador no admite avisos del sistema.";return;}
+ if(!window.isSecureContext){$("crm-notification-status").textContent="Se requiere HTTPS para activar avisos.";return;}
+ const permission=await Notification.requestPermission();
+ if(permission!=="granted"){$("crm-notification-status").textContent="No se concedió permiso. Las alertas siguen disponibles en el CRM.";return;}
+ browserReminderEnabled=true;$("crm-notification-status").textContent="Avisos activados mientras la app esté abierta. No se envían con la app cerrada.";
+ previousReminderSignature="";maybeNotifyOverdue();
+});
+
 $("inbox-filter").addEventListener("change",renderInbox);
 $("settings-signout").addEventListener("click",()=> $("signout").click());
 function renderHome(){
@@ -656,5 +765,7 @@ async function changeConversationStatus(id,action){
 }
 
 setupCrmInstall();
+alertTimer=window.setInterval(pollDueTasks,60000);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)pollDueTasks();});
 checkAuth().catch(error=>{$("login-error").textContent="Error de conexión. Actualiza la página.";console.error(error?.message||"Error");});
 })();
