@@ -3,6 +3,8 @@ on:
   push:
     paths:
       - .github/workflows/cl360-fly-health.yml
+      - supabase/functions/cl360-fly-chat/index.ts
+      - supabase/functions/cl360-apply/index.ts
   workflow_dispatch:
 jobs:
   verify:
