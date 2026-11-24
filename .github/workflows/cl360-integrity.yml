@@ -7,6 +7,8 @@ on:
       - asistente/index.html
       - supabase/functions/cl360-fly-chat/index.ts
       - supabase/functions/cl360-apply/index.ts
+      - supabase/functions/cl360-candidate-chat/index.ts
+      - mensajes/**
   workflow_dispatch:
 jobs:
   check:
@@ -126,6 +128,18 @@ jobs:
           const apply=fs.readFileSync('supabase/functions/cl360-apply/index.ts','utf8');
           if(!apply.includes('cl360_fly_attach_session')||!chat.includes('flyConsent:flyUsedWithConsent'))
             throw Error('Falta vínculo entre entrevista Fly y candidato');
+          const candidateChannel=fs.readFileSync('supabase/functions/cl360-candidate-chat/index.ts','utf8');
+          const messageApp=fs.readFileSync('mensajes/app.js','utf8');
+          const messageManifest=JSON.parse(fs.readFileSync('mensajes/manifest.webmanifest','utf8'));
+          if(!candidateChannel.includes('chat_no_autorizado')||!candidateChannel.includes('cl360_candidate_send_inapp'))
+            throw Error('El chat del candidato debe exigir consentimiento y RPC privada');
+          if(!apply.includes('live_chat_enabled:true')||!chat.includes('id="live-chat-consent"'))
+            throw Error('Debe comprobarse el consentimiento del seguimiento en el sitio');
+          if(!messageApp.includes('cl360_staff_send_candidate_message')||!messageApp.includes('live_chat_enabled===true')||!messageApp.includes('send-whatsapp'))
+            throw Error('Faltan los dos canales de respuesta supervisada');
+          if(messageManifest.scope!=='./'||messageManifest.display!=='standalone')
+            throw Error('La app de mensajes debe continuar instalándose independientemente');
+          console.log('Canal bidireccional con autorización explícita: correcto');
           console.log('Reglas básicas del contrato: correctas');
           JS
       - name: Compilar función TypeScript sin ejecutarla
@@ -136,7 +150,7 @@ jobs:
             serve(handler:(request:Request)=>Response|Promise<Response>):void;
           };
           TS
-          for fn in cl360-fly-chat cl360-apply; do
+          for fn in cl360-fly-chat cl360-apply cl360-candidate-chat; do
             ./node_modules/.bin/tsc --noEmit --skipLibCheck --lib ES2022,DOM --target ES2022 --module esnext --strict false /tmp/cl360-deno-globals.d.ts "supabase/functions/$fn/index.ts"
             echo "TypeScript correcto: $fn"
           done
