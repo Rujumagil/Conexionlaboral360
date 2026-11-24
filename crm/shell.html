@@ -42,6 +42,7 @@
   <div class="mini-kpi"><span>Atención humana</span><strong id="kpi-human">—</strong></div>
   <div class="mini-kpi"><span>Contrataciones</span><strong id="kpi-hired">—</strong></div>
  </div>
+   <section class="panel fly-home-alerts" aria-label="Alertas de seguimiento"><div class="panel-head"><h2>Asistente de pendientes</h2><button class="btn ghost" data-go="fly">Ver los 3 asistentes</button></div><div id="fly-home-alerts">Consultando vencimientos…</div></section>
    <div class="home-grid">
     <section class="panel"><div class="section-title"><div><span class="tag">ACTIVIDAD</span><h2>Próximas acciones</h2></div><button class="text-button" data-go="seguimientos">Ver agenda →</button></div><div id="home-followups" class="home-mini"><div class="empty">Sin seguimientos pendientes.</div></div></section>
     <section class="panel"><div class="section-title"><div><span class="tag">RESUMEN</span><h2>Tu equipo de reclutamiento</h2></div></div>
@@ -96,8 +97,26 @@
    <section class="panel"><div class="panel-head"><h2>Estado del asistente</h2><span id="fly-health-badge" class="pill">Verificando conexión</span></div>
     <div class="fly"><div class="fly-icon">✦</div><div><strong>Andy · Atención supervisada</strong><p id="fly-health-detail">Consultando disponibilidad de la conversación contextual.</p>
     <p class="small">La decisión de entrevista y contratación corresponde a personas. No se publican sueldos ni se envían mensajes automáticos por WhatsApp.</p></div></div>
-    <div class="fly-rules"><div>✓ Vacantes verificadas</div><div>✓ Sin rechazo automático</div><div>✓ WhatsApp mediante acción humana</div><div>◌ Conversación generativa pendiente de credencial</div></div>
+    <div class="fly-rules"><div>✓ Vacantes verificadas</div><div>✓ Sin rechazo automático</div><div>✓ WhatsApp mediante acción humana</div><div>✓ Intervención humana supervisada</div></div>
    </section>
+   <div class="fly-agent-grid" aria-label="Asistentes internos de reclutamiento">
+    <section class="panel fly-agent">
+     <div class="panel-head"><div><span class="tag">ASISTENTE 1 · REVISIÓN</span><h2>Revisión de candidatos</h2></div><span id="fly-review-count" class="pill">—</span></div>
+     <p class="small">Ordena los casos por fecha de registro y muestra información que Astrid debe revisar. No califica ni rechaza automáticamente a ninguna persona.</p>
+     <div id="fly-review-list" class="fly-agent-results" aria-live="polite"><p class="empty">Consultando expedientes…</p></div>
+    </section>
+    <section class="panel fly-agent">
+     <div class="panel-head"><div><span class="tag">ASISTENTE 2 · SEGUIMIENTOS</span><h2>Pendientes y vencidos</h2></div><span id="fly-followup-count" class="pill">—</span></div>
+     <p class="small">Detecta tareas con fecha vencida y las próximas a vencer. Las alertas son internas: no envía WhatsApp ni mensajes por sí mismo.</p>
+     <div id="fly-followup-list" class="fly-agent-results" aria-live="polite"><p class="empty">Consultando agenda…</p></div>
+    </section>
+    <section class="panel fly-agent">
+     <div class="panel-head"><div><span class="tag">ASISTENTE 3 · RENDIMIENTO</span><h2>Indicadores de Astrid</h2></div></div>
+     <p class="small">Muestra actividad operativa del CRM. Los resultados reflejan solo registros en el sistema, no toda la actividad de llamadas o WhatsApp.</p>
+     <div id="fly-performance" class="fly-agent-results" aria-live="polite"><p class="empty">Calculando indicadores…</p></div>
+    </section>
+   </div>
+   <div class="fly-agent-toolbar"><button type="button" class="btn ghost" id="fly-agents-refresh">Actualizar informe</button><span id="fly-agents-updated" class="small" role="status"></span></div>
   </section>
   <section class="app-view hide" data-view="ajustes" id="view-ajustes">
    <div class="page-intro"><div><span class="tag">ADMINISTRACIÓN</span><h2>Ajustes del CRM</h2><p>Configuración y permisos del espacio de Conexión Laboral 360.</p></div></div>
