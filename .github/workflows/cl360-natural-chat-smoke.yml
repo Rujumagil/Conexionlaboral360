@@ -71,10 +71,22 @@ jobs:
             if(await page.locator('#controls a[href*="wa.me/523319708528"]').count()<1)throw Error("Falta derivación para sueldo sin confirmar");
             console.log("Derivación de sueldo no confirmado: OK");
             const other=await browser.newPage({viewport:{width:390,height:844}});
+            const chatMessages=[];let recordedPost=false;
             await other.route('https://qwxydjotwhniahaovrff.supabase.co/**',async route=>{
               const u=route.request().url();
               if(u.includes('/cl360_jobs?'))return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(jobs)});
               if(u.includes('/functions/v1/cl360-fly-chat'))return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,ready:true})});
+              if(u.includes('/functions/v1/cl360-apply')){
+                const payload=JSON.parse(route.request().postData()||'{}');
+                if(!payload.liveChatConsent||!payload.flySessionId)throw Error('No se registró consentimiento del chat interno');
+                recordedPost=true;
+                return route.fulfill({status:201,contentType:'application/json',body:JSON.stringify({ok:true,liveChatReady:true,flyHistoryLinked:false})});
+              }
+              if(u.includes('/functions/v1/cl360-candidate-chat')){
+                const payload=JSON.parse(route.request().postData()||'{}');
+                if(payload.action==='send')chatMessages.push({id:'candidate-post-1',source:'candidate',body:payload.message,created_at:new Date().toISOString()});
+                return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,status:'human',messages:[{id:'staff-answer-1',source:'staff',body:'Hola, te escribe Astrid desde el CRM.',created_at:new Date().toISOString()},...chatMessages]})});
+              }
               return route.fulfill({status:404,contentType:'application/json',body:'{}'});
             });
             await other.goto('http://127.0.0.1:8765/Conexionlaboral360/asistente/',{waitUntil:'domcontentloaded'});
@@ -99,6 +111,17 @@ jobs:
             await other.locator('#intake-form').waitFor({timeout:15000});
             if(await other.locator('#full-name').inputValue()!=="María López" || await other.locator('#phone').inputValue()!=="3312345678")throw Error("Andy no conservó nombre y teléfono hasta la confirmación");
             console.log("Nombre y teléfono opcional se conservan sin duplicar preguntas: OK");
+            await other.locator('#consent').check();
+            await other.locator('#live-chat-consent').check();
+            await other.locator('#intake-form button[type="submit"]').click();
+            await other.getByRole('button',{name:'Sí, enviar mi postulación'}).waitFor({timeout:15000});
+            await other.getByRole('button',{name:'Sí, enviar mi postulación'}).click();
+            await other.locator('.bubble.assistant').filter({hasText:'Hola, te escribe Astrid desde el CRM.'}).waitFor({timeout:20000});
+            if(!recordedPost)throw Error('Postulación no envió consentimiento');
+            await otherType("Gracias por responder, Astrid");
+            await other.locator('.bubble.candidate').filter({hasText:'Gracias por responder, Astrid'}).waitFor({timeout:15000});
+            if(chatMessages.length!==1)throw Error('El mensaje del candidato no llegó al canal interno');
+            console.log("Chat bidireccional simulado: consentimiento, respuesta humana visible y envío del candidato OK");
             await other.close();
             if(errors.length)throw Error('Errores de JavaScript: '+errors.join('; '));
             console.log("Experiencia, disponibilidad y zona por texto: OK");
