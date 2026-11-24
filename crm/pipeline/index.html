@@ -42,12 +42,12 @@
  </div>
  <div class="app-content">
   <section class="app-view" data-view="inicio" id="view-inicio">
-   <div class="welcome-banner"><div><span class="banner-overline">PANEL GENERAL</span><h2>Tu operación de reclutamiento, en un solo lugar.</h2><p>Vacantes, candidatos, conversaciones y seguimientos organizados para el equipo.</p></div><div class="crm-quick-actions"><button class="btn yellow" data-go="conversaciones">◉ Mensajes</button><button class="btn ghost" data-go="vacantes">Administrar vacantes</button></div></div>
+   <div class="welcome-banner"><div><span class="banner-overline">PANEL DE RECLUTAMIENTO</span><h2>Tu jornada, organizada.</h2><p>Revisa los candidatos que necesitan atención, los mensajes pendientes y los próximos contactos.</p></div><div class="crm-quick-actions"><button class="btn yellow" data-go="conversaciones">◉ Abrir mensajes</button><button class="btn ghost" data-go="candidatos">Ver candidatos</button></div></div>
    <div class="metrics" aria-label="Indicadores de reclutamiento">
     <div class="metric"><span class="metric-icon">♙</span><strong id="m-total">—</strong><span>Postulantes</span></div>
     <div class="metric"><span class="metric-icon">✧</span><strong id="m-new">—</strong><span>Sin contactar</span></div>
     <div class="metric"><span class="metric-icon">↗</span><strong id="m-active">—</strong><span>En proceso</span></div>
-    <div class="metric"><span class="metric-icon">✓</span><strong id="m-qualified">—</strong><span>Calificados</span></div>
+    <div class="metric"><span class="metric-icon">✓</span><strong id="m-qualified">—</strong><span>Preentrevistas registradas</span></div>
     <div class="metric"><span class="metric-icon">▣</span><strong id="m-overdue">—</strong><span>Seguimientos vencidos</span></div>
    </div>
 
@@ -57,9 +57,9 @@
   <div class="mini-kpi"><span>Atención humana</span><strong id="kpi-human">—</strong></div>
   <div class="mini-kpi"><span>Contrataciones</span><strong id="kpi-hired">—</strong></div>
  </div>
-   <section class="panel fly-home-alerts" aria-label="Alertas de seguimiento"><div class="panel-head"><h2>Asistente de pendientes</h2><button class="btn ghost" data-go="fly">Ver los 3 asistentes</button></div><div id="fly-home-alerts">Consultando vencimientos…</div></section>
+   <section class="panel fly-home-alerts" aria-label="Prioridades de atención"><div class="panel-head"><div><span class="tag">ATENCIÓN PRIORITARIA</span><h2>Qué necesitas atender</h2></div><button class="btn ghost" data-go="fly">Ver los 3 asistentes</button></div><div id="fly-home-alerts" class="priority-list" aria-live="polite">Consultando pendientes…</div></section>
    <div class="home-grid">
-    <section class="panel"><div class="section-title"><div><span class="tag">ACTIVIDAD</span><h2>Próximas acciones</h2></div><button class="text-button" data-go="seguimientos">Ver agenda →</button></div><div id="home-followups" class="home-mini"><div class="empty">Sin seguimientos pendientes.</div></div></section>
+    <section class="panel"><div class="section-title"><div><span class="tag">AGENDA</span><h2>Próximos seguimientos</h2></div><button class="text-button" data-go="seguimientos">Ver agenda →</button></div><div id="home-followups" class="home-mini"><div class="empty">Sin seguimientos programados.</div></div></section>
     <section class="panel"><div class="section-title"><div><span class="tag">RESUMEN</span><h2>Tu equipo de reclutamiento</h2></div></div>
      <div class="quick-card"><span>Vacantes publicadas</span><strong id="home-open-jobs">—</strong></div>
      <div class="quick-card"><span>Casos por atender</span><strong id="home-waiting">—</strong></div>
@@ -96,7 +96,7 @@
    <div class="pipeline-board" id="pipeline-board" aria-label="Tablero de candidatos por etapa"></div>
   </section>
   <section class="app-view hide" data-view="conversaciones" id="view-conversaciones">
-   <div class="page-intro"><div><span class="tag">BANDEJA DE MENSAJES</span><h2>Mensajes y atención humana</h2><p>Revisa el historial registrado por Andy, toma conversaciones y prepara respuestas para WhatsApp.</p></div><button id="conversation-refresh" class="btn ghost">↻ Actualizar</button></div>
+   <div class="page-intro"><div><span class="tag">BANDEJA DE MENSAJES</span><h2>Mensajes y atención humana</h2><p>Revisa el historial registrado por Andy, toma conversaciones y prepara respuestas para WhatsApp.</p></div><div class="chat-actions"><a class="btn yellow" href="../mensajes/" target="_blank" rel="noopener noreferrer">◉ Instalar solo Mensajes ↗</a><button id="conversation-refresh" class="btn ghost">↻ Actualizar</button></div></div>
    <div class="inbox-layout">
     <section class="inbox-list"><div class="inbox-heading"><strong>Bandeja</strong><select id="inbox-filter" aria-label="Filtrar conversaciones"><option value="all">Todas</option><option value="waiting">Pendientes</option><option value="human">Tomadas</option><option value="bot">Asistente</option><option value="closed">Cerradas</option></select></div><div id="inbox-threads"><p class="empty">Sin conversaciones todavía.</p></div></section>
     <section class="chat-pane" id="chat-pane"><div class="empty">Selecciona una conversación para revisar el historial y tomar el control de la atención.</div></section>
