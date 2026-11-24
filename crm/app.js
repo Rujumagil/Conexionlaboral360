@@ -167,7 +167,7 @@ const appViews={
  conversaciones:"Centro de conversaciones",seguimientos:"Seguimientos",fly:"Compás Fly",ajustes:"Configuración"
 };
 let activeView="inicio",threads=[],messages=[],activeConversationId=null,conversationsLoadError=false;
-const routeBase=new URL("./",document.baseURI);
+const routeBase=new window.URL("./",document.baseURI);
 const initialRoute=(()=>{
  const prefix=routeBase.pathname;
  const remainder=location.pathname.startsWith(prefix)?location.pathname.slice(prefix.length).replace(/^\/+|\/+$/g,""):"";
@@ -175,7 +175,7 @@ const initialRoute=(()=>{
 })();
 function urlForView(view,candidateId){
  const href=view==="inicio"?"./":view+"/";
- const u=new URL(href,routeBase);
+ const u=new window.URL(href,routeBase);
  if(candidateId)u.searchParams.set("candidato",candidateId);
  return u;
 }
