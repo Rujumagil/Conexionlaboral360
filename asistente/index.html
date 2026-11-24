@@ -316,6 +316,7 @@ async function submit(){
   setPhase("done");
   await reply("¡Listo, "+firstName()+"! 🎉 Tu postulación se registró correctamente. Gracias por platicar conmigo.");
   if(flyUsedWithConsent&&!data.flyHistoryLinked)await reply("Tu registro se guardó. No pude adjuntar las preguntas libres; Astrid sí podrá consultar el resumen de tu preentrevista.");
+  if(answers.historyConsent&&!data.flyHistoryCount&&!data.browserTranscriptCount)await reply("El registro está guardado, pero no pude adjuntar la copia de esta conversación. Astrid sí podrá consultar los datos de tu postulación.");
   await reply(humanReviewReasons().length?"Tu registro ya está guardado. Estos puntos merecen revisión con Astrid: "+humanReviewReasons().join("; ")+". Puedes continuar con ella por WhatsApp. La contratación aún no está confirmada.":"Tu registro ya está guardado. Puedes continuar con Astrid por WhatsApp para revisar los detalles y siguientes pasos. La contratación aún no está confirmada.");
   const message="Hola, Lic. Astrid Araiza. Terminé mi preentrevista en Conexión Laboral 360. Soy "+answers.name+" y me interesa la vacante "+selected.title+". Me gustaría continuar mi postulación.";
   const a=document.createElement("a");a.className="action gold";a.href=WA+"?text="+encodeURIComponent(message);a.target="_blank";a.rel="noopener noreferrer";
