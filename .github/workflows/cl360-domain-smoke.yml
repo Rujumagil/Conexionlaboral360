@@ -1,0 +1,36 @@
+name: CL360 · Prueba del nuevo dominio Cloudflare
+on:
+  push:
+    paths:
+      - .github/workflows/cl360-domain-smoke.yml
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Comprobar sitio, Andy y CRM en Cloudflare
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import urllib.request, urllib.error, socket, ssl
+          hosts=["https://conexionlaboral360.app","https://conexionlaboral360.proyectocompas-info.workers.dev"]
+          paths=["/","/asistente/","/crm/","/crm/app.js"]
+          for host in hosts:
+            print("DOMINIO:",host)
+            for path in paths:
+              url=host+path
+              try:
+                req=urllib.request.Request(url,headers={"User-Agent":"CL360-availability-test/1.0"})
+                with urllib.request.urlopen(req,timeout=20) as res:
+                  content=res.read(120000).decode('utf-8',errors='replace')
+                  print("RUTA:",path,"HTTP:",res.status,"TIPO:",res.headers.get('Content-Type',''))
+                  if path=="/" and "Conexión Laboral 360" not in content and "CONEXIÓN LABORAL 360" not in content:raise ValueError("Portada inesperada")
+                  if path=="/asistente/" and 'id="question-form"' not in content:raise ValueError("Andy no aparece")
+                  if path=="/crm/" and 'id="login-form"' not in content:raise ValueError("CRM no aparece")
+                  if path=="/crm/app.js" and "routeBase" not in content:raise ValueError("Script de CRM incorrecto")
+              except Exception as exc:
+                print("FALLO:",path,type(exc).__name__,str(exc)[:170])
+                raise SystemExit(1)
+          PY
