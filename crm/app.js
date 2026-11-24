@@ -272,7 +272,7 @@ async function pollDueTasks(){
  if(error)return;
  followups=[...followups.filter(t=>t.status!=="pending"),...(data||[])];
  renderCrmAlerts();maybeNotifyOverdue();
- if(activeView==="inicio"){renderFlyAgents();renderHome();$("m-overdue").textContent=alertItems().length;}
+ if(activeView==="inicio"){if(!document.querySelector(".priority-quick-form")){renderFlyAgents();renderHome();}$("m-overdue").textContent=alertItems().length;}
  if(activeView==="fly")renderFlyAgents();
  if(activeView==="seguimientos")renderFollowups();
 }
