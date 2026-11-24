@@ -102,6 +102,7 @@ Deno.serve(async(req:Request)=>{
    body:JSON.stringify({
     systemInstruction:{parts:[{text:instruction}]},
     contents:turns,
+    store:false,
     generationConfig:{temperature:Math.min(.65,Math.max(.1,Number(profile?.temperature)||.45)),maxOutputTokens:Math.min(500,Math.max(150,Number(profile?.max_output_tokens)||350))}
    }),
    signal:AbortSignal.timeout(17000)
