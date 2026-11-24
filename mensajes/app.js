@@ -24,7 +24,7 @@ async function refresh(){
  if(!user||loading)return;
  loading=true;$("refresh").disabled=true;$("count").textContent="Actualizando conversaciones…";
  const [t,c,j]=await Promise.all([
-  db.from("cl360_conversations").select("id,candidate_id,status,handler_id,last_message_at,fly_session_hash").eq("workspace_id",WS).order("last_message_at",{ascending:false}).limit(300),
+  db.from("cl360_conversations").select("id,candidate_id,status,handler_id,last_message_at,fly_session_hash,live_chat_enabled").eq("workspace_id",WS).order("last_message_at",{ascending:false}).limit(300),
   db.from("cl360_candidates").select("id,full_name,phone,job_slug,stage").eq("workspace_id",WS).limit(500),
   db.from("cl360_jobs").select("slug,title").eq("workspace_id",WS).limit(100)
  ]);
@@ -58,7 +58,7 @@ function renderThreads(){
 function updateComposer(){
  const t=threads.find(x=>x.id===activeId),c=t&&candidate(t.candidate_id);
  const owner=t?.status==="human"&&t.handler_id===user?.id;
- const direct=!!owner&&!!t.fly_session_hash;
+ const direct=!!owner&&!!t.fly_session_hash&&t.live_chat_enabled===true;
  const whatsApp=!!owner&&!!c?.phone;
  const reply=$("reply").value.trim(),wa=$("send-whatsapp");
  $("reply").disabled=!(direct||whatsApp);
@@ -126,7 +126,7 @@ $("back").addEventListener("click",()=>{$("conversation-section").classList.add(
 $("reply").addEventListener("input",updateComposer);
 $("send-inapp").addEventListener("click",async()=>{
  const t=threads.find(x=>x.id===activeId),body=$("reply").value.trim();
- if(!t||t.status!=="human"||t.handler_id!==user?.id||!t.fly_session_hash||!body)return;
+ if(!t||t.status!=="human"||t.handler_id!==user?.id||!t.fly_session_hash||t.live_chat_enabled!==true||!body)return;
  const button=$("send-inapp");button.disabled=true;
  const {error}=await db.rpc("cl360_staff_send_candidate_message",{p_conversation:t.id,p_body:body});
  if(error){$("reply-hint").textContent=error.message?.includes("candidate_channel")?"La sesión del candidato está caducada o no vinculada; utiliza WhatsApp.":"No pude enviar el mensaje. Intenta nuevamente.";button.disabled=false;return;}
