@@ -70,6 +70,8 @@ const KEY="sb_publishable_17NekbDHp_ssL_Pf-CnqPg_v0acxqn3";
 const WS="c7ab2a78-08e0-4a29-8a3b-fadaf244002f";
 const WA="https://wa.me/523319708528";
 const $=id=>document.getElementById(id);
+const securityCampaign=new URLSearchParams(location.search).get("campana")==="guardias-de-seguridad";
+if(new URLSearchParams(location.search).get("embed")==="1"){document.querySelector("header").hidden=true;document.querySelector(".intro").hidden=true;document.querySelector("main").style.margin="8px auto";}
 const delay=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches?0:480;
 let jobs=[],selected=null,pendingIntroJob=null,phase="loading",version=0,busy=false;
 let flyReady=false,flySession=crypto.randomUUID(),flyHistory=[],flyQuestionBusy=false,flyUsedWithConsent=false,chatInputBusy=false;
@@ -160,7 +162,7 @@ async function promptIntroPhone(){
 }
 async function startIntroduction(job=null){
  pendingIntroJob=job;
- await stage("introName","¡Hola! 👋 Soy Andy, tu asistente virtual de Conexión Laboral 360. ¿Con quién tengo el gusto de platicar? Puedes decirme tu nombre. Si solo quieres consultar vacantes, no necesitas compartir datos personales.",()=>{
+ await stage("introName","¡Hola! 👋 Soy Andy, tu asistente virtual de Conexión Laboral 360. "+(securityCampaign?"Gracias por tu interés en las vacantes de guardias de seguridad. ":"")+"¿Con quién tengo el gusto de platicar? Puedes decirme tu nombre. Si solo quieres consultar vacantes, no necesitas compartir datos personales.",()=>{
   suggestOptions([[job?"Ver la vacante sin dar datos":"Ver vacantes sin dar datos",()=>finishIntroduction(),true]]);
  });
 }
@@ -188,7 +190,7 @@ async function fetchJobs(){
   const result=await fetch(url,{headers:{apikey:KEY}});
   if(!result.ok)throw Error("Sin respuesta del catálogo");
   const payload=await result.json();if(!Array.isArray(payload))throw Error("Catálogo no válido");
-  jobs=payload;
+  jobs=securityCampaign?payload.filter(j=>/seguridad|guardia|vigilancia|vigilante/i.test([j.title,j.area].join(" "))):payload;
   const requested=new URLSearchParams(location.search).get("vacante");
   const preset=jobs.find(x=>x.slug===requested);
   await startIntroduction(preset||null);
