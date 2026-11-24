@@ -58,7 +58,13 @@
      <button type="button" class="mobile-tab" data-tab="bot"><span aria-hidden="true">✦</span><small>Andy</small></button>
    </nav>
   </section>
-  <section class="conversation hidden-mobile" id="conversation-section" aria-label="Detalle del mensaje">
+  <section class="conversation hidden-mobile no-active-chat" id="conversation-section" aria-label="Detalle del mensaje">
+   <div id="chat-welcome" class="chat-welcome" aria-live="polite">
+     <div class="welcome-mark" aria-hidden="true">◉</div>
+     <h2>Tus conversaciones, en un solo lugar</h2>
+     <p>Selecciona un candidato de la lista para leer sus mensajes y continuar la atención.</p>
+     <span>Conexión Laboral 360 · Mensajes privados</span>
+   </div>
    <div class="chat-top">
     <button type="button" id="back" class="back" aria-label="Volver a mensajes">←</button>
     <div class="chat-avatar" id="chat-avatar" aria-hidden="true">C</div>
@@ -73,10 +79,10 @@
    <div id="timeline" class="timeline"><div class="empty">Elige un candidato para leer los mensajes vinculados a su postulación.</div></div>
    <div class="human-controls" id="human-controls"></div>
    <div class="composer" id="composer">
-    <label for="reply" class="composer-label">Escribir respuesta <span id="channel-state">· Atención supervisada</span></label>
+    <label for="reply" class="composer-label">Mensaje <span id="channel-state">· Atención supervisada</span></label>
     <div class="compose-row">
-     <textarea id="reply" placeholder="Escribe tu mensaje…" rows="2" maxlength="1000" disabled></textarea>
-     <button type="button" id="send-inapp" class="primary send-button" disabled aria-label="Enviar en este chat">➤ <span>Enviar aquí</span></button>
+     <textarea id="reply" placeholder="Escribe una respuesta…" rows="1" maxlength="1000" disabled></textarea>
+     <button type="button" id="send-inapp" class="primary send-button" disabled aria-label="Enviar en este chat">➤ <span>Enviar</span></button>
     </div>
     <div class="composer-actions">
      <a id="send-whatsapp" class="secondary-link disabled-link" aria-disabled="true" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">◉</span> Responder por WhatsApp</a>
