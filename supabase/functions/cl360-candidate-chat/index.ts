@@ -28,12 +28,13 @@ Deno.serve(async(request:Request)=>{
  const hash=Array.from(new Uint8Array(bytes)).map(n=>n.toString(16).padStart(2,"0")).join("");
  const requestHeaders={apikey:secret,authorization:"Bearer "+secret,"content-type":"application/json"};
  try{
-  const lookup=await fetch(base+"/rest/v1/cl360_conversations?select=id,status,candidate_id,fly_session_hash&workspace_id=eq."+WS+"&fly_session_hash=eq."+hash+"&limit=1",
+  const lookup=await fetch(base+"/rest/v1/cl360_conversations?select=id,status,candidate_id,live_chat_enabled&workspace_id=eq."+WS+"&fly_session_hash=eq."+hash+"&limit=1",
    {headers:requestHeaders,signal:AbortSignal.timeout(6500),cache:"no-store"});
   if(!lookup.ok)return output(503,{ok:false,error:"consulta_no_disponible"});
   const conversations=await lookup.json();
   const conversation=Array.isArray(conversations)?conversations[0]:null;
   if(!conversation)return output(404,{ok:false,error:"conversacion_no_vinculada"});
+  if(conversation.live_chat_enabled!==true)return output(403,{ok:false,error:"chat_no_autorizado"});
   const candidateResponse=await fetch(base+"/rest/v1/cl360_candidates?select=id,consent_at,last_submitted_at&id=eq."+conversation.candidate_id+"&workspace_id=eq."+WS+"&limit=1",
    {headers:requestHeaders,signal:AbortSignal.timeout(6500),cache:"no-store"});
   if(!candidateResponse.ok)return output(503,{ok:false,error:"consulta_no_disponible"});
