@@ -19,10 +19,10 @@ async function checkFlyAvailability(){
   const live=health.ready===true;
   $("fly-health-badge").textContent=live?"Conversación activa":"Respuestas guiadas";
   $("fly-health-detail").textContent=live
-    ?"La conversación contextual de Fly Recruiter está disponible para preguntas abiertas autorizadas. El CRM conserva el control humano de entrevistas y seguimientos."
+    ?"La conversación contextual de Andy (Compás Fly) está disponible para preguntas abiertas autorizadas. El CRM conserva el control humano de entrevistas y seguimientos."
     :health.providerConfigured!==true
-      ?"El backend Fly Recruiter responde, pero todavía falta configurar la credencial privada GEMINI_API_KEY de Supabase. La preentrevista guiada sigue disponible."
-      :"Gemini está configurado; falta habilitar el perfil supervisado Fly Recruiter tras las pruebas. La preentrevista guiada continúa operativa.";
+      ?"El backend Andy (Compás Fly) responde, pero todavía falta configurar la credencial privada GEMINI_API_KEY de Supabase. La preentrevista guiada sigue disponible."
+      :"Gemini está configurado; falta habilitar el perfil supervisado Andy (Compás Fly) tras las pruebas. La preentrevista guiada continúa operativa.";
  }catch{
   $("fly-health-badge").textContent="Verificación pendiente";
   $("fly-health-detail").textContent="No se pudo comprobar el servidor de Fly. La preentrevista guiada sigue disponible.";
@@ -164,7 +164,7 @@ $("search").addEventListener("input",renderCandidates);$("filter-stage").addEven
 /* App navigation, pipeline and internal conversations */
 const appViews={
  inicio:"Centro de operaciones",vacantes:"Vacantes",candidatos:"Candidatos",pipeline:"Pipeline de reclutamiento",
- conversaciones:"Centro de conversaciones",seguimientos:"Seguimientos",fly:"Compás Fly",ajustes:"Configuración"
+ conversaciones:"Centro de conversaciones",seguimientos:"Seguimientos",fly:"Andy · Compás Fly",ajustes:"Configuración"
 };
 let activeView="inicio",threads=[],messages=[],activeConversationId=null,conversationsLoadError=false;
 const routeBase=new window.URL("./",document.baseURI);
