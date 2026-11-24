@@ -34,21 +34,29 @@ header{background:var(--dark);color:#fff}.head{max-width:1080px;margin:auto;min-
 .chat>.question-form .label{font-size:.8rem;color:var(--muted)}
 .chat>.question-form .action{background:var(--navy);color:#fff;border-color:var(--navy)}
 .chat>.question-form .footnote{margin-bottom:0}
+.choice-label{font-size:.76rem;font-weight:750;color:var(--muted);margin:0 0 9px}
+.controls{min-height:0}.controls:empty{display:none}.controls .action{font-size:.87rem;min-height:39px;padding:9px 13px;border-radius:100px}
+.controls .job-list{display:flex;flex-wrap:wrap;gap:8px}
+.controls .job{flex:0 1 auto;padding:9px 13px;border-radius:100px;background:#f3f8fc;gap:0;font-size:.86rem}
+.controls .job small{display:none}
+.messages{max-height:580px}
+@media(max-width:600px){.controls .action{flex:0 0 auto;min-height:40px}.controls .job{max-width:100%}.chat-head{align-items:flex-start}.intro{margin-bottom:16px}}
+
 @media(max-width:600px){.chat>.question-form{padding:12px 14px}}
 </style>
 </head>
 <body>
 <header><div class="head"><div class="brand"><img src="../assets/logo-oficial.svg" alt=""><div><b>CONEXIÓN LABORAL 360</b><small>Asistente de reclutamiento</small></div></div><a href="../#vacantes">Ver vacantes</a></div></header>
 <main class="container">
-<div class="intro"><h1>Tu próxima oportunidad empieza aquí</h1><p>Conoce una vacante, responde una entrevista inicial breve y después contacta a la asesora para continuar tu proceso.</p></div>
+<div class="intro"><h1>Encontremos una oportunidad para ti</h1><p>Cuéntame qué trabajo buscas. Podemos platicar, revisar vacantes y avanzar a tu ritmo.</p></div>
 <section class="chat" aria-label="Entrevista inicial de reclutamiento">
 <div class="chat-head"><div><strong><span class="status-dot"></span>Asistente virtual de reclutamiento</strong><small>Atención virtual · Tu postulación tendrá revisión humana</small></div><span class="steps" id="steps">Inicio</span></div>
 <div class="progress"><span id="progress" style="width:0%"></span></div>
 <div class="messages" id="messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
 <div id="controls" class="controls"></div>
-<form id="question-form" class="question-form"><label class="label" for="candidate-question">O escríbeme tu duda con tus propias palabras</label><div class="question-row"><input class="field" id="candidate-question" maxlength="240" placeholder="Ej. ¿Dónde está el servicio?, ¿cuál es el horario?" autocomplete="off" aria-describedby="question-help"><button class="action secondary" type="submit">Preguntar</button></div><p class="footnote" id="question-help">Puedes preguntar libremente. Si algo no está confirmado, lo revisará Astrid.</p><label class="privacy" id="fly-consent-wrap" hidden style="margin-top:12px"><input type="checkbox" id="fly-consent"><span>Autorizo el procesamiento automatizado de mis preguntas. Si completo mi postulación, autorizo también que se guarden las preguntas y respuestas generadas por el asistente en mi expediente privado para revisión humana. Evitaré compartir documentos o datos sensibles. <a href="../aviso-candidatos.html" target="_blank" rel="noopener noreferrer">Información de privacidad</a>.</span></label><p class="error" id="fly-question-error" role="alert"></p></form>
+<form id="question-form" class="question-form"><label class="label" for="candidate-question">Tu mensaje</label><div class="question-row"><input class="field" id="candidate-question" maxlength="240" placeholder="Escribe aquí… Ej. ¿Qué vacantes tienen?" autocomplete="off" aria-describedby="question-help"><button class="action secondary" type="submit">Enviar</button></div><p class="footnote" id="question-help">Puedes escribir como en una conversación. Las opciones son sugerencias, no pasos obligatorios.</p><label class="privacy" id="fly-consent-wrap" hidden style="margin-top:12px"><input type="checkbox" id="fly-consent"><span>Autorizo el procesamiento automatizado de mis preguntas. Si completo mi postulación, autorizo también que se guarden las preguntas y respuestas generadas por el asistente en mi expediente privado para revisión humana. Evitaré compartir documentos o datos sensibles. <a href="../aviso-candidatos.html" target="_blank" rel="noopener noreferrer">Información de privacidad</a>.</span></label><p class="error" id="fly-question-error" role="alert"></p></form>
 </section>
-<section class="faq" aria-label="Información general">
+<section class="faq" aria-label="Información general" hidden>
 <h2>¿Te quedó alguna duda? Podemos platicarla</h2>
 <div class="choices"><button class="action secondary faq-btn" data-faq="salary">Sueldos</button><button class="action secondary faq-btn" data-faq="benefits">Beneficios</button><button class="action secondary faq-btn" data-faq="process">Proceso de contratación</button><button class="action secondary faq-btn" data-faq="privacy">Mis datos</button><button class="action secondary faq-btn" data-faq="identity">¿Quién me atiende?</button></div>
 <div class="answer" id="faq-answer" hidden></div>
@@ -64,7 +72,7 @@ const WA="https://wa.me/523334123734";
 const $=id=>document.getElementById(id);
 const delay=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches?0:480;
 let jobs=[],selected=null,phase="loading",version=0,busy=false;
-let flyReady=false,flySession=crypto.randomUUID(),flyHistory=[],flyQuestionBusy=false,flyUsedWithConsent=false;
+let flyReady=false,flySession=crypto.randomUUID(),flyHistory=[],flyQuestionBusy=false,flyUsedWithConsent=false,chatInputBusy=false;
 const answers={experience_level:"",experience:"",availability:"",preferred_zone:"",name:"",phone:"",consent:false,website:""};
 const labels={si:"Sí",no:"No",prefiero_comentarlo:"Prefiero comentarlo con Astrid",consultar:"Necesito consultarlo"};
 function scrollChat(){const box=$("messages");box.scrollTop=box.scrollHeight;}
@@ -108,10 +116,37 @@ function errorLine(){
  const el=document.createElement("p");el.className="error";el.setAttribute("role","alert");$("controls").append(el);return el;
 }
 function firstName(){return(answers.name||"").split(/\s+/)[0]||"";}
+
+function suggestOptions(items){
+ const controls=$("controls");controls.replaceChildren();
+ if(!items.length)return;
+ const label=document.createElement("p");label.className="choice-label";label.textContent="Puedes responder escribiendo o elegir una opción:";
+ const group=document.createElement("div");group.className="choices";controls.append(label,group);
+ items.forEach(([caption,handler,primary])=>{
+   const btn=document.createElement("button");btn.type="button";btn.className="action "+(primary?"gold":"secondary");
+   btn.textContent=caption;btn.addEventListener("click",handler);group.append(btn);
+ });
+}
+function matchJob(message){
+ const q=normalizeQuestion(message).replace(/[^a-z0-9 ]+/g," ").replace(/\s+/g," ").trim();
+ if(!q)return null;
+ const candidates=jobs.map(job=>{
+  const name=normalizeQuestion(job.title).replace(/[^a-z0-9 ]+/g," ").trim();
+  const meaningful=name.split(" ").filter(w=>w.length>3&&!["coto","obra","servicio"].includes(w));
+  return {job,score:q.includes(name)?100:meaningful.reduce((n,w)=>n+(q.includes(w)?10:0),0)};
+ }).sort((a,b)=>b.score-a.score);
+ return candidates[0]?.score>0?candidates[0].job:null;
+}
+function describeJobs(){
+ const options=jobs.slice(0,12);
+ return options.map((j,i)=>(i+1)+". "+j.title+" — "+j.area+" · "+j.location).join("\n");
+}
+function showJobChoices(){
+ suggestOptions(jobs.slice(0,12).map(job=>[job.title,()=>selectJob(job),false]));
+}
 async function fetchJobs(){
  setPhase("loading");
- if(!$("messages").children.length)await reply("¡Hola! 👋 Qué gusto saludarte. Te doy la bienvenida a Conexión Laboral 360. Soy tu asistente virtual de reclutamiento y te acompañaré para conocer las oportunidades que tenemos.");
- $("controls").textContent="Revisando vacantes disponibles…";
+ $("controls").textContent="Consultando oportunidades…";
  try{
   const url=API+"/rest/v1/cl360_jobs?select=slug,title,area,location,shift,details&workspace_id=eq."+WS+"&status=eq.active&order=created_at.asc";
   const result=await fetch(url,{headers:{apikey:KEY}});
@@ -120,48 +155,45 @@ async function fetchJobs(){
   jobs=payload;
   const requested=new URLSearchParams(location.search).get("vacante");
   const preset=jobs.find(x=>x.slug===requested);
-  if(preset)selectJob(preset,true);else showJobs();
+  if(preset){await reply("¡Hola! Soy el asistente virtual de Conexión Laboral 360. 😊 Te puedo orientar sobre la vacante que te interesó.");selectJob(preset,true);}
+  else{
+    setPhase("choose");
+    await reply("¡Hola! 👋 Soy el asistente virtual de Conexión Laboral 360. ¿Buscas trabajo en alguna zona o prefieres que te cuente qué vacantes tenemos?");
+    suggestOptions([["Ver vacantes",()=>showJobs(),true],["¿Cómo funciona?",async()=>{say("¿Cómo funciona?");await reply(faq.process);suggestOptions([["Ver vacantes",()=>showJobs(),true]])},false]]);
+  }
  }catch{
-  await stage("choose","Por el momento no puedo confirmar qué vacantes siguen disponibles. Prefiero no darte información que no esté verificada.",()=>{
-   option("Intentar otra vez",fetchJobs,"gold");
-   option("Regresar a las vacantes",()=>location.assign("../#vacantes"));
+  await stage("choose","No pude consultar las vacantes confirmadas en este momento. Podemos intentarlo de nuevo.",()=>{
+   option("Reintentar",fetchJobs,"gold");
   });
  }
 }
 async function showJobs(){
- await stage("choose",selected?"Claro, podemos revisar otra opción. ¿Cuál de estas vacantes te interesa?":"Cuéntame, ¿qué vacante te llamó la atención? Aquí te comparto las opciones disponibles.",()=>{
-  if(!jobs.length){$("controls").textContent="Por ahora no tenemos vacantes confirmadas.";return;}
-  const grid=document.createElement("div");grid.className="job-list";$("controls").append(grid);
-  jobs.forEach(job=>{
-   const button=document.createElement("button");button.type="button";button.className="job";
-   const name=document.createElement("strong");name.textContent=job.title;
-   const description=document.createElement("small");description.textContent=job.area+" · "+job.location;
-   button.append(name,description);button.addEventListener("click",()=>selectJob(job));grid.append(button);
-  });
- });
+ setPhase("choose");
+ if(!jobs.length){await reply("Por ahora no tengo vacantes activas confirmadas. Puedes volver a consultarme más tarde.");suggestOptions([]);return;}
+ await reply("Claro 😊. Estas son las "+jobs.length+" vacantes que tenemos disponibles en este momento:\n"+describeJobs()+"\n\n¿Cuál te interesa? Puedes decirme el nombre o tocar una opción.");
+ showJobChoices();
 }
 async function selectJob(job,fromLink=false){
  selected=job;
  flyHistory=[];flySession=crypto.randomUUID();flyUsedWithConsent=false;
  answers.experience_level="";answers.experience="";answers.availability="";answers.preferred_zone="";
  if(!fromLink)say("Me interesa "+job.title+".");
- const text="¡Perfecto! Te cuento un poco sobre "+job.title+". Está en "+job.location+
-  " y el horario publicado es "+job.shift+". ¿Te gustaría que platiquemos brevemente de tu experiencia y disponibilidad?";
+ const text="¡Buena elección! "+job.title+" está en "+job.location+" y el turno anunciado es "+job.shift+".\n\n¿Te gustaría postularte o primero quieres aclarar algo del puesto?";
  await stage("choose",text,()=>{
-  option("Sí, me interesa",askExperience,"gold");
-  option("Prefiero otra vacante",showJobs);
+  option("Quiero postularme",askExperience,"gold");
+  option("Ver otras vacantes",showJobs);
  });
 }
 async function askExperience(){
- await stage("experience","Muy bien 😊. Para conocerte mejor, ¿has trabajado antes en un puesto similar? Si no tienes experiencia, no pasa nada; podemos continuar.",()=>{
+ await stage("experience","¡Vamos! Cuéntame, ¿has trabajado antes en algo parecido? Si no, podemos seguir sin problema.",()=>{
   [["Sí, tengo experiencia","si"],["Aún no","no"],["Prefiero comentarlo","prefiero_comentarlo"]].forEach(([text,value])=>
    option(text,()=>{answers.experience_level=value;say(text);askDetails();})
   );
  });
 }
 async function askDetails(){
- let question="Me gustaría conocer un poquito más de tu experiencia. ¿En qué actividades has trabajado?";
- if(answers.experience_level==="no")question="¡Está bien! Todas las personas empezamos por algún lugar. Cuéntame qué tipo de trabajo has realizado, aunque haya sido en otra área.";
+ let question="¿Qué tipo de actividades has realizado? Cuéntamelo como prefieras.";
+ if(answers.experience_level==="no")question="Perfecto, también cuenta la experiencia de otras áreas. ¿En qué has trabajado o qué actividades has realizado?";
  if(answers.experience_level==="prefiero_comentarlo")question="Por supuesto, los detalles puedes platicarlos después con Astrid. Por ahora, ¿qué actividades o tipo de trabajo te interesa compartir?";
  await stage("details",question,()=>{
   const input=document.createElement("textarea");input.className="field";input.rows=3;input.maxLength=900;
@@ -177,8 +209,7 @@ async function askDetails(){
 }
 async function askAvailability(){
  const response=answers.experience_level==="si"?"Gracias por contarme.":"Gracias por compartirlo conmigo.";
- await stage("availability",response+" Ahora, sobre el horario: para esta vacante se anuncia "+selected.shift+
-  ". ¿Cómo te queda ese turno? No hay problema si necesitas revisarlo.",()=>{
+ await stage("availability",response+" El horario anunciado es "+selected.shift+". ¿Cómo te quedaría?",()=>{
   [["Me funciona el turno","si"],["Por ahora no puedo","no"],["Necesito revisarlo","consultar"]].forEach(([text,value])=>
    option(text,()=>{answers.availability=value;say(text);askZone();})
   );
@@ -188,7 +219,7 @@ async function askZone(){
  let intro="Entiendo. ";
  if(answers.availability==="si")intro="¡Excelente! ";
  if(answers.availability==="no")intro="Gracias por decírmelo; lo dejaremos anotado para que lo revise Astrid. ";
- await stage("zone",intro+"¿En qué zona te gustaría trabajar? Puedes decirme el municipio o una zona cercana, sin compartir tu dirección exacta.",()=>{
+ await stage("zone",intro+"¿Por qué zona te gustaría trabajar? Con el municipio o una zona cercana está bien; no necesito tu dirección.",()=>{
   const input=document.createElement("input");input.className="field";input.type="text";input.maxLength=120;
   input.placeholder="Ej. Zapopan, Tlaquepaque, Centro…";input.value=answers.preferred_zone;$("controls").append(input);
   option("Continuar",()=>{
@@ -267,23 +298,72 @@ const faq={
  identity:"Soy el asistente virtual de reclutamiento de Conexión Laboral 360. Te ayudo con esta primera conversación; la Lic. Astrid Araiza es quien revisa tu postulación y continúa la atención personal."
 };
 const faqLabels={salary:"Quisiera saber el sueldo",benefits:"¿Qué prestaciones hay?",process:"¿Cómo sigue el proceso?",privacy:"¿Qué harán con mis datos?",identity:"¿Quién me está atendiendo?"};
-function normalizeQuestion(text){return text.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();}
+
+function normalizeQuestion(text){return String(text||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();}
+function isJobQuestion(q){return /\b(vacant(?:e|es)|opcion(?:es)?|puesto(?:s)?|empleo(?:s)?|trabajo(?:s)?|ofrecen|tienen disponible|hay disponible)\b/.test(q);}
+function isInformational(q){return /\?|sueldo|salario|paga|prestacion|beneficio|horario|turno|jornada|ubicacion|donde|zona|requisito|documento|edad|experiencia|proceso|entrevista|quien|humano|bot|virtual|privacidad|datos|imss|seguro/.test(q);}
 function answerQuestion(question){
  const q=normalizeQuestion(question);
+ if(isJobQuestion(q)&&!/(horario|turno|ubicacion|donde|sueldo|requisitos)/.test(q)){
+   return jobs.length?"Claro, estas son las vacantes activas que tengo confirmadas:\n"+describeJobs()+"\n\n¿Te llama la atención alguna?":"Ahora mismo no tengo vacantes activas confirmadas.";
+ }
  if(/\b(quien|persona|humano|humana|robot|bot|virtual|ia)\b/.test(q)||q.includes("atiende"))return faq.identity;
  if(/sueldo|salario|cuanto pagan|pagan|dinero|remuneracion|pago por/.test(q))return faq.salary;
- if(/prestaciones|beneficios|seguro social|imss|aguinaldo|vacaciones/.test(q))return faq.benefits;
+ if(/prestaciones|beneficios|seguro social|imss|aguinaldo|vacaciones/.test(q))return "Las prestaciones dependen de la vacante. Astrid puede confirmarte las condiciones del puesto que elijas, para no darte información equivocada.";
  if(/horario|turno|jornada|horas|a que hora/.test(q))return selected?
-  "Para "+selected.title+", el turno anunciado es "+selected.shift+". Si necesitas un ajuste o tienes dudas, lo puede revisar Astrid contigo.":
-  "Cada vacante tiene un turno distinto. Si eliges un servicio, puedo decirte el horario publicado.";
+  "Para "+selected.title+", el turno anunciado es "+selected.shift+". Si necesitas confirmar algún detalle, lo revisamos con Astrid.":
+  "El horario cambia según el puesto. Dime qué vacante te interesa y te comparto el turno anunciado.";
  if(/ubicacion|donde queda|direccion|zona|cerca|transporte|municipio|ubicado/.test(q))return selected?
-  selected.title+" se encuentra en la zona de "+selected.location+". Por seguridad y precisión, la ubicación exacta la confirmas con la asesora.":
-  "Puedo comentarte la zona aproximada de cada vacante en cuanto elijas una.";
+  selected.title+" se anuncia en "+selected.location+". La ubicación precisa puede confirmártela Astrid.":
+  "Tenemos oportunidades en distintas zonas. Si me dices una vacante o una zona, te ayudo a ubicar las opciones.";
  if(/experiencia|requisitos|documentos|edad|escolaridad|sin experiencia/.test(q))return
-  "Puedes continuar aunque no tengas experiencia previa. Los requisitos específicos y documentos necesarios los confirma Astrid; no voy a descartar tu solicitud con una respuesta de esta charla.";
+  "Puedes postularte aunque no tengas experiencia previa. Los requisitos específicos y los documentos del puesto los confirma Astrid; no descartamos tu interés por esta respuesta.";
  if(/pasos|proceso|entrevista|contratan|siguiente|postular|registro/.test(q))return faq.process;
  if(/datos|privacidad|consentimiento|guardar|informacion personal/.test(q))return faq.privacy;
- return "Gracias por preguntarme. Prefiero no darte una respuesta que no tenga confirmada. Cuando termines esta primera charla podrás consultarlo directamente con Astrid. ¿Continuamos con tu postulación?";
+ return selected?"Te ayudo a revisarlo. Puedo contarte sobre el turno, la zona o el proceso, y Astrid confirma los detalles que no estén publicados.":"Claro, podemos platicarlo. Si buscas trabajo, te comparto las opciones activas o podemos empezar por la zona que te interesa.";
+}
+function showContextChoices(){
+ if(selected&&phase==="choose")suggestOptions([["Postularme",askExperience,true],["Otras vacantes",showJobs,false]]);
+ else if(!selected&&phase==="choose")showJobChoices();
+}
+function yesNo(q){if(/\b(si|claro|adelante|me interesa|quiero|vamos|continuar|postularme)\b/.test(q))return "si";if(/\b(no|otra|otras|diferente|cambiar)\b/.test(q))return "no";return null;}
+async function handleNaturalMessage(message){
+ const q=normalizeQuestion(message);
+ if(!jobs.length&&phase==="loading"){await reply("Estoy consultando las vacantes. Puedes intentar de nuevo en un momento.");return;}
+ const found=matchJob(message);
+ if(!selected&&(found||/^\s*\d{1,2}\s*$/.test(q))){
+   const n=Number(q),job=found||jobs[n-1];
+   if(job){await selectJob(job,true);return;}
+ }
+ if(isJobQuestion(q)&&(!selected||/otras|lista|cuales|que vacantes|tienen|disponibles/.test(q))){await showJobs();return;}
+ if(selected&&phase==="choose"){
+  if(/otra|otras|cambiar|ver (mas|vacantes)/.test(q)){await showJobs();return;}
+  if(/postular|inscrib|registr|adelante|empez|continu|\bsi\b|me interesa/.test(q)){await askExperience();return;}
+ }
+ if(phase==="experience"&&!isInformational(q)){
+  const choice=yesNo(q);
+  if(choice){answers.experience_level=choice;await askDetails();return;}
+  if(/prefiero|comentar|luego/.test(q)){answers.experience_level="prefiero_comentarlo";await askDetails();return;}
+ }
+ if(phase==="details"&&!isInformational(q)&&message.trim().length>=2){
+  answers.experience=message.trim().slice(0,900);await askAvailability();return;
+ }
+ if(phase==="availability"){
+  if(/revisar|consultar|depende|confirmar/.test(q)){answers.availability="consultar";await askZone();return;}
+  if(!isInformational(q)){const choice=yesNo(q);if(choice){answers.availability=choice;await askZone();return;}}
+ }
+ if(phase==="zone"&&!isInformational(q)&&message.length<=120){
+  answers.preferred_zone=message.trim();await askContact();return;
+ }
+ if(!selected&&/\b(zapopan|guadalajara|tlaquepaque|tonala|centro|norte|sur|miravalle|san agustin)\b/.test(q)){
+  const filtered=jobs.filter(job=>normalizeQuestion(job.location).includes(q));
+  await reply(filtered.length?"Encontré estas vacantes en esa zona:\n"+filtered.map(j=>j.title+" — "+j.location).join("\n")+"\n\n¿Cuál te interesa?":"No veo una coincidencia exacta en esa zona. Te muestro las opciones que sí están publicadas.");
+  showJobChoices();return;
+ }
+ if(!selected||!flyReady||!$("fly-consent").checked){
+  await reply(answerQuestion(message));showContextChoices();return;
+ }
+ await replyToOpenQuestion(message);
 }
 async function checkFlyHealth(){
  try{
@@ -299,12 +379,12 @@ async function replyToOpenQuestion(question){
  const msgError=$("fly-question-error");
  msgError.textContent="";
  if(!flyReady||!selected){
-  await reply(answerQuestion(question));
+  await reply(answerQuestion(question));showContextChoices();
   return;
  }
  if(!$("fly-consent").checked){
   msgError.textContent="Para responder preguntas libres, necesito tu autorización para procesarlas. Si prefieres no hacerlo, puedes continuar con la preentrevista guiada.";
-  await reply(answerQuestion(question));return;
+  await reply(answerQuestion(question));showContextChoices();return;
  }
  if(flyQuestionBusy)return;
  flyQuestionBusy=true;submit.disabled=true;input.disabled=true;
@@ -339,10 +419,12 @@ document.querySelectorAll("[data-faq]").forEach(button=>button.addEventListener(
 }));
 $("question-form").addEventListener("submit",async(event)=>{
  event.preventDefault();
- const input=$("candidate-question");
- const question=input.value.trim();if(!question||flyQuestionBusy)return;
- if(question.length>240)return;
- input.value="";say(question);focusChat();await replyToOpenQuestion(question);
+ const input=$("candidate-question"),send=$("question-form").querySelector('button[type="submit"]');
+ const question=input.value.trim();if(!question||flyQuestionBusy||chatInputBusy||question.length>240||phase==="done")return;
+ chatInputBusy=true;send.disabled=true;input.disabled=true;
+ input.value="";say(question);focusChat();
+ try{await handleNaturalMessage(question);}
+ finally{chatInputBusy=false;send.disabled=false;input.disabled=false;input.focus({preventScroll:true});}
 });
 checkFlyHealth();
 fetchJobs();
