@@ -26,6 +26,19 @@ Deno.serve(async (request: Request) => {
   const phone = String(body.phone ?? "").replace(/[^+0-9]/g, "");
   const job = String(body.job ?? "");
   const experience = String(body.experience ?? "").trim();
+  const screening = (body.screening && typeof body.screening === "object" && !Array.isArray(body.screening)) ? body.screening as Record<string, unknown> : null;
+  const levels = ["si", "no", "prefiero_comentarlo"];
+  const availabilityValues = ["si", "no", "consultar"];
+  if (!screening || !levels.includes(String(screening.experience_level || "")) ||
+      !availabilityValues.includes(String(screening.availability || "")) ||
+      String(screening.preferred_zone ?? "").length > 120) {
+    return response(400, { ok: false, error: "preentrevista_incompleta" });
+  }
+  const verifiedScreening = {
+    experience_level: String(screening.experience_level),
+    availability: String(screening.availability),
+    preferred_zone: String(screening.preferred_zone ?? "").trim()
+  };
   if (body.consent !== true || name.length < 3 || name.length > 120 ||
     !/^\+?[0-9]{10,15}$/.test(phone) || !/^[a-z0-9-]{3,80}$/.test(job) ||
     experience.length < 2 || experience.length > 1000) return response(400, { ok:false, error:"verifica_los_campos_y_el_consentimiento" });
@@ -35,10 +48,10 @@ Deno.serve(async (request: Request) => {
   const fingerprint = Array.from(new Uint8Array(fingerprintBytes)).map(n => n.toString(16).padStart(2, "0")).join("");
   let upstream: Response;
   try {
-    upstream = await fetch(url + "/rest/v1/rpc/cl360_submit_application", {
+    upstream = await fetch(url + "/rest/v1/rpc/cl360_submit_screened_application", {
       method: "POST",
       headers: { "apikey": serviceKey, "authorization": "Bearer " + serviceKey, "content-type": "application/json", "prefer": "return=representation" },
-      body: JSON.stringify({ p_name:name, p_phone:phone, p_job_slug:job, p_experience:experience, p_consent:true, p_fingerprint:fingerprint })
+      body: JSON.stringify({ p_name:name, p_phone:phone, p_job_slug:job, p_experience:experience, p_screening:verifiedScreening, p_consent:true, p_fingerprint:fingerprint })
     });
   } catch { return response(503, {ok:false,error:"servicio_temporalmente_no_disponible"}); }
   if (!upstream.ok) {
@@ -46,6 +59,7 @@ Deno.serve(async (request: Request) => {
     const message = String(err?.message || "");
     if (message.includes("rate_limited")) return response(429, {ok:false,error:"limite_de_intentos"});
     if (message.includes("job_not_available")) return response(400, {ok:false,error:"vacante_no_disponible"});
+    if (message.includes("invalid_screening")) return response(400, {ok:false,error:"preentrevista_incompleta"});
     if (message.includes("invalid_application")) return response(400, {ok:false,error:"datos_invalidos"});
     return response(503, {ok:false,error:"no_se_pudo_registrar"});
   }
