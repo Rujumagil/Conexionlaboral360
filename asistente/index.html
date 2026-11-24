@@ -50,7 +50,7 @@ header{background:var(--dark);color:#fff}.head{max-width:1080px;margin:auto;min-
 <main class="container">
 <div class="intro"><h1>Encontremos una oportunidad para ti</h1><p>Cuéntame qué trabajo buscas. Podemos platicar, revisar vacantes y avanzar a tu ritmo.</p></div>
 <section class="chat" aria-label="Entrevista inicial de reclutamiento">
-<div class="chat-head"><div><strong><span class="status-dot"></span>Asistente virtual de reclutamiento</strong><small>Atención virtual · Tu postulación tendrá revisión humana</small></div><span class="steps" id="steps">Inicio</span></div>
+<div class="chat-head"><div><strong><span class="status-dot"></span>Andy · asistente virtual</strong><small>Atención virtual · Tu postulación tendrá revisión humana</small></div><span class="steps" id="steps">Inicio</span></div>
 <div class="progress"><span id="progress" style="width:0%"></span></div>
 <div class="messages" id="messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
 <div id="controls" class="controls"></div>
@@ -78,7 +78,7 @@ const labels={si:"Sí",no:"No",prefiero_comentarlo:"Prefiero comentarlo con Astr
 function scrollChat(){const box=$("messages");box.scrollTop=box.scrollHeight;}
 function bubble(text,who="assistant"){
  const el=document.createElement("div");el.className="bubble "+who;
- const label=document.createElement("span");label.className="who";label.textContent=who==="assistant"?"Reclutamiento 360":"Tú";
+ const label=document.createElement("span");label.className="who";label.textContent=who==="assistant"?"Andy":"Tú";
  el.append(label,document.createTextNode(text));$("messages").append(el);scrollChat();return el;
 }
 function say(text){bubble(text,"candidate");}
@@ -90,7 +90,7 @@ function setPhase(stage){
 }
 function typing(){
  const el=document.createElement("div");el.className="bubble assistant typing";el.setAttribute("aria-label","Escribiendo respuesta");
- const name=document.createElement("span");name.className="who";name.textContent="Reclutamiento 360";
+ const name=document.createElement("span");name.className="who";name.textContent="Andy";
  const dots=document.createElement("span");dots.className="typing-dots";
  for(let i=0;i<3;i++){const dot=document.createElement("i");dots.append(dot);}
  el.append(name,dots);$("messages").append(el);scrollChat();return el;
@@ -155,10 +155,10 @@ async function fetchJobs(){
   jobs=payload;
   const requested=new URLSearchParams(location.search).get("vacante");
   const preset=jobs.find(x=>x.slug===requested);
-  if(preset){await reply("¡Hola! Soy el asistente virtual de Conexión Laboral 360. 😊 Te puedo orientar sobre la vacante que te interesó.");selectJob(preset,true);}
+  if(preset){await reply("¡Hola! Soy Andy, la asistente virtual de Conexión Laboral 360. 😊 Te puedo orientar sobre la vacante que te interesó.");selectJob(preset,true);}
   else{
     setPhase("choose");
-    await reply("¡Hola! 👋 Soy el asistente virtual de Conexión Laboral 360. ¿Buscas trabajo en alguna zona o prefieres que te cuente qué vacantes tenemos?");
+    await reply("¡Hola! 👋 Soy Andy, la asistente virtual de Conexión Laboral 360. ¿Buscas trabajo en alguna zona o prefieres que te cuente qué vacantes tenemos?");
     suggestOptions([["Ver vacantes",()=>showJobs(),true],["¿Cómo funciona?",async()=>{say("¿Cómo funciona?");await reply(faq.process);suggestOptions([["Ver vacantes",()=>showJobs(),true]])},false]]);
   }
  }catch{
@@ -295,7 +295,7 @@ const faq={
  benefits:"En las vacantes actuales de seguridad se anuncian prestaciones de ley, pago semanal, sin semana de fondo y pagos puntuales. Los detalles específicos los confirma Astrid; otras áreas pueden tener condiciones diferentes.",
  process:"Primero platicamos sobre la vacante, tu experiencia, disponibilidad y zona preferida. Con tu permiso guardamos la postulación; después podrás hablar por WhatsApp con Astrid. Ella realiza el seguimiento y la evaluación.",
  privacy:"Tus datos se guardan en un CRM privado cuando nos autorizas. Puedes consultar los detalles en el aviso de privacidad y solicitar ayuda o el ejercicio de tus derechos a través del contacto indicado.",
- identity:"Soy el asistente virtual de reclutamiento de Conexión Laboral 360. Te ayudo con esta primera conversación; la Lic. Astrid Araiza es quien revisa tu postulación y continúa la atención personal."
+ identity:"Soy Andy, la asistente virtual de reclutamiento de Conexión Laboral 360. Te ayudo con esta primera conversación; la Lic. Astrid Araiza es quien revisa tu postulación y continúa la atención personal."
 };
 const faqLabels={salary:"Quisiera saber el sueldo",benefits:"¿Qué prestaciones hay?",process:"¿Cómo sigue el proceso?",privacy:"¿Qué harán con mis datos?",identity:"¿Quién me está atendiendo?"};
 
