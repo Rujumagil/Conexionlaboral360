@@ -262,7 +262,7 @@ async function askContact(){
   '<label class="label" for="phone">Tu teléfono o WhatsApp</label><input id="phone" class="field" type="tel" autocomplete="tel" maxlength="25" inputmode="tel" required placeholder="10 dígitos">'+
   '<div class="hidden" aria-hidden="true"><label for="website">Dejar vacío</label><input id="website" autocomplete="off" tabindex="-1"></div>'+
   '<label class="privacy"><input type="checkbox" id="consent" required><span>Autorizo a Conexión Laboral 360 a utilizar mis datos exclusivamente para gestionar esta postulación y contactarme durante el proceso. Consulté la <a href="../aviso-candidatos.html" target="_blank" rel="noopener noreferrer">información de privacidad</a>.</span></label>'+
-  '<label class="privacy"><input type="checkbox" id="live-chat-consent"><span>También quiero poder continuar esta conversación aquí con Astrid después de enviar mi postulación. Entiendo que los nuevos mensajes se guardarán en mi expediente y que debo conservar este chat abierto para recibir respuestas.</span></label>'+
+  '<label class="privacy"><input type="checkbox" id="live-chat-consent"><span>También quiero continuar por este chat con Astrid después de postularme. Autorizo que los mensajes nuevos se guarden en mi expediente. Necesitaré mantener abierta esta conversación para recibir respuestas.</span></label>'+
   '<p class="error" id="contact-error" role="alert"></p><button type="submit" class="action gold">Continuar</button>';
   $("controls").append(form);$("full-name").value=answers.name;$("phone").value=answers.phone;
   form.addEventListener("submit",e=>{
@@ -328,7 +328,7 @@ function stopLiveChat(){
  $("candidate-question").placeholder="Escribe aquí…";
 }
 async function syncLiveChat(action="poll",message=""){
- if(!liveChatReady||liveChatPolling)return;
+ if(!liveChatReady||(liveChatPolling&&action==="poll"))return;
  liveChatPolling=true;
  try{
   const result=await fetch(API+"/functions/v1/cl360-candidate-chat",{
@@ -347,7 +347,7 @@ async function syncLiveChat(action="poll",message=""){
   }
   if(json.status==="closed"){stopLiveChat();await reply("Esta conversación se cerró. Si necesitas algo más, puedes contactar a Astrid por WhatsApp.");}
  }catch(error){
-  if(action==="send")await reply("No pude guardar tu mensaje en este momento. Intenta enviarlo de nuevo o contacta a Astrid por WhatsApp.");
+  if(action==="send"){ $("candidate-question").value=message;await reply("No pude guardar tu mensaje en este momento. Sigue escrito en el campo para que puedas intentarlo de nuevo o contactar a Astrid por WhatsApp."); }
  }finally{liveChatPolling=false;}
 }
 function startLiveChat(){
