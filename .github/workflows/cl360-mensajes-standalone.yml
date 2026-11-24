@@ -47,9 +47,10 @@ jobs:
             await page.route('https://cdn.jsdelivr.net/**',route=>route.fulfill({status:200,contentType:'application/javascript',body:mockCode}));
             await page.goto(base,{waitUntil:'domcontentloaded'});
             await page.locator('#app').waitFor({state:'visible',timeout:15000});
-            await page.getByRole('heading',{name:'Tus conversaciones, en un solo lugar'}).waitFor({state:'visible'});
+            if(!await page.locator('#conversation-section').evaluate(el=>el.classList.contains('no-active-chat')))throw Error('La conversación debe iniciar sin chat activo');
             if(!await page.locator('#composer').isHidden())throw Error('El compositor debe ocultarse antes de seleccionar un chat');
             if(!await page.locator('.chat-top').isHidden())throw Error('La barra de chat no debe verse sin conversación');
+            if(!await page.locator('#inbox-section').isVisible())throw Error('La lista de chats debe ocupar la pantalla móvil');
             const lastFilter=page.locator('.filter-chip[data-filter="closed"]');
             if(!await lastFilter.isVisible())throw Error('El filtro Cerrados debe ser visible y no quedar cortado');
             const box=await lastFilter.boundingBox();
