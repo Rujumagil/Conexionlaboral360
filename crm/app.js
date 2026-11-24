@@ -4,6 +4,30 @@ const KEY="sb_publishable_17NekbDHp_ssL_Pf-CnqPg_v0acxqn3";
 const WS="c7ab2a78-08e0-4a29-8a3b-fadaf244002f";
 const db=window.supabase?.createClient(URL,KEY,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:false}});
 const $=(id)=>document.getElementById(id);
+let deferredInstallPrompt=null;
+window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();deferredInstallPrompt=event;});
+window.addEventListener("appinstalled",()=>{$("install-crm-status").textContent="App instalada";deferredInstallPrompt=null;});
+async function setupCrmInstall(){
+ if("serviceWorker" in navigator&&location.protocol==="https:"){
+  try{await navigator.serviceWorker.register(new window.URL("sw.js",document.baseURI).href,{scope:new window.URL("./",document.baseURI).pathname});}
+  catch(error){console.warn("La instalación offline no está disponible:",error?.name||"error");}
+ }
+ const button=$("install-crm");
+ button?.addEventListener("click",async()=>{
+  if(window.matchMedia("(display-mode: standalone)").matches){$("install-crm-status").textContent="Ya tienes abierta la app instalada";return;}
+  if(deferredInstallPrompt){
+   const prompt=deferredInstallPrompt;deferredInstallPrompt=null;
+   await prompt.prompt();
+   const selection=await prompt.userChoice;
+   $("install-crm-status").textContent=selection?.outcome==="accepted"?"Instalación solicitada":"Puedes instalar desde el menú del navegador";
+  }else{
+   $("install-crm-status").textContent=/iPhone|iPad|iPod/i.test(navigator.userAgent)?
+    "En Safari: Compartir → Agregar a pantalla de inicio":
+    "En Chrome: menú ⋮ → Instalar aplicación o Agregar a pantalla principal";
+  }
+ });
+}
+
 const safe=(x)=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt=(date)=>date?new Date(date).toLocaleString('es-MX',{dateStyle:'medium',timeStyle:'short'}):"—";
 function candidateReviewNotes(candidate){
@@ -296,7 +320,7 @@ $("search").addEventListener("input",renderCandidates);$("filter-stage").addEven
 /* App navigation, pipeline and internal conversations */
 const appViews={
  inicio:"Centro de operaciones",vacantes:"Vacantes",candidatos:"Candidatos",pipeline:"Pipeline de reclutamiento",
- conversaciones:"Centro de conversaciones",seguimientos:"Seguimientos",fly:"Andy · Compás Fly",ajustes:"Configuración"
+ conversaciones:"Mensajes y atención humana",seguimientos:"Seguimientos",fly:"Andy · Compás Fly",ajustes:"Configuración"
 };
 let activeView="inicio",threads=[],messages=[],activeConversationId=null,conversationsLoadError=false;
 const routeBase=new window.URL("./",document.baseURI);
@@ -403,6 +427,7 @@ function renderPipeline(){
   board.append(col);
  });
 }
+function waContact(phone){const digits=String(phone||"").replace(/\D/g,"");return digits.length===10?"52"+digits:digits;}
 function conversationLabel(s){return({waiting:"Pendiente",bot:"Asistente virtual",human:"Tomada por humano",closed:"Cerrada"})[s]||s;}
 function conversationCandidate(t){return candidates.find(c=>c.id===t.candidate_id);}
 async function loadConversations(){
@@ -469,8 +494,8 @@ async function openConversation(id){
  if(c?.phone){
   const wa=document.createElement("a");wa.className="btn yellow";
   wa.target="_blank";wa.rel="noopener noreferrer";
-  wa.href="https://wa.me/"+c.phone.replace(/[^0-9]/g,"")+"?text="+encodeURIComponent("Hola, soy del equipo de Conexión Laboral 360. Revisamos tu postulación para "+title(c.job_slug)+" y nos gustaría continuar tu proceso.");
-  wa.textContent="WhatsApp ↗";actions.append(wa);
+  wa.href="https://wa.me/"+waContact(c.phone)+"?text="+encodeURIComponent("Hola, soy del equipo de Conexión Laboral 360. Revisamos tu postulación para "+title(c.job_slug)+" y nos gustaría continuar tu proceso.");
+  wa.textContent="Pasar a WhatsApp ↗";actions.append(wa);
  }
  header.append(info,actions);
  const timeline=document.createElement("div");timeline.className="chat-timeline";timeline.id="internal-timeline";
@@ -503,7 +528,39 @@ async function openConversation(id){
   add.disabled=false;if(error)return err(error);
   field.value="";await openConversation(id);
  });
- panel.replaceChildren(header,timeline,mini,form);
+ const handoff=document.createElement("section");handoff.className="wa-handoff";
+ const htitle=document.createElement("strong");htitle.textContent="Responder personalmente";
+ handoff.append(htitle);
+ const note=document.createElement("p");note.className="small";
+ const isOwner=current.status==="human"&&current.handler_id===user?.id;
+ if(current.status==="human"&&!isOwner)note.textContent="Este caso está tomado por otra persona del equipo.";
+ else if(!isOwner)note.textContent="Primero pulsa «Tomar conversación» para detener las respuestas de Andy en esta conversación vinculada.";
+ else if(!c?.phone)note.textContent="No hay teléfono registrado para abrir el chat de WhatsApp.";
+ else note.textContent="Escribe una respuesta, abre WhatsApp y pulsa Enviar allí. El CRM no envía mensajes automáticamente y no puede confirmar su entrega.";
+ handoff.append(note);
+ if(isOwner&&c?.phone){
+  const area=document.createElement("textarea");area.className="field";area.rows=3;area.maxLength=1000;
+  area.placeholder="Hola, soy Astrid de Conexión Laboral 360…";
+  area.setAttribute("aria-label","Respuesta para enviar por WhatsApp");
+  const waLink=document.createElement("a");waLink.className="btn yellow";waLink.textContent="Abrir respuesta en WhatsApp ↗";waLink.target="_blank";waLink.rel="noopener noreferrer";
+  waLink.setAttribute("aria-disabled","true");waLink.classList.add("disabled-link");
+  const copy=document.createElement("button");copy.type="button";copy.className="btn ghost";copy.textContent="Copiar respuesta";copy.disabled=true;
+  const buttons=document.createElement("div");buttons.className="chat-actions";buttons.append(waLink,copy);
+  const status=document.createElement("small");status.className="small";status.setAttribute("role","status");
+  const sync=()=>{
+   const value=area.value.trim();
+   copy.disabled=!value;
+   if(value){waLink.href="https://wa.me/"+waContact(c.phone)+"?text="+encodeURIComponent(value);waLink.classList.remove("disabled-link");waLink.setAttribute("aria-disabled","false");}
+   else{waLink.removeAttribute("href");waLink.classList.add("disabled-link");waLink.setAttribute("aria-disabled","true");}
+  };
+  area.addEventListener("input",sync);
+  copy.addEventListener("click",async()=>{
+   try{await navigator.clipboard.writeText(area.value.trim());status.textContent="Respuesta copiada (todavía no enviada).";}
+   catch{status.textContent="No se pudo copiar; selecciona el texto manualmente.";}
+  });
+  handoff.append(area,buttons,status);
+ }
+ panel.replaceChildren(header,timeline,mini,handoff,form);
  timeline.scrollTop=timeline.scrollHeight;
 }
 async function changeConversationStatus(id,action){
@@ -513,5 +570,6 @@ async function changeConversationStatus(id,action){
  await openConversation(id);
 }
 
+setupCrmInstall();
 checkAuth().catch(error=>{$("login-error").textContent="Error de conexión. Actualiza la página.";console.error(error?.message||"Error");});
 })();
