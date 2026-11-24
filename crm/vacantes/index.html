@@ -6,6 +6,9 @@
 <base href="../">
 <title>Vacantes · Conexión Laboral 360</title>
 <link rel="stylesheet" href="app.css">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 </head>
 <body>
 <header class="top"><div class="top-inner"><div class="brand"><img src="../assets/logo-oficial.svg" alt=""><div><b>Conexión Laboral 360</b><small>CRM privado de reclutamiento</small></div></div><div class="top-right"><a href="../">Ver sitio público</a><span class="signed" id="signed"></span><button id="signout" class="hide">Cerrar sesión</button></div></div></header>
@@ -20,7 +23,7 @@
    <button class="nav-item" data-nav="vacantes"><span class="nav-icon">▤</span> Vacantes</button>
    <button class="nav-item" data-nav="candidatos"><span class="nav-icon">♙</span> Candidatos</button>
    <button class="nav-item" data-nav="pipeline"><span class="nav-icon">☷</span> Pipeline</button>
-   <button class="nav-item" data-nav="conversaciones"><span class="nav-icon">◉</span> Conversaciones <span id="nav-inbox-count" class="nav-count">0</span></button>
+   <button class="nav-item" data-nav="conversaciones"><span class="nav-icon">◉</span> Mensajes <span id="nav-inbox-count" class="nav-count">0</span></button>
   </nav>
   <div class="nav-subtitle">GESTIÓN</div>
   <nav class="app-menu" aria-label="Herramientas de gestión">
@@ -33,11 +36,11 @@
  <div class="app-main">
  <div class="app-toolbar">
    <div><p class="eyebrow">CONEXIÓN LABORAL 360 · CRM</p><h1 id="view-title">Centro de operaciones</h1></div>
-   <div class="toolbar-actions"><span id="last-updated" class="stamp">Última actualización —</span><button class="btn ghost" id="global-refresh" type="button">↻ Actualizar</button><a class="btn yellow" href="../asistente/" target="_blank" rel="noopener noreferrer">Ver asistente ↗</a></div>
+   <div class="toolbar-actions"><button class="btn ghost" id="install-crm" type="button">⬇ Instalar app</button><span id="install-crm-status" class="small" role="status"></span><span id="last-updated" class="stamp">Última actualización —</span><button class="btn ghost" id="global-refresh" type="button">↻ Actualizar</button><a class="btn yellow" href="../asistente/" target="_blank" rel="noopener noreferrer">Ver asistente ↗</a></div>
  </div>
  <div class="app-content">
   <section class="app-view" data-view="inicio" id="view-inicio">
-   <div class="welcome-banner"><div><span class="banner-overline">PANEL GENERAL</span><h2>Tu operación de reclutamiento, en un solo lugar.</h2><p>Vacantes, candidatos, conversaciones y seguimientos organizados para el equipo.</p></div><button class="btn yellow" data-go="vacantes">Administrar vacantes</button></div>
+   <div class="welcome-banner"><div><span class="banner-overline">PANEL GENERAL</span><h2>Tu operación de reclutamiento, en un solo lugar.</h2><p>Vacantes, candidatos, conversaciones y seguimientos organizados para el equipo.</p></div><div class="crm-quick-actions"><button class="btn yellow" data-go="conversaciones">◉ Mensajes</button><button class="btn ghost" data-go="vacantes">Administrar vacantes</button></div></div>
    <div class="metrics" aria-label="Indicadores de reclutamiento">
     <div class="metric"><span class="metric-icon">♙</span><strong id="m-total">—</strong><span>Postulantes</span></div>
     <div class="metric"><span class="metric-icon">✧</span><strong id="m-new">—</strong><span>Sin contactar</span></div>
@@ -91,12 +94,12 @@
    <div class="pipeline-board" id="pipeline-board" aria-label="Tablero de candidatos por etapa"></div>
   </section>
   <section class="app-view hide" data-view="conversaciones" id="view-conversaciones">
-   <div class="page-intro"><div><span class="tag">BANDEJA DE ATENCIÓN</span><h2>Conversaciones</h2><p>Historial del caso, notas internas, toma humana y contacto por WhatsApp.</p></div><button id="conversation-refresh" class="btn ghost">↻ Actualizar</button></div>
+   <div class="page-intro"><div><span class="tag">BANDEJA DE MENSAJES</span><h2>Mensajes y atención humana</h2><p>Revisa el historial registrado por Andy, toma conversaciones y prepara respuestas para WhatsApp.</p></div><button id="conversation-refresh" class="btn ghost">↻ Actualizar</button></div>
    <div class="inbox-layout">
     <section class="inbox-list"><div class="inbox-heading"><strong>Bandeja</strong><select id="inbox-filter" aria-label="Filtrar conversaciones"><option value="all">Todas</option><option value="waiting">Pendientes</option><option value="human">Tomadas</option><option value="bot">Asistente</option><option value="closed">Cerradas</option></select></div><div id="inbox-threads"><p class="empty">Sin conversaciones todavía.</p></div></section>
-    <section class="chat-pane" id="chat-pane"><div class="empty">Selecciona una conversación para ver el caso y sus notas internas.</div></section>
+    <section class="chat-pane" id="chat-pane"><div class="empty">Selecciona una conversación para revisar el historial y tomar el control de la atención.</div></section>
    </div>
-   <p class="inbox-hint">Los mensajes escritos aquí son notas internas del equipo. No se envían al candidato. La integración de mensajes reales de WhatsApp y transcripciones completas del asistente todavía está pendiente.</p>
+   <p class="inbox-hint">El historial refleja los turnos de Andy vinculados a una postulación y las notas internas. Responder por WhatsApp abre su aplicación con un texto preparado: debes pulsar Enviar allí. Los mensajes externos no se sincronizan automáticamente con el CRM.</p>
   </section>
   <section class="app-view hide" data-view="seguimientos" id="view-seguimientos">
     <div class="page-intro"><div><span class="tag">TAREAS</span><h2>Agenda de seguimientos</h2><p>Controla las siguientes llamadas, entrevistas y contactos.</p></div></div>
@@ -135,7 +138,7 @@
   <section class="panel detail hide" id="detail" aria-label="Expediente del candidato"></section>
  </div></div>
  <nav class="mobile-nav" aria-label="Pestañas principales">
-   <button data-nav="inicio" class="active"><span>▦</span>Inicio</button><button data-nav="vacantes"><span>▤</span>Vacantes</button><button data-nav="candidatos"><span>♙</span>Candidatos</button><button data-nav="pipeline"><span>☷</span>Pipeline</button><button data-nav="conversaciones"><span>◉</span>Chats</button><button data-nav="ajustes"><span>☰</span>Más</button>
+   <button data-nav="inicio" class="active"><span>▦</span>Inicio</button><button data-nav="vacantes"><span>▤</span>Vacantes</button><button data-nav="candidatos"><span>♙</span>Candidatos</button><button data-nav="pipeline"><span>☷</span>Pipeline</button><button data-nav="conversaciones"><span>◉</span>Mensajes</button><button data-nav="ajustes"><span>☰</span>Más</button>
  </nav>
 </main>
 <!-- Shared application layout: views use separate GitHub Pages URLs. -->
