@@ -74,13 +74,32 @@ Deno.serve(async (request: Request) => {
     if (message.includes("invalid_application")) return response(400, {ok:false,error:"datos_invalidos"});
     return response(503, {ok:false,error:"no_se_pudo_registrar"});
   }
+  const candidateId = await upstream.json().catch(()=>null);
+  const attribution: Record<string,string> = {};
+  if(body.attribution && typeof body.attribution === "object" && !Array.isArray(body.attribution)){
+    const input=body.attribution as Record<string,unknown>;
+    for(const key of ["utm_source","utm_medium","utm_campaign","utm_content","utm_term","campana"]){
+      const value=input[key];
+      if(typeof value==="string" && /^[a-zA-Z0-9_.-]{1,100}$/.test(value)) attribution[key]=value;
+    }
+  }
+  let attributionSaved=false;
+  if(Object.keys(attribution).length && typeof candidateId==="string" && /^[a-f0-9-]{36}$/i.test(candidateId)){
+    try{
+      const saved=await fetch(url+"/rest/v1/cl360_candidates?workspace_id=eq.c7ab2a78-08e0-4a29-8a3b-fadaf244002f&id=eq."+candidateId+"&select=id",{
+        method:"PATCH",headers:{apikey:serviceKey,authorization:"Bearer "+serviceKey,"content-type":"application/json",prefer:"return=representation"},
+        body:JSON.stringify({campaign_attribution:attribution}),signal:AbortSignal.timeout(5000)
+      });
+      const rows=saved.ok?await saved.json():[];
+      attributionSaved=Array.isArray(rows)&&rows.length===1;
+    }catch{console.error("cl360_campaign_attribution_failed");}
+  }
   let flyHistoryLinked = false;
   let liveChatReady = false;
   let flyHistoryCount = 0;
   let browserTranscriptCount=0;
   if((flyConsent || liveChatConsent || historyConsent) && flySessionId){
     try{
-      const candidateId = await upstream.json();
       if(typeof candidateId==="string"&&/^[a-f0-9-]{36}$/i.test(candidateId)){
         const bytes=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(serviceKey.slice(-24)+"|"+flySessionId));
         const sessionHash=Array.from(new Uint8Array(bytes)).map(n=>n.toString(16).padStart(2,"0")).join("");
@@ -121,5 +140,5 @@ Deno.serve(async (request: Request) => {
       }
     }catch(error){console.error("cl360_fly_attach_unavailable",{kind:error instanceof Error?error.name:"unknown"});}
   }
-  return response(201, {ok:true,flyHistoryLinked,flyHistoryCount,browserTranscriptCount,liveChatReady});
+  return response(201, {ok:true,flyHistoryLinked,flyHistoryCount,browserTranscriptCount,liveChatReady,attributionSaved});
 });
