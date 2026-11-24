@@ -21,6 +21,14 @@ header{background:var(--dark);color:#fff}.head{max-width:1080px;margin:auto;min-
 .messages{scroll-behavior:smooth}
 .choices{gap:8px}
 .faq-btn:focus-visible,.action:focus-visible,.job:focus-visible{outline:3px solid #f2b800;outline-offset:3px}
+
+.question-form{margin-top:13px;background:#fff;border:1px solid var(--line);padding:12px 15px;border-radius:13px}
+.question-row{display:flex;gap:8px;align-items:flex-start}
+.question-row .field{margin:0;min-width:0;flex:1}
+.question-row .action{flex:0 0 auto}
+.question-form .label{margin:0 0 8px}
+.question-form .footnote{margin-top:8px}
+@media(max-width:520px){.question-row{flex-direction:column}.question-row .action,.question-row .field{width:100%}}
 </style>
 </head>
 <body>
@@ -36,7 +44,7 @@ header{background:var(--dark);color:#fff}.head{max-width:1080px;margin:auto;min-
 <section class="faq" aria-label="Información general">
 <h2>¿Te quedó alguna duda? Podemos platicarla</h2>
 <div class="choices"><button class="action secondary faq-btn" data-faq="salary">Sueldos</button><button class="action secondary faq-btn" data-faq="benefits">Beneficios</button><button class="action secondary faq-btn" data-faq="process">Proceso de contratación</button><button class="action secondary faq-btn" data-faq="privacy">Mis datos</button><button class="action secondary faq-btn" data-faq="identity">¿Quién me atiende?</button></div>
-<div class="answer" id="faq-answer" hidden></div>
+<form id="question-form" class="question-form"><label class="label" for="candidate-question">O escríbeme tu duda con tus propias palabras</label><div class="question-row"><input class="field" id="candidate-question" maxlength="240" placeholder="Ej. ¿Dónde está el servicio?, ¿cuál es el horario?" autocomplete="off" aria-describedby="question-help"><button class="action secondary" type="submit">Preguntar</button></div><p class="footnote" id="question-help">Te responderé con información confirmada; si algo requiere aclaración, te lo indicará la asesora.</p></form><div class="answer" id="faq-answer" hidden></div>
 </section>
 <p class="notice">Te acompaña un asistente virtual en esta primera conversación. El seguimiento y las decisiones de reclutamiento corresponden al personal de Conexión Laboral 360. <a href="../aviso-candidatos.html" target="_blank" rel="noopener noreferrer">Información de privacidad</a>.</p>
 </main>
@@ -248,10 +256,39 @@ const faq={
  identity:"Soy el asistente virtual de reclutamiento de Conexión Laboral 360. Te ayudo con esta primera conversación; la Lic. Astrid Araiza es quien revisa tu postulación y continúa la atención personal."
 };
 const faqLabels={salary:"Quisiera saber el sueldo",benefits:"¿Qué prestaciones hay?",process:"¿Cómo sigue el proceso?",privacy:"¿Qué harán con mis datos?",identity:"¿Quién me está atendiendo?"};
+function normalizeQuestion(text){return text.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();}
+function answerQuestion(question){
+ const q=normalizeQuestion(question);
+ if(/\b(quien|persona|humano|humana|robot|bot|virtual|ia)\b/.test(q)||q.includes("atiende"))return faq.identity;
+ if(/sueldo|salario|cuanto pagan|pagan|dinero|remuneracion|pago por/.test(q))return faq.salary;
+ if(/prestaciones|beneficios|seguro social|imss|aguinaldo|vacaciones/.test(q))return faq.benefits;
+ if(/horario|turno|jornada|horas|a que hora/.test(q))return selected?
+  "Para "+selected.title+", el turno anunciado es "+selected.shift+". Si necesitas un ajuste o tienes dudas, lo puede revisar Astrid contigo.":
+  "Cada vacante tiene un turno distinto. Si eliges un servicio, puedo decirte el horario publicado.";
+ if(/ubicacion|donde queda|direccion|zona|cerca|transporte|municipio|ubicado/.test(q))return selected?
+  selected.title+" se encuentra en la zona de "+selected.location+". Por seguridad y precisión, la ubicación exacta la confirmas con la asesora.":
+  "Puedo comentarte la zona aproximada de cada vacante en cuanto elijas una.";
+ if(/experiencia|requisitos|documentos|edad|escolaridad|sin experiencia/.test(q))return
+  "Puedes continuar aunque no tengas experiencia previa. Los requisitos específicos y documentos necesarios los confirma Astrid; no voy a descartar tu solicitud con una respuesta de esta charla.";
+ if(/pasos|proceso|entrevista|contratan|siguiente|postular|registro/.test(q))return faq.process;
+ if(/datos|privacidad|consentimiento|guardar|informacion personal/.test(q))return faq.privacy;
+ return "Gracias por preguntarme. Prefiero no darte una respuesta que no tenga confirmada. Cuando termines esta primera charla podrás consultarlo directamente con Astrid. ¿Continuamos con tu postulación?";
+}
+function focusChat(){
+ const chat=document.querySelector(".chat");
+ if(chat&&typeof chat.scrollIntoView==="function")chat.scrollIntoView({behavior:"smooth",block:"start"});
+}
 document.querySelectorAll("[data-faq]").forEach(button=>button.addEventListener("click",async()=>{
  const key=button.dataset.faq;if(!faq[key])return;
- say(faqLabels[key]);await reply(faq[key]);$("faq-answer").hidden=true;
+ say(faqLabels[key]);focusChat();await reply(faq[key]);
 }));
+$("question-form").addEventListener("submit",async(event)=>{
+ event.preventDefault();
+ const input=$("candidate-question");
+ const question=input.value.trim();if(!question)return;
+ if(question.length>240)return;
+ input.value="";say(question);focusChat();await reply(answerQuestion(question));
+});
 fetchJobs();
 })();
 </script>
