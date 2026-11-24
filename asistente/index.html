@@ -73,12 +73,16 @@ const $=id=>document.getElementById(id);
 const delay=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches?0:480;
 let jobs=[],selected=null,pendingIntroJob=null,phase="loading",version=0,busy=false;
 let flyReady=false,flySession=crypto.randomUUID(),flyHistory=[],flyQuestionBusy=false,flyUsedWithConsent=false,chatInputBusy=false;
+const browserTranscript=[];
 const answers={experience_level:"",experience:"",availability:"",preferred_zone:"",name:"",phone:"",consent:false,liveChatConsent:false,website:""};
 let liveChatReady=false,liveChatSeen=new Set(),liveChatTimer=null,liveChatStartedAt=0,liveChatPolling=false;
 const labels={si:"Sí",no:"No",prefiero_comentarlo:"Prefiero comentarlo con Astrid",consultar:"Necesito consultarlo"};
 function scrollChat(){const box=$("messages");box.scrollTop=box.scrollHeight;}
 function bubble(text,who="assistant"){
  const el=document.createElement("div");el.className="bubble "+who;
+ if(phase!=="done"&&(who==="assistant"||who==="candidate")&&typeof text==="string"&&text.trim()&&browserTranscript.length<40){
+  browserTranscript.push({role:who==="assistant"?"fly":"candidate",body:text.trim().slice(0,750)});
+ }
  const label=document.createElement("span");label.className="who";label.textContent=who==="assistant"?"Andy":"Tú";
  el.append(label,document.createTextNode(text));$("messages").append(el);scrollChat();return el;
 }
@@ -263,6 +267,7 @@ async function askContact(){
   '<div class="hidden" aria-hidden="true"><label for="website">Dejar vacío</label><input id="website" autocomplete="off" tabindex="-1"></div>'+
   '<label class="privacy"><input type="checkbox" id="consent" required><span>Autorizo a Conexión Laboral 360 a utilizar mis datos exclusivamente para gestionar esta postulación y contactarme durante el proceso. Consulté la <a href="../aviso-candidatos.html" target="_blank" rel="noopener noreferrer">información de privacidad</a>.</span></label>'+
   '<label class="privacy"><input type="checkbox" id="live-chat-consent"><span>También quiero continuar por este chat con Astrid después de postularme. Autorizo que los mensajes nuevos se guarden en mi expediente. Necesitaré mantener abierta esta conversación para recibir respuestas.</span></label>'+
+  '<label class="privacy"><input type="checkbox" id="history-consent"><span>Autorizo guardar en mi expediente una copia de la conversación que tuve con Andy en este navegador, para que Astrid pueda revisar mis preguntas y respuestas.</span></label>'+
   '<p class="error" id="contact-error" role="alert"></p><button type="submit" class="action gold">Continuar</button>';
   $("controls").append(form);$("full-name").value=answers.name;$("phone").value=answers.phone;
   form.addEventListener("submit",e=>{
@@ -271,7 +276,7 @@ async function askContact(){
    if(name.length<3||! /^\+?[0-9]{10,15}$/.test(phone)||!$("consent").checked){
     $("contact-error").textContent="¿Me ayudas a verificar tu nombre, teléfono y autorización?";return;
    }
-   answers.name=name;answers.phone=phone;answers.consent=true;answers.liveChatConsent=$("live-chat-consent").checked;answers.website=$("website").value;
+   answers.name=name;answers.phone=phone;answers.consent=true;answers.liveChatConsent=$("live-chat-consent").checked;answers.historyConsent=$("history-consent").checked;answers.website=$("website").value;
    say("Soy "+firstName()+". Quiero registrar mi postulación y autorizo el contacto.");askReview();
   });
  });
@@ -299,7 +304,7 @@ async function submit(){
    method:"POST",headers:{"content-type":"application/json",apikey:KEY},
    body:JSON.stringify({name:answers.name,phone:answers.phone,job:selected.slug,experience:answers.experience,
     consent:answers.consent,website:answers.website||"",
-    flyConsent:flyUsedWithConsent,liveChatConsent:answers.liveChatConsent,flySessionId:(flyUsedWithConsent||answers.liveChatConsent)?flySession:null,
+    flyConsent:flyUsedWithConsent,liveChatConsent:answers.liveChatConsent,historyConsent:answers.historyConsent===true,transcript:answers.historyConsent===true?browserTranscript.slice(0,40):[],flySessionId:(flyUsedWithConsent||answers.liveChatConsent||answers.historyConsent)?flySession:null,
     screening:{experience_level:answers.experience_level,availability:answers.availability,preferred_zone:answers.preferred_zone}})
   });
   const data=await response.json().catch(()=>({}));
@@ -317,7 +322,7 @@ async function submit(){
   a.textContent="Hablar con Astrid por WhatsApp";$("controls").append(a);
   if(answers.liveChatConsent&&data.liveChatReady)startLiveChat();
   else if(answers.liveChatConsent)await reply("No pude activar el chat de seguimiento en esta postulación. Puedes continuar por WhatsApp.");
-  option("Revisar otra vacante",()=>{stopLiveChat();selected=null;flySession=crypto.randomUUID();flyHistory=[];flyUsedWithConsent=false;showJobs();});
+  option("Revisar otra vacante",()=>{stopLiveChat();selected=null;flySession=crypto.randomUUID();flyHistory=[];flyUsedWithConsent=false;browserTranscript.length=0;showJobs();});
  }catch(error){$("send-error").textContent=error.message||"Ocurrió un error. Puedes intentarlo de nuevo.";buttons.forEach(b=>b.disabled=false);}
  finally{busy=false;}
 }
