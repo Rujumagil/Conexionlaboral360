@@ -127,7 +127,7 @@ Deno.serve(async(req:Request)=>{
   // Solo se anexa al CRM cuando una persona completa su postulación consentida.
   const logging=await fetch(project+"/rest/v1/rpc/cl360_fly_record_turn",{
    method:"POST",headers,
-   body:JSON.stringify({p_session_hash:sessionHash,p_question:input,p_reply:reply.slice(0,700)}),
+   body:JSON.stringify({p_session_hash:sessionHash,p_question:input,p_reply:reply.slice(0,1500)}),
    signal:AbortSignal.timeout(6500)
   });
   if(!logging.ok){
