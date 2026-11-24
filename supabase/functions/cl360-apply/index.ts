@@ -14,7 +14,7 @@ Deno.serve(async (request: Request) => {
   let body: Record<string, unknown>;
   try {
     const raw = await request.text();
-    if (raw.length > 5000) return response(413, { ok: false, error: "datos_demasiado_grandes" });
+    if (raw.length > 18500) return response(413, { ok: false, error: "datos_demasiado_grandes" });
     body = JSON.parse(raw);
     if (!body || typeof body !== "object" || Array.isArray(body)) throw Error("bad json");
   } catch { return response(400, { ok: false, error: "datos_invalidos" }); }
@@ -28,9 +28,15 @@ Deno.serve(async (request: Request) => {
   // No se acepta una transcripción proporcionada por el cliente: se usa el registro del servidor.
   const flyConsent = body.flyConsent === true;
   const liveChatConsent = body.liveChatConsent === true;
+  const historyConsent = body.historyConsent === true;
   const flySessionId = typeof body.flySessionId==="string" ? body.flySessionId.trim() : "";
-  if((flyConsent || liveChatConsent) && !/^[a-f0-9-]{36}$/i.test(flySessionId))
+  if((flyConsent || liveChatConsent || historyConsent) && !/^[a-f0-9-]{36}$/i.test(flySessionId))
     return response(400,{ok:false,error:"sesion_de_agente_invalida"});
+  const transcript=historyConsent&&Array.isArray(body.transcript)?body.transcript:[];
+  if(historyConsent&&(!transcript.length||transcript.length>40||JSON.stringify(transcript).length>15000||
+    transcript.some(item=>!item||typeof item!=="object"||!["candidate","fly"].includes(item.role)||
+      typeof item.body!=="string"||item.body.trim().length<1||item.body.trim().length>750)))
+      return response(400,{ok:false,error:"historial_invalido"});
   const screening = (body.screening && typeof body.screening === "object" && !Array.isArray(body.screening)) ? body.screening as Record<string, unknown> : null;
   const levels = ["si", "no", "prefiero_comentarlo"];
   const availabilityValues = ["si", "no", "consultar"];
@@ -71,7 +77,8 @@ Deno.serve(async (request: Request) => {
   let flyHistoryLinked = false;
   let liveChatReady = false;
   let flyHistoryCount = 0;
-  if((flyConsent || liveChatConsent) && flySessionId){
+  let browserTranscriptCount=0;
+  if((flyConsent || liveChatConsent || historyConsent) && flySessionId){
     try{
       const candidateId = await upstream.json();
       if(typeof candidateId==="string"&&/^[a-f0-9-]{36}$/i.test(candidateId)){
@@ -87,6 +94,17 @@ Deno.serve(async (request: Request) => {
           const count=await joined.json();
           flyHistoryLinked=Number.isInteger(count)&&count>0;
           flyHistoryCount=Number.isInteger(count)?count:0;
+          if(historyConsent&&count===0){
+            const stored=await fetch(url+"/rest/v1/rpc/cl360_store_browser_transcript",{
+              method:"POST",headers:{"apikey":serviceKey,"authorization":"Bearer "+serviceKey,"content-type":"application/json"},
+              body:JSON.stringify({p_candidate_id:candidateId,p_session_hash:sessionHash,p_messages:transcript}),
+              signal:AbortSignal.timeout(7000)
+            });
+            if(stored.ok){
+              const n=await stored.json().catch(()=>0);
+              browserTranscriptCount=Number.isInteger(n)?n:0;
+            }else console.error("cl360_browser_transcript_store_failed",{status:stored.status});
+          }
           if(liveChatConsent){
             const enabled=await fetch(url+"/rest/v1/cl360_conversations?workspace_id=eq.c7ab2a78-08e0-4a29-8a3b-fadaf244002f&candidate_id=eq."+candidateId+"&fly_session_hash=eq."+sessionHash+"&select=id",{
               method:"PATCH",
@@ -103,5 +121,5 @@ Deno.serve(async (request: Request) => {
       }
     }catch(error){console.error("cl360_fly_attach_unavailable",{kind:error instanceof Error?error.name:"unknown"});}
   }
-  return response(201, {ok:true,flyHistoryLinked,flyHistoryCount,liveChatReady});
+  return response(201, {ok:true,flyHistoryLinked,flyHistoryCount,browserTranscriptCount,liveChatReady});
 });
