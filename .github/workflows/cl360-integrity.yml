@@ -1,0 +1,48 @@
+name: CL360 · Integridad del asistente y Fly
+on:
+  push:
+    paths:
+      - .github/workflows/cl360-integrity.yml
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verificar JavaScript de la landing, asistente y CRM
+        run: |
+          node <<'JS'
+          const fs=require('node:fs');
+          for(const path of ['index.html','asistente/index.html','crm/index.html']){
+            const html=fs.readFileSync(path,'utf8');
+            const matches=[...html.matchAll(/<script>([^>]*)>([\s\S]*?)<\/script>/g)];
+            const scripts=matches.filter(x=>!x[1].includes('src='));
+            if(!scripts.length)throw Error('Sin JS: '+path);
+            scripts.forEach(x=>new Function(x[2]));
+            console.log('JavaScript correcto:',path);
+          }
+          const landing=fs.readFileSync('index.html','utf8');
+          const chat=fs.readFileSync('asistente/index.html','utf8');
+          const edge=fs.readFileSync('supabase/functions/cl360-fly-chat/index.ts','utf8');
+          if(!landing.includes('asistente/?vacante='))throw Error('Falta enlace contextual a vacante');
+          if(!chat.includes('id="fly-consent"'))throw Error('Falta consentimiento de preguntas libres');
+          if(!chat.includes('functions/v1/cl360-fly-chat'))throw Error('Falta conexión con Fly');
+          if(!chat.includes('await reply(answerQuestion(question))'))throw Error('Falta respaldo guiado');
+          if(!edge.includes('store:false'))throw Error('Falta solicitud de no almacenamiento');
+          if(!edge.includes('cl360_fly_take_turn'))throw Error('Falta límite del servidor');
+          console.log('Reglas básicas del contrato: correctas');
+          JS
+      - name: Instalar analizador TypeScript fijado para la función
+        run: npm install --no-save --no-package-lock --ignore-scripts typescript@5.9.3
+      - name: Compilar función TypeScript sin ejecutarla
+        run: |
+          cat > /tmp/cl360-deno-globals.d.ts <<'TS'
+          declare const Deno: {
+            env: {get(key:string):string|undefined};
+            serve(handler:(request:Request)=>Response|Promise<Response>):void;
+          };
+          TS
+          ./node_modules/.bin/tsc --noEmit --skipLibCheck --lib ES2022,DOM --target ES2022 --module esnext --strict false /tmp/cl360-deno-globals.d.ts supabase/functions/cl360-fly-chat/index.ts
+          echo "Backend TypeScript correcto"
