@@ -23,7 +23,7 @@
 <div><label class="label" for="job-shift">Turno / horario</label><input class="field" id="job-shift" required></div></div>
 <label class="label" for="job-details">Información de la vacante (un punto por línea)</label><textarea class="field" id="job-details" placeholder="Funciones y datos confirmados del puesto" maxlength="1200"></textarea>
 <button type="submit" class="btn yellow" style="margin-top:10px">Guardar vacante pausada</button><p id="job-error" class="error" role="alert"></p></form></section>
-<section class="panel"><div class="panel-head"><h2>Agente de reclutamiento · Compás Fly</h2><span class="pill">Integración pendiente</span></div><div class="fly"><div class="fly-icon">✦</div><div><strong>Preparado para integrar Fly</strong><p>La estructura registra postulaciones, etapas, notas y tareas. La clasificación automática, las conversaciones y los mensajes de seguimiento solo se habilitarán cuando se verifique el conector autorizado. No hay respuestas autónomas activas.</p></div></div></section>
+<section class="panel"><div class="panel-head"><h2>Agente de reclutamiento · Compás Fly</h2><span id="fly-health-badge" class="pill">Verificando conexión</span></div><div class="fly"><div class="fly-icon">✦</div><div><strong>Fly Recruiter · Atención supervisada</strong><p id="fly-health-detail">El asistente público realiza la preentrevista y guarda las respuestas en el CRM. Consultando disponibilidad de la conversación generativa…</p><p class="small">La decisión de entrevista o contratación es humana. No se publican sueldos ni se envían mensajes automáticos por WhatsApp.</p></div></div></section>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.min.js"></script>
 <script>
@@ -40,6 +40,23 @@ let user=null, staffRole=null, candidates=[], followups=[], jobs=[], selected=nu
 const working=(msg)=>{if($("detail"))$("detail").innerHTML='<p class="loading">'+safe(msg)+'</p>'};
 function authScreen(show){$("auth-screen").classList.toggle("hide",!show);$("dashboard").classList.toggle("hide",show);$("signout").classList.toggle("hide",show);}
 function err(error){alert(error?.message||"No se pudo completar la operación. Reintenta.");}
+async function checkFlyAvailability(){
+ try{
+  const response=await fetch(URL+"/functions/v1/cl360-fly-chat",{headers:{apikey:KEY},cache:"no-store"});
+  if(!response.ok)throw Error("unavailable");
+  const health=await response.json();
+  const live=health.ready===true;
+  $("fly-health-badge").textContent=live?"Conversación activa":"Respuestas guiadas";
+  $("fly-health-detail").textContent=live
+    ?"La conversación contextual de Fly Recruiter está disponible para preguntas abiertas autorizadas. El CRM conserva el control humano de entrevistas y seguimientos."
+    :health.providerConfigured!==true
+      ?"El backend Fly Recruiter responde, pero todavía falta configurar la credencial privada GEMINI_API_KEY de Supabase. La preentrevista guiada sigue disponible."
+      :"Gemini está configurado; falta habilitar el perfil supervisado Fly Recruiter tras las pruebas. La preentrevista guiada continúa operativa.";
+ }catch{
+  $("fly-health-badge").textContent="Verificación pendiente";
+  $("fly-health-detail").textContent="No se pudo comprobar el servidor de Fly. La preentrevista guiada sigue disponible.";
+ }
+}
 async function checkAuth(){
   if(!db){$("login-error").textContent="No se pudo cargar la biblioteca de autenticación. Revisa tu conexión.";return;}
   const {data:{user:activeUser}}=await db.auth.getUser();
@@ -48,7 +65,7 @@ async function checkAuth(){
   if(error||!membership||!["owner","admin","manager","sales","support"].includes(membership.role)){
     await db.auth.signOut();authScreen(true);$("login-error").textContent="Tu cuenta todavía no tiene acceso a este CRM.";return;
   }
-  user=activeUser;staffRole=membership.role;canLoad=true;$("signed").textContent=activeUser.email||"";authScreen(false);await load();
+  user=activeUser;staffRole=membership.role;canLoad=true;void checkFlyAvailability();$("signed").textContent=activeUser.email||"";authScreen(false);await load();
 }
 async function load(){
  if(!canLoad)return;
