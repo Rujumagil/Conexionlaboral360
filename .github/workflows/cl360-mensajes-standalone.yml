@@ -74,6 +74,8 @@ jobs:
             if(!await page.locator('#send-inapp').isEnabled())throw Error('Enviar aquí no disponible con sesión consentida');
             await page.locator('#send-inapp').click();
             await page.getByText('Astrid · enviado en el chat').waitFor({state:'visible'});
+            await page.locator('#back').click();
+            await page.locator('#inbox-section').waitFor({state:'visible'});
             await page.locator('[data-filter="human"]').click();
             if(await page.locator('.thread').count()!==1)throw Error('Mis chats debe incluir caso tomado');
             const count=await page.evaluate(()=>window.__directSends);
