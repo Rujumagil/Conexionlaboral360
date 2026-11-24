@@ -354,6 +354,11 @@ async function handleNaturalMessage(message){
     /(hablar|platicar|contactar|whatsapp|telefono|numero|persona|humana|asesora|reclutadora|astrid)/.test(q)){
    await referToAstrid();return;
  }
+ if(/sueldo|salario|cuanto pagan|pago por|prestaciones|beneficios|seguro social|imss|aguinaldo|contratad[oa]|\bapto\b|\bcalific[oa]\b/.test(q)){
+   await reply(/contratad[oa]|\bapto\b|\bcalific[oa]\b/.test(q)?"Andy puede orientarte y registrar tu interés, pero no puede confirmar que estés seleccionado ni contratado. Astrid revisa cada caso y te indica los siguientes pasos.":answerQuestion(message));
+   addAstridWhatsApp();
+   return;
+ }
  if(!jobs.length&&phase==="loading"){await reply("Estoy consultando las vacantes. Puedes intentar de nuevo en un momento.");return;}
  const found=matchJob(message);
  if(!selected&&found&&/\?|^(que|cual|como|donde|cuanto)\b/.test(q)&&/(turno|horario|zona|donde|ubicacion)/.test(q)&&!/me interesa|postular|quiero registrarme/.test(q)){
