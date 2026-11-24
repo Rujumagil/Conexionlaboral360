@@ -63,8 +63,10 @@ jobs:
               throw Error('No usar montaje asíncrono que pueda causar pantalla blanca: '+path);
             if(!shell.includes('data-view="'+page+'"'))throw Error('Vista ausente: '+page);
           }
-          if(!app.includes('location.assign(urlForView(view,candidateId).href)'))
-            throw Error('Navegación de páginas independientes ausente');
+          if(!app.includes('history.pushState')||!app.includes('addEventListener("popstate"'))
+            throw Error('La navegación debe conservar sesión y respetar Atrás');
+          if(app.includes('location.assign(urlForView('))
+            throw Error('Recarga completa detectada al cambiar pestaña');
           if(!['kpi-open-jobs','kpi-waiting','kpi-human','kpi-hired'].every(x=>shell.includes(x)&&app.includes(x)))
             throw Error('Dashboard de KPIs incompleto');
           if(!styles.includes('.dashboard-secondary-kpis'))throw Error('Estilos dashboard ausentes');
