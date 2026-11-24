@@ -1,11 +1,10 @@
 // Fly Recruiter · Conexión Laboral 360
 // La identidad, el catálogo y los límites de uso se validan únicamente en el servidor.
 // Nunca se transmiten al proveedor de IA expedientes del CRM ni credenciales privadas.
-const ORIGIN="https://rujumagil.github.io";
+const ALLOWED_ORIGINS=new Set(["https://rujumagil.github.io","https://conexionlaboral360.app","https://conexionlaboral360.proyectocompas-info.workers.dev"]);
 const WS="c7ab2a78-08e0-4a29-8a3b-fadaf244002f";
 const API="https://generativelanguage.googleapis.com/v1beta/models/";
-const cors={"access-control-allow-origin":ORIGIN,"access-control-allow-methods":"GET,POST,OPTIONS","access-control-allow-headers":"content-type,apikey,authorization,x-client-info","vary":"Origin"};
-const response=(code:number,body:Record<string,unknown>)=>new Response(JSON.stringify(body),{status:code,headers:{...cors,"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
+
 const clean=(v:unknown,max:number)=>typeof v==="string"?v.trim().slice(0,max):"";
 const sha=async(x:string)=>{
  const bytes=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(x));
@@ -16,7 +15,10 @@ function redact(s:string){
   .replace(/(?:\+?\d[\s().-]*){10,15}/g,"[teléfono omitido]").replace(/\s+/g," ").trim();
 }
 Deno.serve(async(req:Request)=>{
- if(req.headers.get("origin")!==ORIGIN)return response(403,{ok:false,error:"origen_no_permitido"});
+ const origin=req.headers.get("origin")||"";
+ const cors={"access-control-allow-origin":ALLOWED_ORIGINS.has(origin)?origin:"https://rujumagil.github.io","access-control-allow-methods":"GET,POST,OPTIONS","access-control-allow-headers":"content-type,apikey,authorization,x-client-info","vary":"Origin"};
+ const response=(code:number,body:Record<string,unknown>)=>new Response(JSON.stringify(body),{status:code,headers:{...cors,"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
+ if(!ALLOWED_ORIGINS.has(origin))return response(403,{ok:false,error:"origen_no_permitido"});
  if(req.method==="OPTIONS")return new Response(null,{status:204,headers:cors});
  if(!["GET","POST"].includes(req.method))return response(405,{ok:false,error:"metodo_no_permitido"});
  const project=Deno.env.get("SUPABASE_URL")||"";
