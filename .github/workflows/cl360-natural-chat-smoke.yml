@@ -59,6 +59,11 @@ jobs:
             await page.locator('.bubble.assistant').filter({hasText:"¿Por qué zona"}).waitFor({timeout:15000});
             await type("Zapopan");
             await page.locator('#intake-form').waitFor({state:'visible',timeout:15000});
+            await type("Quiero hablar con Astrid");
+            await page.locator('.bubble.assistant').filter({hasText:"33 1970 8528"}).waitFor({timeout:15000});
+            const handoff=page.locator('#controls a[href*="wa.me/523319708528"]');
+            if(await handoff.count()!==1)throw Error("No se ofreció WhatsApp oficial de Astrid");
+            console.log("Derivación a Astrid con WhatsApp correcto: OK");
             if(errors.length)throw Error('Errores de JavaScript: '+errors.join('; '));
             console.log("Experiencia, disponibilidad y zona por texto: OK");
             console.log("Formulario de consentimiento visible: OK");
