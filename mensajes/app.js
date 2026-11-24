@@ -24,7 +24,7 @@ async function refresh(){
  if(!user||loading)return;
  loading=true;$("refresh").disabled=true;$("count").textContent="Actualizando conversaciones…";
  const [t,c,j]=await Promise.all([
-  db.from("cl360_conversations").select("id,candidate_id,status,handler_id,last_message_at").eq("workspace_id",WS).order("last_message_at",{ascending:false}).limit(300),
+  db.from("cl360_conversations").select("id,candidate_id,status,handler_id,last_message_at,fly_session_hash").eq("workspace_id",WS).order("last_message_at",{ascending:false}).limit(300),
   db.from("cl360_candidates").select("id,full_name,phone,job_slug,stage").eq("workspace_id",WS).limit(500),
   db.from("cl360_jobs").select("slug,title").eq("workspace_id",WS).limit(100)
  ]);
@@ -57,12 +57,18 @@ function renderThreads(){
 }
 function updateComposer(){
  const t=threads.find(x=>x.id===activeId),c=t&&candidate(t.candidate_id);
- const allowed=t?.status==="human"&&t.handler_id===user?.id&&!!c?.phone;
- const reply=$("reply").value.trim(),a=$("send-whatsapp");
- $("reply").disabled=!allowed;$("copy").disabled=!allowed||!reply;
- a.removeAttribute("href");a.classList.add("disabled-link");a.setAttribute("aria-disabled","true");
- if(allowed&&reply){a.href="https://wa.me/"+phone(c.phone)+"?text="+encodeURIComponent(reply);a.classList.remove("disabled-link");a.setAttribute("aria-disabled","false");}
- $("reply-hint").textContent=allowed?"Abre WhatsApp y pulsa Enviar allí. No se sincroniza ni registra automáticamente.":"Toma la conversación para preparar una respuesta. Andy se detiene en el caso vinculado.";
+ const owner=t?.status==="human"&&t.handler_id===user?.id;
+ const direct=!!owner&&!!t.fly_session_hash;
+ const whatsApp=!!owner&&!!c?.phone;
+ const reply=$("reply").value.trim(),wa=$("send-whatsapp");
+ $("reply").disabled=!(direct||whatsApp);
+ $("copy").disabled=!(direct||whatsApp)||!reply;
+ $("send-inapp").disabled=!direct||!reply;
+ wa.removeAttribute("href");wa.classList.add("disabled-link");wa.setAttribute("aria-disabled","true");
+ if(whatsApp&&reply){wa.href="https://wa.me/"+phone(c.phone)+"?text="+encodeURIComponent(reply);wa.classList.remove("disabled-link");wa.setAttribute("aria-disabled","false");}
+ $("reply-hint").textContent=!owner?"Toma primero el control de la conversación.":
+  !direct&&whatsApp?"Esta postulación no tiene chat interno vinculado. Puedes responder por WhatsApp.":
+  direct?"Enviar aquí entrega la respuesta al chat vinculado del candidato. WhatsApp abre otra aplicación y debes pulsar Enviar allí.":"No hay un canal de respuesta habilitado.";
 }
 async function openConversation(id,changeLayout=true){
  const t=threads.find(x=>x.id===id);if(!t)return;
@@ -74,13 +80,13 @@ async function openConversation(id,changeLayout=true){
  $("timeline").textContent="Cargando historial…";
  $("reply").value="";updateComposer();
  if(changeLayout){$("conversation-section").classList.remove("hidden-mobile");$("inbox-section").classList.add("hidden-mobile");}
- const {data,error}=await db.from("cl360_chat_messages").select("id,source,body,created_at").eq("workspace_id",WS).eq("conversation_id",id).order("created_at",{ascending:true}).limit(150);
+ const {data,error}=await db.from("cl360_chat_messages").select("id,source,visibility,body,created_at").eq("workspace_id",WS).eq("conversation_id",id).order("created_at",{ascending:true}).limit(150);
  if(activeId!==id)return;
  const timeline=$("timeline");timeline.replaceChildren();
  if(error||!data?.length){const p=document.createElement("p");p.className="empty";p.textContent=error?"No se pudo consultar el historial.":"Todavía no hay mensajes guardados en este expediente.";timeline.append(p);}
  else data.forEach(m=>{
   const bubble=document.createElement("div");bubble.className="bubble "+(m.source==="fly"?"andy":m.source==="candidate"?"candidate":m.source==="staff"?"staff":"system");
-  const author=document.createElement("b");author.textContent=({fly:"Andy",candidate:"Candidato",staff:"Nota interna",system:"Sistema"})[m.source]||"Mensaje";
+  const author=document.createElement("b");author.textContent=({fly:"Andy",candidate:"Candidato",staff:m.visibility==="candidate"?"Astrid · enviado en el chat":"Nota interna",system:"Sistema"})[m.source]||"Mensaje";
   const text=document.createElement("p");text.textContent=m.body;
   const date=document.createElement("small");date.textContent=fmt(m.created_at);
   bubble.append(author,text,date);timeline.append(bubble);
@@ -118,6 +124,16 @@ $("filter").addEventListener("change",renderThreads);
 $("search").addEventListener("input",renderThreads);
 $("back").addEventListener("click",()=>{$("conversation-section").classList.add("hidden-mobile");$("inbox-section").classList.remove("hidden-mobile");});
 $("reply").addEventListener("input",updateComposer);
+$("send-inapp").addEventListener("click",async()=>{
+ const t=threads.find(x=>x.id===activeId),body=$("reply").value.trim();
+ if(!t||t.status!=="human"||t.handler_id!==user?.id||!t.fly_session_hash||!body)return;
+ const button=$("send-inapp");button.disabled=true;
+ const {error}=await db.rpc("cl360_staff_send_candidate_message",{p_conversation:t.id,p_body:body});
+ if(error){$("reply-hint").textContent=error.message?.includes("candidate_channel")?"La sesión del candidato está caducada o no vinculada; utiliza WhatsApp.":"No pude enviar el mensaje. Intenta nuevamente.";button.disabled=false;return;}
+ $("reply").value="";
+ await refresh();
+ $("reply-hint").textContent="Mensaje enviado al chat vinculado. Se mostrará cuando el candidato abra o mantenga activo el chat.";
+});
 $("copy").addEventListener("click",async()=>{try{await navigator.clipboard.writeText($("reply").value.trim());$("reply-hint").textContent="Texto copiado. Aún no se ha enviado.";}catch{$("reply-hint").textContent="Selecciona el texto para copiarlo manualmente."; }});
 window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();installPrompt=event;});
 window.addEventListener("appinstalled",()=>{$("install-hint").textContent="Mensajes instalado";installPrompt=null;});
