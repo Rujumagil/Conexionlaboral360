@@ -79,8 +79,11 @@ jobs:
               if(u.includes('/functions/v1/cl360-apply')){
                 const payload=JSON.parse(route.request().postData()||'{}');
                 if(!payload.liveChatConsent||!payload.flySessionId)throw Error('No se registró consentimiento del chat interno');
+                if(!payload.historyConsent||!Array.isArray(payload.transcript)||payload.transcript.length<4)throw Error('Falta copia de conversación con consentimiento');
+                const authored=payload.transcript.filter(x=>x.role==='candidate').map(x=>x.body).join(' · ');
+                if(!authored.includes('María López')||!authored.includes('No tengo experiencia'))throw Error('El historial no recoge las respuestas reales de la sesión');
                 recordedPost=true;
-                return route.fulfill({status:201,contentType:'application/json',body:JSON.stringify({ok:true,liveChatReady:true,flyHistoryLinked:false})});
+                return route.fulfill({status:201,contentType:'application/json',body:JSON.stringify({ok:true,liveChatReady:true,flyHistoryLinked:false,browserTranscriptCount:12})});
               }
               if(u.includes('/functions/v1/cl360-candidate-chat')){
                 const payload=JSON.parse(route.request().postData()||'{}');
@@ -113,6 +116,7 @@ jobs:
             console.log("Nombre y teléfono opcional se conservan sin duplicar preguntas: OK");
             await other.locator('#consent').check();
             await other.locator('#live-chat-consent').check();
+            await other.locator('#history-consent').check();
             await other.locator('#intake-form button[type="submit"]').click();
             await other.getByRole('button',{name:'Sí, enviar mi postulación'}).waitFor({timeout:15000});
             await other.getByRole('button',{name:'Sí, enviar mi postulación'}).click();
@@ -121,7 +125,7 @@ jobs:
             await otherType("Gracias por responder, Astrid");
             await other.locator('.bubble.candidate').filter({hasText:'Gracias por responder, Astrid'}).waitFor({timeout:15000});
             if(chatMessages.length!==1)throw Error('El mensaje del candidato no llegó al canal interno');
-            console.log("Chat bidireccional simulado: consentimiento, respuesta humana visible y envío del candidato OK");
+            console.log("Historial consentido y chat bidireccional simulado: OK");
             await other.close();
             if(errors.length)throw Error('Errores de JavaScript: '+errors.join('; '));
             console.log("Experiencia, disponibilidad y zona por texto: OK");
