@@ -10,6 +10,15 @@ const candidate=id=>candidates.find(c=>c.id===id);
 const job=slug=>jobs.find(j=>j.slug===slug)?.title||slug||"Postulación";
 const phone=p=>{const digits=String(p||"").replace(/\D/g,"");return digits.length===10?"52"+digits:digits;};
 function showApp(on){$("signin").classList.toggle("hidden",on);$("app").classList.toggle("hidden",!on);}
+function setActiveChat(open){
+ $("conversation-section").classList.toggle("no-active-chat",!open);
+ $("chat-welcome").setAttribute("aria-hidden",open?"true":"false");
+}
+function resizeReply(){
+ const field=$("reply");
+ field.style.height="auto";
+ field.style.height=Math.min(field.scrollHeight,120)+"px";
+}
 async function authenticate(){
  if(!db){$("signin-error").textContent="No se pudo iniciar el servicio de acceso.";return;}
  const {data:{user:current},error}=await db.auth.getUser();
@@ -37,6 +46,7 @@ async function refresh(silent=false){
  threads=t.data||[];candidates=c.data||[];jobs=j.data||[];previews=m.error?[]:(m.data||[]);
  renderThreads();
  if(activeId&&threads.some(x=>x.id===activeId))await openConversation(activeId,false,true);
+ else if(activeId){activeId=null;setActiveChat(false);$("conversation-section").classList.add("hidden-mobile");$("inbox-section").classList.remove("hidden-mobile");}
 }
 function setFilter(value){
  if(!["all","waiting","human","bot","closed"].includes(value))return;
@@ -106,7 +116,7 @@ async function openConversation(id,changeLayout=true,preserveDraft=false){
  const draft=preserveDraft?$("reply").value:"";
  const oldScroll=preserveDraft?$("timeline").scrollTop:0;
  const oldHeight=preserveDraft?$("timeline").scrollHeight:0;
- activeId=id;renderThreads();
+ activeId=id;setActiveChat(true);renderThreads();
  if(changeLayout){$("context-panel").classList.add("hidden");$("info-toggle").setAttribute("aria-expanded","false");}
  const c=candidate(t.candidate_id);
  $("chat-avatar").textContent=(c?.full_name||"C").charAt(0).toUpperCase();
@@ -114,7 +124,7 @@ async function openConversation(id,changeLayout=true,preserveDraft=false){
  $("meta").textContent=job(c?.job_slug)+(c?.phone?" · "+c.phone:"");
  $("state").textContent=statusNames[t.status]||t.status;
  $("timeline").textContent="Cargando historial…";
- $("reply").value=draft;updateComposer();
+ $("reply").value=draft;resizeReply();updateComposer();
  if(changeLayout){$("conversation-section").classList.remove("hidden-mobile");$("inbox-section").classList.add("hidden-mobile");}
  const {data,error}=await db.from("cl360_chat_messages").select("id,source,visibility,body,created_at").eq("workspace_id",WS).eq("conversation_id",id).order("created_at",{ascending:true}).limit(150);
  if(activeId!==id)return;
@@ -185,7 +195,7 @@ $("signin-form").addEventListener("submit",async event=>{
  button.disabled=false;$("password").value="";
  if(error){$("signin-error").textContent="Correo o contraseña incorrectos.";return;}await authenticate();
 });
-$("signout").addEventListener("click",async()=>{if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null;}await db?.auth.signOut();user=null;activeId=null;threads=[];showApp(false);$("app-menu").classList.add("hidden");});
+$("signout").addEventListener("click",async()=>{if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null;}await db?.auth.signOut();user=null;activeId=null;threads=[];setActiveChat(false);showApp(false);$("app-menu").classList.add("hidden");});
 $("refresh").addEventListener("click",refresh);
 $("filter").addEventListener("change",()=>setFilter($("filter").value));
 document.querySelectorAll("[data-filter]").forEach(btn=>btn.addEventListener("click",()=>setFilter(btn.dataset.filter)));
@@ -212,14 +222,19 @@ $("back").addEventListener("click",()=>{
  $("info-toggle").setAttribute("aria-expanded","false");
  $("conversation-section").classList.add("hidden-mobile");$("inbox-section").classList.remove("hidden-mobile");
 });
-$("reply").addEventListener("input",updateComposer);
+$("reply").addEventListener("input",()=>{resizeReply();updateComposer();});
+$("reply").addEventListener("keydown",event=>{
+ if(event.key==="Enter"&&!event.shiftKey&&!event.isComposing&&!$("send-inapp").disabled){
+  event.preventDefault();$("send-inapp").click();
+ }
+});
 $("send-inapp").addEventListener("click",async()=>{
  const t=threads.find(x=>x.id===activeId),body=$("reply").value.trim();
  if(!t||t.status!=="human"||t.handler_id!==user?.id||!t.fly_session_hash||t.live_chat_enabled!==true||!body)return;
  const button=$("send-inapp");button.disabled=true;
  const {error}=await db.rpc("cl360_staff_send_candidate_message",{p_conversation:t.id,p_body:body});
  if(error){$("reply-hint").textContent=error.message?.includes("candidate_channel")?"La sesión del candidato está caducada o no vinculada; utiliza WhatsApp.":"No pude enviar el mensaje. Intenta nuevamente.";button.disabled=false;return;}
- $("reply").value="";
+ $("reply").value="";resizeReply();
  await refresh();
  $("reply-hint").textContent="Mensaje enviado al chat vinculado. Se mostrará cuando el candidato abra o mantenga activo el chat.";
 });
