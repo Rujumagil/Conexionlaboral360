@@ -3,6 +3,9 @@ on:
   push:
     paths:
       - .github/workflows/cl360-integrity.yml
+      - crm/index.html
+      - asistente/index.html
+      - supabase/functions/cl360-fly-chat/index.ts
   workflow_dispatch:
 jobs:
   check:
