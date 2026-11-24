@@ -6,6 +6,13 @@ const db=window.supabase?.createClient(URL,KEY,{auth:{autoRefreshToken:true,pers
 const $=(id)=>document.getElementById(id);
 const safe=(x)=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt=(date)=>date?new Date(date).toLocaleString('es-MX',{dateStyle:'medium',timeStyle:'short'}):"—";
+function candidateReviewNotes(candidate){
+ const notes=[];
+ if(candidate.screening_data?.availability==="no")notes.push("El turno anunciado no coincide con su disponibilidad: explorar alternativas.");
+ else if(candidate.screening_data?.availability==="consultar")notes.push("Necesita confirmar si puede cubrir el turno.");
+ if(candidate.screening_data?.experience_level==="prefiero_comentarlo")notes.push("Prefiere conversar sobre su experiencia con Astrid.");
+ return notes;
+}
 const stageNames={new:"Sin contactar",contacted:"Contactado",screening:"Filtrado",interview:"Entrevista",qualified:"Calificado",hired:"Contratado",rejected:"No seleccionado",archived:"Archivado"};
 let user=null, staffRole=null, candidates=[], followups=[], jobs=[], selected=null, canLoad=false;
 const working=(msg)=>{if($("detail"))$("detail").innerHTML='<p class="loading">'+safe(msg)+'</p>'};
@@ -122,6 +129,7 @@ async function renderDetail(candidate){
  '<label class="label">Experiencia previa</label><div>'+safe(({si:"Sí",no:"No",prefiero_comentarlo:"Prefiere comentarlo"})[candidate.screening_data?.experience_level]||"Por confirmar")+'</div>'+
  '<label class="label">Disponibilidad para turno</label><div>'+safe(({si:"Disponible",no:"No disponible",consultar:"Necesita consultar"})[candidate.screening_data?.availability]||"Por confirmar")+'</div>'+
  '<label class="label">Zona preferida</label><div>'+safe(candidate.screening_data?.preferred_zone||"Sin preferencia informada")+'</div>'+
+ '<label class="label">Orientación de Andy</label><div class="small">'+safe(candidateReviewNotes(candidate).join(" ")||"Datos recibidos. Astrid revisará la postulación y decidirá la siguiente etapa.")+'</div>'+
  '<label class="label" for="candidate-stage">Etapa del candidato</label><select id="candidate-stage" class="field">'+dateOptions+'</select>'+
  '<button class="btn yellow" style="margin-top:10px" id="save-stage">Guardar etapa</button><div class="section-divider"></div>'+
  '<label class="label" for="candidate-note">Nota de seguimiento</label><textarea id="candidate-note" class="field" maxlength="1500" placeholder="Resumen de conversación, disponibilidad o siguiente acción"></textarea>'+
@@ -263,7 +271,7 @@ function renderPipeline(){
    const job=document.createElement("span");job.className="small";job.textContent=title(c.job_slug);
    const when=document.createElement("span");when.className="small";when.textContent="Registrado: "+fmt(c.created_at);
    const tag=document.createElement("span");tag.className="pill";
-   tag.textContent=c.screening_data?.availability==="si"?"Turno disponible":c.screening_data?.availability==="no"?"Revisar turno":"Disponibilidad por confirmar";
+   tag.textContent=c.screening_data?.availability==="si"?"Turno declarado compatible":c.screening_data?.availability==="no"?"Revisión de horario": "Disponibilidad por confirmar";
    b.append(name,job,when,tag);b.addEventListener("click",()=>openCandidate(c.id));col.append(b);
   });
   board.append(col);
@@ -343,7 +351,7 @@ async function openConversation(id){
  if(!messages.length)timeline.innerHTML='<p class="empty">Aún no hay notas ni mensajes de seguimiento registrados.</p>';
  else messages.forEach(m=>{
   const box=document.createElement("div");box.className="message "+m.source;
-  const label=document.createElement("b");label.textContent=m.source==="staff"?"Nota del equipo":m.source==="candidate"?"Candidato":m.source==="fly"?"Fly":"Sistema";
+  const label=document.createElement("b");label.textContent=m.source==="staff"?"Nota del equipo":m.source==="candidate"?"Candidato":m.source==="fly"?"Andy":"Sistema";
   const body=document.createElement("div");body.textContent=m.body;
   const date=document.createElement("small");date.textContent=fmt(m.created_at);
   box.append(label,body,date);timeline.append(box);
