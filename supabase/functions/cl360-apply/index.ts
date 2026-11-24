@@ -84,10 +84,21 @@ Deno.serve(async (request: Request) => {
           signal:AbortSignal.timeout(7000)
         });
         if(joined.ok){
-          liveChatReady=liveChatConsent;
           const count=await joined.json();
           flyHistoryLinked=Number.isInteger(count)&&count>0;
           flyHistoryCount=Number.isInteger(count)?count:0;
+          if(liveChatConsent){
+            const enabled=await fetch(url+"/rest/v1/cl360_conversations?workspace_id=eq.c7ab2a78-08e0-4a29-8a3b-fadaf244002f&candidate_id=eq."+candidateId+"&fly_session_hash=eq."+sessionHash+"&select=id",{
+              method:"PATCH",
+              headers:{"apikey":serviceKey,"authorization":"Bearer "+serviceKey,"content-type":"application/json","prefer":"return=representation"},
+              body:JSON.stringify({live_chat_enabled:true}),
+              signal:AbortSignal.timeout(6500)
+            });
+            if(enabled.ok){
+              const rows=await enabled.json().catch(()=>[]);
+              liveChatReady=Array.isArray(rows)&&rows.length===1;
+            }else console.error("cl360_live_chat_enable_failed",{status:enabled.status});
+          }
         }else console.error("cl360_fly_attach_failed",{code:joined.status});
       }
     }catch(error){console.error("cl360_fly_attach_unavailable",{kind:error instanceof Error?error.name:"unknown"});}
