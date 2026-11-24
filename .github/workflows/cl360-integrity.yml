@@ -29,7 +29,14 @@ jobs:
                 const loc=syntax.getLineAndCharacterOfPosition(error.start);
                 console.error(path+' línea '+(loc.line+1)+': '+ts.flattenDiagnosticMessageText(error.messageText,' '));
               }
-              if(syntax.parseDiagnostics.length)throw Error('Error de sintaxis: '+path);
+              if(syntax.parseDiagnostics.length){
+                for(const node of syntax.statements){
+                  const start=syntax.getLineAndCharacterOfPosition(node.getStart(syntax));
+                  const end=syntax.getLineAndCharacterOfPosition(node.getEnd());
+                  console.error('Nodo raíz:',ts.SyntaxKind[node.kind],start.line+1,'→',end.line+1,JSON.stringify(node.getText(syntax).slice(0,65)));
+                }
+                throw Error('Error de sintaxis: '+path);
+              }
               new Function(x[2]);
             });
             console.log('JavaScript correcto:',path);
