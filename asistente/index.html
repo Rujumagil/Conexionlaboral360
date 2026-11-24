@@ -64,7 +64,7 @@ const WA="https://wa.me/523334123734";
 const $=id=>document.getElementById(id);
 const delay=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches?0:480;
 let jobs=[],selected=null,phase="loading",version=0,busy=false;
-let flyReady=false,flySession=crypto.randomUUID(),flyHistory=[],flyQuestionBusy=false;
+let flyReady=false,flySession=crypto.randomUUID(),flyHistory=[],flyQuestionBusy=false,flyUsedWithConsent=false;
 const answers={experience_level:"",experience:"",availability:"",preferred_zone:"",name:"",phone:"",consent:false,website:""};
 const labels={si:"Sí",no:"No",prefiero_comentarlo:"Prefiero comentarlo con Astrid",consultar:"Necesito consultarlo"};
 function scrollChat(){const box=$("messages");box.scrollTop=box.scrollHeight;}
@@ -142,7 +142,7 @@ async function showJobs(){
 }
 async function selectJob(job,fromLink=false){
  selected=job;
- flyHistory=[];
+ flyHistory=[];flySession=crypto.randomUUID();flyUsedWithConsent=false;
  answers.experience_level="";answers.experience="";answers.availability="";answers.preferred_zone="";
  if(!fromLink)say("Me interesa "+job.title+".");
  const text="¡Perfecto! Te cuento un poco sobre "+job.title+". Está en "+job.location+
@@ -239,6 +239,7 @@ async function submit(){
    method:"POST",headers:{"content-type":"application/json",apikey:KEY},
    body:JSON.stringify({name:answers.name,phone:answers.phone,job:selected.slug,experience:answers.experience,
     consent:answers.consent,website:answers.website||"",
+    flyConsent:flyUsedWithConsent,flySessionId:flyUsedWithConsent?flySession:null,
     screening:{experience_level:answers.experience_level,availability:answers.availability,preferred_zone:answers.preferred_zone}})
   });
   const data=await response.json().catch(()=>({}));
@@ -249,6 +250,7 @@ async function submit(){
   }
   setPhase("done");
   await reply("¡Listo, "+firstName()+"! 🎉 Tu postulación se registró correctamente. Gracias por platicar conmigo.");
+  if(flyUsedWithConsent&&!data.flyHistoryLinked)await reply("Tu registro se guardó. No pude adjuntar las preguntas libres; Astrid sí podrá consultar el resumen de tu preentrevista.");
   await reply("Ahora sí, puedes continuar directamente con la Lic. Astrid Araiza por WhatsApp. Ella revisará tus respuestas y te compartirá los detalles del puesto. La contratación aún no está confirmada.");
   const message="Hola, Lic. Astrid Araiza. Terminé mi preentrevista en Conexión Laboral 360. Soy "+answers.name+" y me interesa la vacante "+selected.title+". Me gustaría continuar mi postulación.";
   const a=document.createElement("a");a.className="action gold";a.href=WA+"?text="+encodeURIComponent(message);a.target="_blank";a.rel="noopener noreferrer";
@@ -317,6 +319,7 @@ async function replyToOpenQuestion(question){
   if(!r.ok||data.ok!==true||typeof data.reply!=="string"||!data.reply.trim())throw Error(data.error||"respuesta_no_disponible");
   indicator.remove();
   bubble(data.reply.trim());
+  flyUsedWithConsent=true;
   flyHistory.push({role:"user",text:question},{role:"assistant",text:data.reply.trim().slice(0,650)});
   flyHistory=flyHistory.slice(-8);
  }catch(error){
