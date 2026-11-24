@@ -65,6 +65,15 @@ Deno.serve(async(req:Request)=>{
  const ip=(req.headers.get("cf-connecting-ip")||req.headers.get("x-real-ip")||req.headers.get("x-forwarded-for")?.split(",")[0]||"unknown").trim();
  const fingerprint=await sha(secret.slice(-24)+"|"+ip);
  const sessionHash=await sha(secret.slice(-24)+"|"+session);
+ // Si Astrid tomó el caso, Fly deja de responder antes de llamar al modelo.
+ try{
+  const stateResponse=await fetch(project+"/rest/v1/rpc/cl360_fly_session_state",{
+   method:"POST",headers,body:JSON.stringify({p_session_hash:sessionHash}),signal:AbortSignal.timeout(6500)
+  });
+  if(!stateResponse.ok)return response(503,{ok:false,error:"control_humano_no_disponible"});
+  const state=await stateResponse.json();
+  if(state==="human"||state==="closed")return response(409,{ok:false,error:"conversacion_tomada_por_asesora"});
+ }catch{return response(503,{ok:false,error:"control_humano_no_disponible"});}
  try{
   const limit=await fetch(project+"/rest/v1/rpc/cl360_fly_take_turn",{
    method:"POST",headers,body:JSON.stringify({p_ip_hash:fingerprint,p_session_hash:sessionHash}),
@@ -114,6 +123,19 @@ Deno.serve(async(req:Request)=>{
   const json=await r.json();
   const reply=String(json?.candidates?.[0]?.content?.parts?.map((p:Record<string,unknown>)=>p.text||"").join("\n")||"").trim().slice(0,1500);
   if(!reply)return response(503,{ok:false,error:"sin_respuesta"});
+  // Registrar en Supabase exclusivamente el turno generado en el servidor.
+  // Solo se anexa al CRM cuando una persona completa su postulación consentida.
+  const logging=await fetch(project+"/rest/v1/rpc/cl360_fly_record_turn",{
+   method:"POST",headers,
+   body:JSON.stringify({p_session_hash:sessionHash,p_question:input,p_reply:reply.slice(0,700)}),
+   signal:AbortSignal.timeout(6500)
+  });
+  if(!logging.ok){
+   const status=await logging.text().catch(()=>"");
+   if(status.includes("human_takeover_active"))return response(409,{ok:false,error:"conversacion_tomada_por_asesora"});
+   console.error("cl360_fly_history_not_saved",{code:logging.status});
+   return response(503,{ok:false,error:"historial_no_disponible"});
+  }
   return response(200,{ok:true,reply,ai:true});
  }catch(err){
   console.error("cl360_fly_unavailable",{code:err instanceof Error?err.name:"unknown"});
