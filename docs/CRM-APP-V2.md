@@ -45,3 +45,7 @@ Las notas de la bandeja son internas: **no se envían al candidato**. El enlace 
 6. Actualizar etapa y programar próximo seguimiento.
 
 No publicar sueldos; la asesora los comunica personalmente. No rechazar automáticamente por respuestas de disponibilidad o experiencia.
+
+## Fly Recruiter · Vinculación de conversaciones (24/nov/2026)
+
+La bandeja de Conversaciones ya admite el historial real de turnos Fly con fuente `candidate` / `fly`, **únicamente generado y registrado por el servidor**, después de que el candidato aceptó su tratamiento y completó la postulación. Los registros previos al alta son temporales y se eliminan mediante tarea programada. `cl360_take_conversation` mantiene estados humanos; Fly valida esos estados antes de responder. El canal WhatsApp sigue abriéndose externamente y no se sincroniza. **La credencial Gemini no está disponible**, por lo que el modo generativo sigue bloqueado hasta validación.
