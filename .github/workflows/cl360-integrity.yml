@@ -57,8 +57,10 @@ jobs:
           for(const page of pages){
             const path=page==='inicio'?'crm/index.html':'crm/'+page+'/index.html';
             const html=fs.readFileSync(path,'utf8');
-            if(!html.includes('app.css')||!html.includes('app.js')||!html.includes('shell.html'))
-              throw Error('Ruta con módulos compartidos incompletos: '+path);
+            if(!html.includes('app.css')||!html.includes('app.js')||!html.includes('id="login-form"'))
+              throw Error('Ruta sin estilos, app o formulario de acceso directo: '+path);
+            if(html.includes('fetch("shell.html"')||html.includes('id="crm-loading"'))
+              throw Error('No usar montaje asíncrono que pueda causar pantalla blanca: '+path);
             if(!shell.includes('data-view="'+page+'"'))throw Error('Vista ausente: '+page);
           }
           if(!app.includes('location.assign(urlForView(view,candidateId).href)'))
