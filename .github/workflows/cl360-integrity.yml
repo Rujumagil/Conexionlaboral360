@@ -11,6 +11,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+      - name: Instalar TypeScript para analizar errores de sintaxis
+        run: npm install --no-save --no-package-lock --ignore-scripts typescript@5.9.3
       - name: Verificar JavaScript de la landing, asistente y CRM
         run: |
           node <<'JS'
@@ -20,7 +22,16 @@ jobs:
             const matches=[...html.matchAll(/<script>([^>]*)>([\s\S]*?)<\/script>/g)];
             const scripts=matches.filter(x=>!x[1].includes('src='));
             if(!scripts.length)throw Error('Sin JS: '+path);
-            scripts.forEach(x=>new Function(x[2]));
+            scripts.forEach(x=>{
+              const ts=require('typescript');
+              const syntax=ts.createSourceFile(path+'.js',x[2],ts.ScriptTarget.Latest,true,ts.ScriptKind.JS);
+              for(const error of syntax.parseDiagnostics){
+                const loc=syntax.getLineAndCharacterOfPosition(error.start);
+                console.error(path+' línea '+(loc.line+1)+': '+ts.flattenDiagnosticMessageText(error.messageText,' '));
+              }
+              if(syntax.parseDiagnostics.length)throw Error('Error de sintaxis: '+path);
+              new Function(x[2]);
+            });
             console.log('JavaScript correcto:',path);
           }
           const landing=fs.readFileSync('index.html','utf8');
@@ -34,8 +45,6 @@ jobs:
           if(!edge.includes('cl360_fly_take_turn'))throw Error('Falta límite del servidor');
           console.log('Reglas básicas del contrato: correctas');
           JS
-      - name: Instalar analizador TypeScript fijado para la función
-        run: npm install --no-save --no-package-lock --ignore-scripts typescript@5.9.3
       - name: Compilar función TypeScript sin ejecutarla
         run: |
           cat > /tmp/cl360-deno-globals.d.ts <<'TS'
