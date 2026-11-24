@@ -101,3 +101,17 @@ Se conserva el requisito de consentimiento, la validación server-side del cuest
 5. Probar el recorrido hasta `cl360-apply` y la entrega de WhatsApp únicamente tras persistir el registro. No automatizar mensajes ni contratación.
 
 **Nota:** la implementación y los límites pueden evolucionar, pero no debe presentarse como una IA operativa hasta superar la prueba real con el secreto configurado.
+
+## Integración Fly → Conversaciones CRM (24 de noviembre de 2026)
+
+**Implementación ya realizada (backend):** `cl360-fly-chat` v4, `cl360-apply` v5, tablas `cl360_fly_session_turns` y `cl360_conversations` (campo `fly_session_hash`), RPC privados `cl360_fly_record_turn`, `cl360_fly_attach_session`, `cl360_fly_session_state`. No se creó un segundo proyecto Supabase.
+
+- Si `Gemini` está habilitado y el candidato autoriza preguntas libres, cada pareja pregunta/respuesta generada realmente por el servidor se guarda temporalmente con hash irreversible de sesión, sin exponer el expediente.
+- Cuando se completa y confirma una postulación consentida, `cl360-apply` recibe el UUID de sesión y, usando el UUID del candidato devuelto por `cl360_submit_screened_application`, adjunta los turnos verificados a `cl360_chat_messages` mediante `cl360_fly_attach_session` y elimina el historial temporal.
+- Astrid ve esos mensajes desde la pestaña Conversaciones, asociados al candidato. El servidor comprueba `cl360_fly_session_state` antes de solicitar generación y bloquea nuevas respuestas del agente para sesiones anexadas con estado `human` o `closed`.
+- Los registros temporales no vinculados caducan a 24 horas. Tarea pg_cron `cl360-fly-purge-temporary-turns` ejecuta depuración a los minutos :15 de cada hora. No hay acceso de `anon` ni `authenticated` a la tabla temporal ni a los RPC de anexión; solo service_role.
+- Prueba transaccional con datos sintéticos: guardar 2 turnos, anexar al expediente, tomar conversación y bloquear respuesta posterior; prueba pasó y se ejecutó `ROLLBACK`. Sin candidatos de prueba persistidos.
+
+**Limitaciones claras:** la credencial `GEMINI_API_KEY` **sigue sin estar configurada** según consulta de salud (HTTP 200, `providerConfigured:false`, `ready:false`) y el perfil permanece `enabled=false`, supervisado. Por lo tanto no se han generado conversaciones con el modelo real. Los mensajes del flujo guiado siguen siendo un resumen de preentrevista, no una transcripción inventada. La toma humana es efectiva en el servidor cuando ya existe una sesión Fly vinculada a un expediente; no equivale a WhatsApp bidireccional ni a control de sesiones anónimas antes del registro. Para validar producción debe configurarse la clave privada en Edge Secrets de Supabase, probar modelo y respuestas con datos sintéticos, revisar privacidad/costos y habilitar el perfil supervisado.
+
+**Nota de privacidad:** la casilla de preguntas libres ahora informa que, al completar una postulación, el historial generado por Fly será vinculado al expediente privado. Nunca pegar la clave del modelo en la web o en GitHub.
