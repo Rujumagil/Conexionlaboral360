@@ -5,7 +5,7 @@ const db=window.supabase?.createClient(URL,KEY,{auth:{persistSession:true,autoRe
 const $=id=>document.getElementById(id);
 const fmt=s=>s?new Date(s).toLocaleString("es-MX",{dateStyle:"short",timeStyle:"short"}):"—";
 const statusNames={waiting:"Pendiente",bot:"Andy",human:"Atención humana",closed:"Cerrada"};
-let user=null,threads=[],candidates=[],jobs=[],activeId=null,loading=false,installPrompt=null;
+let user=null,threads=[],candidates=[],jobs=[],previews=[],activeId=null,loading=false,installPrompt=null,refreshTimer=null;
 const candidate=id=>candidates.find(c=>c.id===id);
 const job=slug=>jobs.find(j=>j.slug===slug)?.title||slug||"Postulación";
 const phone=p=>{const digits=String(p||"").replace(/\D/g,"");return digits.length===10?"52"+digits:digits;};
@@ -19,40 +19,70 @@ async function authenticate(){
   showApp(false);$("signin-error").textContent="Esta cuenta no tiene permiso para consultar estos mensajes.";return;
  }
  user=current;showApp(true);await refresh();
+ if(refreshTimer)clearInterval(refreshTimer);
+ refreshTimer=setInterval(()=>{if(document.visibilityState==="visible")refresh(true);},30000);
 }
-async function refresh(){
+async function refresh(silent=false){
  if(!user||loading)return;
- loading=true;$("refresh").disabled=true;$("count").textContent="Actualizando conversaciones…";
- const [t,c,j]=await Promise.all([
+ loading=true;$("refresh").disabled=true;
+ if(!silent)$("count").textContent="Actualizando conversaciones…";
+ const [t,c,j,m]=await Promise.all([
   db.from("cl360_conversations").select("id,candidate_id,status,handler_id,last_message_at,fly_session_hash,live_chat_enabled").eq("workspace_id",WS).order("last_message_at",{ascending:false}).limit(300),
   db.from("cl360_candidates").select("id,full_name,phone,job_slug,stage").eq("workspace_id",WS).limit(500),
-  db.from("cl360_jobs").select("slug,title").eq("workspace_id",WS).limit(100)
+  db.from("cl360_jobs").select("slug,title").eq("workspace_id",WS).limit(100),
+  db.from("cl360_chat_messages").select("conversation_id,source,visibility,body,created_at").eq("workspace_id",WS).order("created_at",{ascending:false}).limit(500)
  ]);
  loading=false;$("refresh").disabled=false;
  if(t.error||c.error||j.error){$("count").textContent="Error al cargar. Pulsa ↻ para reintentar.";return;}
- threads=t.data||[];candidates=c.data||[];jobs=j.data||[];
+ threads=t.data||[];candidates=c.data||[];jobs=j.data||[];previews=m.error?[]:(m.data||[]);
  renderThreads();
- if(activeId&&threads.some(x=>x.id===activeId))await openConversation(activeId,false);
+ if(activeId&&threads.some(x=>x.id===activeId))await openConversation(activeId,false,true);
+}
+function setFilter(value){
+ if(!["all","waiting","human","bot","closed"].includes(value))return;
+ $("filter").value=value;
+ document.querySelectorAll("[data-filter]").forEach(b=>{
+  const active=b.dataset.filter===value;b.classList.toggle("active",active);b.setAttribute("aria-pressed",String(active));
+ });
+ document.querySelectorAll("[data-tab]").forEach(b=>b.classList.toggle("active",b.dataset.tab===value));
+ renderThreads();
 }
 function renderThreads(){
- const q=$("search").value.trim().toLowerCase(),filter=$("filter").value;
+ const q=$("search").value.trim().toLocaleLowerCase("es-MX"),filter=$("filter").value;
  const filtered=threads.filter(t=>{
   const c=candidate(t.candidate_id);
-  return (filter==="all"||t.status===filter)&&(!q||String(c?.full_name||"").toLowerCase().includes(q)||job(c?.job_slug).toLowerCase().includes(q));
+  const allowed=filter==="all"||filter==="human"?(filter==="all"||(t.status==="human"&&t.handler_id===user?.id)):t.status===filter;
+  return allowed&&(!q||String(c?.full_name||"").toLocaleLowerCase("es-MX").includes(q)||job(c?.job_slug).toLocaleLowerCase("es-MX").includes(q));
  });
- $("count").textContent=filtered.length+" conversaciones";
+ $("count").textContent=filtered.length+" "+(filtered.length===1?"conversación":"conversaciones");
+ const waiting=threads.filter(t=>t.status==="waiting").length;
+ $("inbox-badge").hidden=!waiting;$("inbox-badge").textContent=String(waiting);
+ $("inbox-subtitle").textContent=waiting?waiting+" pendiente"+(waiting===1?"":"s")+" de atención":"Atención a candidatos";
  const list=$("thread-list");list.replaceChildren();
- if(!filtered.length){const p=document.createElement("p");p.className="empty";p.textContent="No hay mensajes en este filtro. Solo aparecen conversaciones vinculadas a postulaciones.";list.append(p);}
+ if(!filtered.length){
+  const p=document.createElement("p");p.className="empty";
+  p.textContent=q?"No hay candidatos con esa búsqueda.":filter==="all"?"Aún no hay conversaciones vinculadas a postulaciones.":"No hay conversaciones en esta sección.";list.append(p);
+ }
  filtered.forEach(t=>{
-  const c=candidate(t.candidate_id),button=document.createElement("button");button.type="button";button.className="thread"+(activeId===t.id?" selected":"");
-  const avatar=document.createElement("span");avatar.className="avatar";avatar.textContent=(c?.full_name||"C").charAt(0).toUpperCase();
+  const c=candidate(t.candidate_id),button=document.createElement("button");button.type="button";
+  button.className="thread"+(activeId===t.id?" selected":"");
+  button.setAttribute("aria-label","Abrir conversación con "+(c?.full_name||"candidato"));
+  const avatar=document.createElement("span");avatar.className="avatar";avatar.textContent=(c?.full_name||"C").trim().charAt(0).toUpperCase();
   const info=document.createElement("div");info.className="thread-info";
   const line=document.createElement("div");line.className="thread-line";
   const name=document.createElement("strong");name.textContent=c?.full_name||"Candidato";
   const date=document.createElement("small");date.textContent=fmt(t.last_message_at);line.append(name,date);
-  const description=document.createElement("div");description.className="small";description.textContent=job(c?.job_slug);
-  const state=document.createElement("span");state.className="state "+t.status;state.textContent=statusNames[t.status]||t.status;
-  info.append(line,description,state);button.append(avatar,info);button.addEventListener("click",()=>openConversation(t.id));list.append(button);
+  const desc=document.createElement("div");desc.className="small";desc.textContent=job(c?.job_slug);
+  info.append(line,desc);
+  const last=previews.find(m=>m.conversation_id===t.id&&
+   (m.source==="candidate"||m.source==="fly"||(m.source==="staff"&&m.visibility==="candidate")));
+  if(last){
+   const preview=document.createElement("span");preview.className="thread-preview";
+   const who=document.createElement("span");who.className="preview-author";who.textContent=last.source==="candidate"?"Candidato: ":last.source==="fly"?"Andy: ":"Astrid: ";
+   preview.append(who,document.createTextNode(last.body||""));info.append(preview);
+  }
+  const state=document.createElement("span");state.className="state "+t.status;state.textContent=statusNames[t.status]||t.status;info.append(state);
+  button.append(avatar,info);button.addEventListener("click",()=>openConversation(t.id));list.append(button);
  });
 }
 function updateComposer(){
