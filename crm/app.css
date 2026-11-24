@@ -171,3 +171,33 @@ body{background:#edf2f8}
 #view-inicio .home-empty{padding:20px 12px;text-align:center;line-height:1.6;color:#677d91;font-size:.85rem}
 @media(max-width:1024px){.priority-form-fields{grid-template-columns:1fr 1fr}.priority-form-actions{grid-column:1/-1}}
 @media(max-width:680px){#view-inicio .welcome-banner{padding:22px}#view-inicio .metric{padding:15px}.priority-item{gap:9px;padding:12px}.priority-copy{min-width:calc(100% - 54px)}.priority-actions{width:100%;justify-content:flex-end}.priority-actions .btn{flex:1}.priority-form-fields{grid-template-columns:1fr}.priority-form-actions{grid-column:auto}.priority-form-actions .btn{flex:1}}
+
+
+/* Histórico y centro de alertas de CL360 */
+.alerts-button{display:inline-flex;align-items:center;gap:7px}
+.alerts-count{display:inline-grid;place-items:center;border-radius:99px;background:#b52e33;color:white;padding:2px 7px;font-size:.73rem;font-weight:800;min-width:23px}
+.alerts-count[hidden]{display:none!important}
+.crm-alerts-panel{position:relative;margin:0 24px 8px auto;max-width:540px;background:white;border:1px solid #d8e6ee;border-radius:16px;box-shadow:0 12px 34px #102c4724;padding:18px;z-index:4}
+.crm-alerts-panel.hide{display:none!important}
+.alerts-head{display:flex;align-items:start;justify-content:space-between;gap:12px;padding-bottom:11px;border-bottom:1px solid #e9eff4}
+.alerts-head strong{color:#173b57;font-size:1.05rem}.alerts-head p{font-size:.8rem;color:#607b8c;margin:4px 0 0}
+.alert-task{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #eef2f5}
+.alert-task>div{display:grid;gap:4px;min-width:0;overflow-wrap:anywhere}
+.alert-task strong{font-size:.82rem;color:#1b3951}
+.alert-task small{font-size:.74rem;color:#61798c}
+#crm-enable-notifications{margin-top:13px}
+#crm-notification-status{line-height:1.5;margin:9px 0 0}
+.historical-period-label{display:flex;flex-direction:column;gap:5px;color:#577184;font-size:.73rem;font-weight:700}
+#fly-history-period{border:1px solid #d8e4ed;border-radius:9px;background:white;color:#1a3e58;padding:7px 10px;font:inherit}
+.historical-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:11px 0 16px}
+.historical-stat{display:flex;flex-direction:column;gap:7px;border:1px solid #dce8f0;border-radius:12px;padding:12px;background:#f7fafc}
+.historical-stat strong{font-size:1.65rem;color:#0e405d;line-height:1.15}
+.historical-stat span{font-size:.74rem;color:#587385;line-height:1.4}
+.historical-chart{height:175px;display:flex;justify-content:space-around;align-items:end;border-bottom:1px solid #bfd1dd;border-radius:12px 12px 0 0;padding:12px 10px 0;gap:5px;background:#f7fafc}
+.historical-bar-item{height:100%;flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:5px;min-width:0}
+.historical-bar-item>span{font-size:.7rem;color:#245a78;font-weight:700}
+.historical-bar{min-height:3px;width:min(75%,40px);background:#0da486;border-radius:7px 7px 0 0}
+.historical-bar-item small{font-size:.61rem;color:#637a8b;text-align:center;min-height:29px;white-space:nowrap}
+.historical-foot{margin:12px 0 0;line-height:1.5}
+@media(max-width:760px){.historical-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.crm-alerts-panel{margin:8px;max-width:none}.historical-chart{gap:2px;padding:10px 4px 0}.historical-bar-item small{font-size:.54rem;writing-mode:vertical-rl;min-height:45px}}
+@media(max-width:430px){.alerts-head{flex-wrap:wrap}.alert-task{align-items:start;flex-direction:column}.alert-task button{align-self:flex-end}.historical-stat{padding:10px}}
