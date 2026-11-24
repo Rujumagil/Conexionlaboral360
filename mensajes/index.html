@@ -21,30 +21,72 @@
  </form>
 </div>
 <div id="app" class="app hidden">
- <header class="header"><div class="title-line"><div class="brand-symbol">◉</div><div><h1>Mensajes</h1><p>Conexión Laboral 360</p></div></div>
- <div class="header-actions"><button type="button" id="install" class="subtle">↓ Instalar</button><button type="button" id="refresh" class="subtle" title="Actualizar conversaciones">↻</button><button type="button" id="signout" class="subtle" title="Cerrar sesión">Salir</button></div></header>
+ <header class="header">
+  <div class="title-line"><div class="brand-symbol" aria-hidden="true"><span class="brand-chat"></span></div><div><h1>Mensajes</h1><p>Conexión Laboral 360</p></div></div>
+  <div class="header-actions">
+   <button type="button" id="refresh" class="icon-button" title="Actualizar conversaciones" aria-label="Actualizar conversaciones">↻</button>
+   <button type="button" id="install" class="icon-button install-button" title="Instalar esta app" aria-label="Instalar esta app">↓</button>
+   <button type="button" id="menu-toggle" class="icon-button" title="Más opciones" aria-label="Más opciones" aria-expanded="false">⋮</button>
+  </div>
+  <div id="app-menu" class="app-menu hidden">
+   <button type="button" id="install-menu">Instalar aplicación</button>
+   <button type="button" id="menu-refresh">Actualizar bandeja</button>
+   <button type="button" id="signout">Cerrar sesión</button>
+  </div>
+ </header>
  <p id="install-hint" class="status" role="status"></p>
  <main class="layout">
   <section class="inbox" id="inbox-section" aria-label="Bandeja de mensajes">
-   <div class="inbox-top"><label class="search-label" for="filter">Buscar</label><input id="search" type="search" placeholder="Buscar candidato o vacante" autocomplete="off">
-    <select id="filter" aria-label="Filtrar conversaciones"><option value="all">Todos los mensajes</option><option value="waiting">Pendientes</option><option value="bot">Atiende Andy</option><option value="human">Tomados</option><option value="closed">Cerrados</option></select></div>
+   <div class="inbox-top">
+    <div class="inbox-heading"><div><h2>Conversaciones</h2><p id="inbox-subtitle">Atención de candidatos</p></div><span id="inbox-badge" class="inbox-badge" hidden>0</span></div>
+    <label class="search-wrap" for="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Buscar candidato o vacante" autocomplete="off"></label>
+    <div id="filter-chips" class="filter-chips" role="group" aria-label="Filtrar conversaciones">
+      <button type="button" class="filter-chip active" data-filter="all" aria-pressed="true">Todos</button>
+      <button type="button" class="filter-chip" data-filter="waiting" aria-pressed="false">Pendientes</button>
+      <button type="button" class="filter-chip" data-filter="human" aria-pressed="false">Mis chats</button>
+      <button type="button" class="filter-chip" data-filter="bot" aria-pressed="false">Andy</button>
+      <button type="button" class="filter-chip" data-filter="closed" aria-pressed="false">Cerrados</button>
+    </div>
+    <select id="filter" class="visually-hidden" aria-label="Filtrar conversaciones"><option value="all">Todos los mensajes</option><option value="waiting">Pendientes</option><option value="bot">Atiende Andy</option><option value="human">Mis chats</option><option value="closed">Cerrados</option></select>
+   </div>
    <div id="count" class="list-caption" aria-live="polite">Cargando conversaciones…</div>
    <div id="thread-list" class="thread-list"></div>
+   <nav class="mobile-tabs" aria-label="Secciones de Mensajes">
+     <button type="button" class="mobile-tab active" data-tab="all"><span aria-hidden="true">☏</span><small>Chats</small></button>
+     <button type="button" class="mobile-tab" data-tab="waiting"><span aria-hidden="true">◷</span><small>Pendientes</small></button>
+     <button type="button" class="mobile-tab" data-tab="human"><span aria-hidden="true">♧</span><small>Mis chats</small></button>
+     <button type="button" class="mobile-tab" data-tab="bot"><span aria-hidden="true">✦</span><small>Andy</small></button>
+   </nav>
   </section>
   <section class="conversation hidden-mobile" id="conversation-section" aria-label="Detalle del mensaje">
-   <div class="chat-top"><button type="button" id="back" class="back" aria-label="Volver a mensajes">←</button>
+   <div class="chat-top">
+    <button type="button" id="back" class="back" aria-label="Volver a mensajes">←</button>
+    <div class="chat-avatar" id="chat-avatar" aria-hidden="true">C</div>
     <div class="chat-person"><strong id="person">Selecciona una conversación</strong><span id="meta">Historial privado</span></div>
-    <span id="state" class="pill">—</span></div>
+    <button type="button" id="info-toggle" class="chat-info-button" aria-label="Información del candidato" title="Información del candidato" aria-expanded="false">ⓘ</button>
+    <span id="state" class="pill">—</span>
+   </div>
+   <aside id="context-panel" class="context-panel hidden" aria-label="Información del candidato">
+     <div class="context-title"><strong>Información del candidato</strong><button type="button" id="info-close" class="icon-close" aria-label="Cerrar información">×</button></div>
+     <div id="context-details" class="context-details"></div>
+   </aside>
    <div id="timeline" class="timeline"><div class="empty">Elige un candidato para leer los mensajes vinculados a su postulación.</div></div>
    <div class="human-controls" id="human-controls"></div>
    <div class="composer" id="composer">
-    <label for="reply">Respuesta para WhatsApp</label><textarea id="reply" placeholder="Escribe tu respuesta para continuar con el candidato..." rows="3" maxlength="1000" disabled></textarea>
-    <div class="composer-actions"><button type="button" id="send-inapp" class="primary" disabled>Enviar aquí</button><a id="send-whatsapp" class="secondary-link disabled-link" aria-disabled="true" target="_blank" rel="noopener noreferrer">Abrir en WhatsApp ↗</a><button type="button" id="copy" disabled>Copiar</button></div>
-    <p id="reply-hint">Toma la conversación para responder. El chat interno requiere que el candidato haya autorizado este canal; WhatsApp se envía por separado.</p>
+    <label for="reply" class="composer-label">Escribir respuesta <span id="channel-state">· Atención supervisada</span></label>
+    <div class="compose-row">
+     <textarea id="reply" placeholder="Escribe tu mensaje…" rows="2" maxlength="1000" disabled></textarea>
+     <button type="button" id="send-inapp" class="primary send-button" disabled aria-label="Enviar en este chat">➤ <span>Enviar aquí</span></button>
+    </div>
+    <div class="composer-actions">
+     <a id="send-whatsapp" class="secondary-link disabled-link" aria-disabled="true" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">◉</span> Responder por WhatsApp</a>
+     <button type="button" id="copy" class="copy-button" disabled aria-label="Copiar respuesta">⧉ <span>Copiar</span></button>
+    </div>
+    <p id="reply-hint" role="status">Toma la conversación para responder. El chat interno requiere autorización; WhatsApp se envía por separado.</p>
    </div>
   </section>
  </main>
- <footer>Mensajes vinculados a postulaciones. Andy no envía respuestas después de que tomas un caso. WhatsApp es un canal externo.</footer>
+
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.min.js"></script>
 <script src="./app.js" defer></script>
