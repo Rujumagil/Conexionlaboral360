@@ -74,3 +74,11 @@ Conector operativo Fly, autoseguimiento de mensajes reales, sincronización ofic
 **Estado real:** la experiencia conversacional actual es **guiada y determinista**, no un modelo generativo de IA en funcionamiento. Compás Fly Recruiter sigue desactivado y pendiente de conexión verificada, conforme al issue [#305](https://github.com/Rujumagil/compas-evolution/issues/305). No se deben presentar sus respuestas como IA generativa hasta completar conexión, trazabilidad, control de costos, supervisión, pruebas de discriminación y consentimiento.
 
 **Seguridad:** el RPC de registro con cuestionario no está disponible para `anon`; se ejecuta solo desde Edge con rol de servicio y sus credenciales no aparecen en GitHub Pages. La casilla de consentimiento es obligatoria. Falta una prueba completa de registro desde navegador usando datos de una persona que autorice expresamente el ensayo, y validar el aviso de privacidad definitivo antes de campañas masivas.
+
+## Experiencia conversacional mejorada — 23/nov/2026
+
+La ruta `/asistente/` ahora presenta una charla más natural: mensajes individuales, señal de escritura breve, respuestas en contexto según experiencia y disponibilidad, selección de vacantes por tarjetas, campo de preguntas libres dentro del chat y preguntas rápidas. Los textos son respetuosos y no excluyentes. La interfaz se identifica con claridad como **asistente virtual de reclutamiento**, sin atribuirse identidad humana.
+
+El motor actual sigue siendo **guiado y determinista**: responde a preguntas comunes (sueldos, beneficios, turnos, ubicación, experiencia, privacidad y proceso) mediante reglas basadas en datos confirmados. Para preguntas fuera de cobertura, deriva la aclaración a la Lic. Astrid Araiza. No se afirma que exista una IA generativa conectada: Fly Recruiter sigue deshabilitado y su conexión real permanece pendiente en el issue #305.
+
+Se conserva el requisito de consentimiento, la validación server-side del cuestionario, el guardado en el CRM y la entrega de WhatsApp **solo tras registrar la postulación**. No se toman decisiones automatizadas de rechazo ni contratación. La guía conversacional no equivale a una verificación de identidad, referencia o aptitud laboral.
