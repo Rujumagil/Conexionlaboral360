@@ -26,6 +26,12 @@ Deno.serve(async (request: Request) => {
   const phone = String(body.phone ?? "").replace(/[^+0-9]/g, "");
   const job = String(body.job ?? "");
   const experience = String(body.experience ?? "").trim();
+  // El historial generado por Fly solo se vincula con consentimiento y un UUID de sesión.
+  // No se acepta una transcripción proporcionada por el cliente: se usa el registro del servidor.
+  const flyConsent = body.flyConsent === true;
+  const flySessionId = typeof body.flySessionId==="string" ? body.flySessionId.trim() : "";
+  if(flyConsent && !/^[a-f0-9-]{36}$/i.test(flySessionId))
+    return response(400,{ok:false,error:"sesion_de_agente_invalida"});
   const screening = (body.screening && typeof body.screening === "object" && !Array.isArray(body.screening)) ? body.screening as Record<string, unknown> : null;
   const levels = ["si", "no", "prefiero_comentarlo"];
   const availabilityValues = ["si", "no", "consultar"];
@@ -63,5 +69,27 @@ Deno.serve(async (request: Request) => {
     if (message.includes("invalid_application")) return response(400, {ok:false,error:"datos_invalidos"});
     return response(503, {ok:false,error:"no_se_pudo_registrar"});
   }
-  return response(201, {ok:true});
+  let flyHistoryLinked = false;
+  let flyHistoryCount = 0;
+  if(flyConsent && flySessionId){
+    try{
+      const candidateId = await upstream.json();
+      if(typeof candidateId==="string"&&/^[a-f0-9-]{36}$/i.test(candidateId)){
+        const bytes=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(serviceKey.slice(-24)+"|"+flySessionId));
+        const sessionHash=Array.from(new Uint8Array(bytes)).map(n=>n.toString(16).padStart(2,"0")).join("");
+        const joined=await fetch(url+"/rest/v1/rpc/cl360_fly_attach_session",{
+          method:"POST",
+          headers:{"apikey":serviceKey,"authorization":"Bearer "+serviceKey,"content-type":"application/json"},
+          body:JSON.stringify({p_candidate_id:candidateId,p_session_hash:sessionHash}),
+          signal:AbortSignal.timeout(7000)
+        });
+        if(joined.ok){
+          const count=await joined.json();
+          flyHistoryLinked=Number.isInteger(count)&&count>0;
+          flyHistoryCount=Number.isInteger(count)?count:0;
+        }else console.error("cl360_fly_attach_failed",{code:joined.status});
+      }
+    }catch(error){console.error("cl360_fly_attach_unavailable",{kind:error instanceof Error?error.name:"unknown"});}
+  }
+  return response(201, {ok:true,flyHistoryLinked,flyHistoryCount});
 });
