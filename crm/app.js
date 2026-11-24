@@ -36,7 +36,7 @@ async function checkAuth(){
   if(error||!membership||!["owner","admin","manager","sales","support"].includes(membership.role)){
     await db.auth.signOut();authScreen(true);$("login-error").textContent="Tu cuenta todavía no tiene acceso a este CRM.";return;
   }
-  user=activeUser;staffRole=membership.role;canLoad=true;navigate(initialRoute);void checkFlyAvailability();$("signed").textContent=activeUser.email||"";authScreen(false);await load();
+  user=activeUser;staffRole=membership.role;canLoad=true;navigate(viewFromLocation(),null,true);void checkFlyAvailability();$("signed").textContent=activeUser.email||"";authScreen(false);await load();
 }
 async function load(){
  if(!canLoad)return;
@@ -168,20 +168,26 @@ const appViews={
 };
 let activeView="inicio",threads=[],messages=[],activeConversationId=null,conversationsLoadError=false;
 const routeBase=new window.URL("./",document.baseURI);
-const initialRoute=(()=>{
+function viewFromLocation(){
  const prefix=routeBase.pathname;
  const remainder=location.pathname.startsWith(prefix)?location.pathname.slice(prefix.length).replace(/^\/+|\/+$/g,""):"";
  return appViews[remainder]?remainder:"inicio";
-})();
+}
+const initialRoute=viewFromLocation();
 function urlForView(view,candidateId){
  const href=view==="inicio"?"./":view+"/";
  const u=new window.URL(href,routeBase);
  if(candidateId)u.searchParams.set("candidato",candidateId);
  return u;
 }
-function navigate(view,candidateId=null){
+function navigate(view,candidateId=null,fromHistory=false){
  if(!appViews[view])view="inicio";
- if(view!==initialRoute){location.assign(urlForView(view,candidateId).href);return;}
+ if(!canLoad)return;
+ if(candidateId&&candidates.some(c=>c.id===candidateId))selected=candidateId;
+ if(!fromHistory){
+  const url=urlForView(view,candidateId);
+  if(location.pathname!==url.pathname||location.search!==url.search)history.pushState({crmView:view},"",url.href);
+ }
  activeView=view;
  document.querySelectorAll("[data-view]").forEach(el=>el.classList.toggle("hide",el.dataset.view!==view));
  document.querySelectorAll("[data-nav]").forEach(btn=>{
@@ -204,6 +210,12 @@ document.querySelectorAll("[data-nav]").forEach(btn=>{
  btn.setAttribute("title","Abrir "+(appViews[btn.dataset.nav]||"módulo"));
 });
 document.querySelectorAll("[data-go]").forEach(btn=>btn.addEventListener("click",()=>navigate(btn.dataset.go)));
+window.addEventListener("popstate",()=>{
+ if(!canLoad)return;
+ const candidateId=new URLSearchParams(location.search).get("candidato");
+ if(candidateId&&candidates.some(c=>c.id===candidateId))selected=candidateId;
+ navigate(viewFromLocation(),candidateId,true);
+});
 $("global-refresh").addEventListener("click",async()=>{await load();await loadConversations();});
 $("job-add-shortcut").addEventListener("click",()=>{
  if(!["owner","admin","manager"].includes(staffRole))return err({message:"Tu perfil no tiene permiso para administrar vacantes."});
@@ -229,7 +241,6 @@ function renderHome(){
 function openCandidate(id){
  const c=candidates.find(x=>x.id===id);
  if(!c)return;
- if(initialRoute!=="candidatos"){location.assign(urlForView("candidatos",id).href);return;}
  selected=id;
  navigate("candidatos");
  renderDetail(c);
