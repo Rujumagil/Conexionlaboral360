@@ -43,4 +43,19 @@ jobs:
             print("Respuesta HTTP:",exc.code)
             print("Error controlado:",error.get("error","unknown"))
             raise SystemExit(1)
+          # Probar también la charla general antes de seleccionar una vacante.
+          general={"consent":True,"sessionId":str(uuid.uuid4()),"jobSlug":"",
+            "message":"Prueba sin datos personales: ¿qué tipos de vacantes tienen?",
+            "history":[]}
+          req=urllib.request.Request(url,data=json.dumps(general).encode(),headers=headers,method="POST")
+          try:
+            with urllib.request.urlopen(req,timeout=40) as res:
+              data=json.load(res)
+              print("Conversación sin vacante seleccionada:",bool(res.status==200 and data.get("ok") and data.get("reply")))
+              if not data.get("ok") or not data.get("reply"):raise SystemExit(1)
+          except urllib.error.HTTPError as exc:
+            try: error=json.load(exc)
+            except: error={}
+            print("Prueba general HTTP:",exc.code,"Código:",error.get("error","unknown"))
+            raise SystemExit(1)
           PY
