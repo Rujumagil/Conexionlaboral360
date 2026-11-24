@@ -71,7 +71,7 @@ const WS="c7ab2a78-08e0-4a29-8a3b-fadaf244002f";
 const WA="https://wa.me/523319708528";
 const $=id=>document.getElementById(id);
 const delay=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches?0:480;
-let jobs=[],selected=null,phase="loading",version=0,busy=false;
+let jobs=[],selected=null,pendingIntroJob=null,phase="loading",version=0,busy=false;
 let flyReady=false,flySession=crypto.randomUUID(),flyHistory=[],flyQuestionBusy=false,flyUsedWithConsent=false,chatInputBusy=false;
 const answers={experience_level:"",experience:"",availability:"",preferred_zone:"",name:"",phone:"",consent:false,website:""};
 const labels={si:"Sí",no:"No",prefiero_comentarlo:"Prefiero comentarlo con Astrid",consultar:"Necesito consultarlo"};
@@ -84,8 +84,8 @@ function bubble(text,who="assistant"){
 function say(text){bubble(text,"candidate");}
 function setPhase(stage){
  phase=stage;version++;$("controls").replaceChildren();
- const progress={loading:0,choose:0,experience:15,details:30,availability:45,zone:60,contact:75,review:90,done:100};
- const titles={loading:"Bienvenida",choose:"Elegir vacante",experience:"Conociéndote",details:"Tu experiencia",availability:"Disponibilidad",zone:"Tu zona",contact:"Datos de contacto",review:"Confirmación",done:"Registro listo"};
+ const progress={loading:0,introName:0,introPhone:0,choose:0,experience:15,details:30,availability:45,zone:60,contact:75,review:90,done:100};
+ const titles={loading:"Bienvenida",introName:"Presentación",introPhone:"Contacto opcional",choose:"Elegir vacante",experience:"Conociéndote",details:"Tu experiencia",availability:"Disponibilidad",zone:"Tu zona",contact:"Datos de contacto",review:"Confirmación",done:"Registro listo"};
  $("progress").style.width=(progress[stage]??0)+"%";$("steps").textContent=titles[stage]||"Conversación";
 }
 function typing(){
@@ -144,6 +144,36 @@ function describeJobs(){
 function showJobChoices(){
  suggestOptions(jobs.slice(0,12).map(job=>[job.title,()=>selectJob(job),false]));
 }
+function finishIntroduction(){
+ if(pendingIntroJob){const job=pendingIntroJob;pendingIntroJob=null;return selectJob(job,true);}
+ return showJobs();
+}
+async function promptIntroPhone(){
+ await stage("introPhone","Mucho gusto, "+firstName()+". 😊 Si te interesa que Astrid pueda darte seguimiento, ¿me compartes tu número de teléfono o WhatsApp? Es opcional y solo lo registraré en el CRM si después confirmas tu postulación y autorizas usar tus datos.",()=>{
+  suggestOptions([["Prefiero continuar sin dar mi número",()=>finishIntroduction(),true],["Ver vacantes",()=>showJobs(),false]]);
+ });
+}
+async function startIntroduction(job=null){
+ pendingIntroJob=job;
+ await stage("introName","¡Hola! 👋 Soy Andy, tu asistente virtual de Conexión Laboral 360. ¿Con quién tengo el gusto de platicar? Puedes decirme tu nombre. Si solo quieres consultar vacantes, no necesitas compartir datos personales.",()=>{
+  suggestOptions([[job?"Ver la vacante sin dar datos":"Ver vacantes sin dar datos",()=>finishIntroduction(),true]]);
+ });
+}
+function recognizeIntroductionName(text){
+ const raw=text.trim().replace(/[.!]+$/,"").replace(/\s+/g," ");
+ const named=raw.match(/^(?:me llamo|mi nombre es|soy)\s+(.+)$/i);
+ const value=(named?named[1]:raw).trim();
+ if(value.length<2||value.length>120||/[0-9@?¿!]/.test(value)||/^(hola|buenas|buenos dias|si|no|claro|gracias|quiero|busco|trabajo|vacantes|empleo|ver|informacion|me interesa)$/i.test(value))return null;
+ if(!/^[\p{L}][\p{L}\p{M}' -]*$/u.test(value)||value.split(" ").length>5)return null;
+ return value;
+}
+function parseContactPhone(text){
+ const value=text.replace(/[\s().-]/g,"").replace(/^(mi numero es|mi teléfono es|mi telefono es|mi whatsapp es|es)/i,"").trim();
+ return /^\+?[0-9]{10,15}$/.test(value)?value:null;
+}
+function isSkipIntro(text){
+ return /(prefiero|despues|despues|no quiero|sin datos|sin numero|no doy|ver vacantes|que vacantes|vacantes tienen|quiero ver|solo ver|primero ver|no gracias)/.test(normalizeQuestion(text));
+}
 async function fetchJobs(){
  setPhase("loading");
  $("controls").textContent="Consultando oportunidades…";
@@ -155,12 +185,7 @@ async function fetchJobs(){
   jobs=payload;
   const requested=new URLSearchParams(location.search).get("vacante");
   const preset=jobs.find(x=>x.slug===requested);
-  if(preset){await reply("¡Hola! Soy Andy, la asistente virtual de Conexión Laboral 360. 😊 Te puedo orientar sobre la vacante que te interesó.");selectJob(preset,true);}
-  else{
-    setPhase("choose");
-    await reply("¡Hola! 👋 Soy Andy, la asistente virtual de Conexión Laboral 360. ¿Buscas trabajo en alguna zona o prefieres que te cuente qué vacantes tenemos?");
-    suggestOptions([["Ver vacantes",()=>showJobs(),true],["¿Cómo funciona?",async()=>{say("¿Cómo funciona?");await reply(faq.process);suggestOptions([["Ver vacantes",()=>showJobs(),true]])},false]]);
-  }
+  await startIntroduction(preset||null);
  }catch{
   await stage("choose","No pude consultar las vacantes confirmadas en este momento. Podemos intentarlo de nuevo.",()=>{
    option("Reintentar",fetchJobs,"gold");
@@ -178,7 +203,7 @@ async function selectJob(job,fromLink=false){
  // Conserva el contexto y las preguntas autorizadas anteriores a la elección.
  answers.experience_level="";answers.experience="";answers.availability="";answers.preferred_zone="";
  if(!fromLink)say("Me interesa "+job.title+".");
- const text="¡Buena elección! "+job.title+" está en "+job.location+" y el turno anunciado es "+job.shift+".\n\n¿Te gustaría postularte o primero quieres aclarar algo del puesto?";
+ const text="¡Buena elección"+(answers.name?", "+firstName():"")+"! "+job.title+" está en "+job.location+" y el turno anunciado es "+job.shift+".\n\n¿Te gustaría postularte o primero quieres aclarar algo del puesto?";
  await stage("choose",text,()=>{
   option("Quiero postularme",askExperience,"gold");
   option("Ver otras vacantes",showJobs);
@@ -229,7 +254,7 @@ async function askZone(){
  });
 }
 async function askContact(){
- await stage("contact","Ya casi terminamos. Para que Astrid pueda revisar tu postulación y darle seguimiento, ¿me compartes tu nombre completo y un teléfono de contacto? Solo los guardaremos con tu autorización.",()=>{
+ await stage("contact",answers.name&&answers.phone?"¡Ya casi terminamos! Vamos a confirmar tu nombre completo y teléfono para registrar tu postulación con tu autorización.":answers.name?"¡Ya casi terminamos, "+firstName()+"! Para que Astrid pueda dar seguimiento, necesito tu número de contacto y que confirmes tu nombre completo. Solo se guardarán si autorizas la postulación.":"Ya casi terminamos. Para que Astrid pueda revisar tu postulación y darle seguimiento, ¿me compartes tu nombre completo y un teléfono de contacto? Solo los guardaremos con tu autorización.",()=>{
   const form=document.createElement("form");form.id="intake-form";
   form.innerHTML='<label class="label" for="full-name">Tu nombre completo</label><input id="full-name" class="field" autocomplete="name" maxlength="120" minlength="3" required placeholder="¿Cómo te llamas?">'+
   '<label class="label" for="phone">Tu teléfono o WhatsApp</label><input id="phone" class="field" type="tel" autocomplete="tel" maxlength="25" inputmode="tel" required placeholder="10 dígitos">'+
@@ -350,6 +375,30 @@ async function referToAstrid(){
 }
 async function handleNaturalMessage(message){
  const q=normalizeQuestion(message);
+ if(phase==="introName"){
+  if(isSkipIntro(message)||isJobQuestion(q)||matchJob(message)){
+   await finishIntroduction();
+   if(isJobQuestion(q))return;
+   return;
+  }
+  const name=recognizeIntroductionName(message);
+  if(name){answers.name=name;await promptIntroPhone();return;}
+  await reply("Con gusto te ayudo. Si quieres, dime cómo te llamas; también puedes revisar las vacantes sin compartir tus datos.");
+  suggestOptions([["Ver vacantes sin dar datos",()=>finishIntroduction(),true]]);
+  return;
+ }
+ if(phase==="introPhone"){
+  const phone=parseContactPhone(message);
+  if(phone){
+   answers.phone=phone;
+   await reply("Gracias, "+firstName()+". Lo usaré para completar tu postulación si decides registrarte y das tu autorización. Por ahora no he guardado el número en el CRM. ¿Vemos las oportunidades?");
+   await finishIntroduction();return;
+  }
+  if(isSkipIntro(message)||isJobQuestion(q)||matchJob(message)){await finishIntroduction();return;}
+  await reply("Para seguimiento puedes compartir un teléfono de 10 dígitos, pero no es obligatorio para conocer nuestras vacantes. ¿Quieres continuar sin darlo?");
+  suggestOptions([["Sí, ver vacantes",()=>finishIntroduction(),true]]);
+  return;
+ }
  if(/(astrid|hablar con (una )?persona|atencion humana|reclutadora|asesora|whatsapp|telefono de contacto|numero de contacto)/.test(q)&&
     /(hablar|platicar|contactar|whatsapp|telefono|numero|persona|humana|asesora|reclutadora|astrid)/.test(q)){
    await referToAstrid();return;
