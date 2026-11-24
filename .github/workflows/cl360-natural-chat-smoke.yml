@@ -64,6 +64,10 @@ jobs:
             const handoff=page.locator('#controls a[href*="wa.me/523319708528"]');
             if(await handoff.count()!==1)throw Error("No se ofreció WhatsApp oficial de Astrid");
             console.log("Derivación a Astrid con WhatsApp correcto: OK");
+            await type("¿Cuánto pagan?");
+            await page.locator('.bubble.assistant').filter({hasText:"no tengo una cifra confirmada"}).waitFor({timeout:15000});
+            if(await page.locator('#controls a[href*="wa.me/523319708528"]').count()<1)throw Error("Falta derivación para sueldo sin confirmar");
+            console.log("Derivación de sueldo no confirmado: OK");
             if(errors.length)throw Error('Errores de JavaScript: '+errors.join('; '));
             console.log("Experiencia, disponibilidad y zona por texto: OK");
             console.log("Formulario de consentimiento visible: OK");
