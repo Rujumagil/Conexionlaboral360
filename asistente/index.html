@@ -46,7 +46,7 @@ header{background:var(--dark);color:#fff}.head{max-width:1080px;margin:auto;min-
 <div class="progress"><span id="progress" style="width:0%"></span></div>
 <div class="messages" id="messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
 <div id="controls" class="controls"></div>
-<form id="question-form" class="question-form"><label class="label" for="candidate-question">O escríbeme tu duda con tus propias palabras</label><div class="question-row"><input class="field" id="candidate-question" maxlength="240" placeholder="Ej. ¿Dónde está el servicio?, ¿cuál es el horario?" autocomplete="off" aria-describedby="question-help"><button class="action secondary" type="submit">Preguntar</button></div><p class="footnote" id="question-help">Te responderé con información confirmada; si algo requiere aclaración, te lo indicará la asesora.</p></form>
+<form id="question-form" class="question-form"><label class="label" for="candidate-question">O escríbeme tu duda con tus propias palabras</label><div class="question-row"><input class="field" id="candidate-question" maxlength="240" placeholder="Ej. ¿Dónde está el servicio?, ¿cuál es el horario?" autocomplete="off" aria-describedby="question-help"><button class="action secondary" type="submit">Preguntar</button></div><p class="footnote" id="question-help">Puedes preguntar libremente. Si algo no está confirmado, lo revisará Astrid.</p><label class="privacy" id="fly-consent-wrap" hidden style="margin-top:12px"><input type="checkbox" id="fly-consent"><span>Autorizo que mis preguntas de esta charla se procesen mediante el servicio automatizado para responderme. Evitaré escribir datos sensibles o documentos. <a href="../aviso-candidatos.html" target="_blank" rel="noopener noreferrer">Información de privacidad</a>.</span></label><p class="error" id="fly-question-error" role="alert"></p></form>
 </section>
 <section class="faq" aria-label="Información general">
 <h2>¿Te quedó alguna duda? Podemos platicarla</h2>
@@ -64,6 +64,7 @@ const WA="https://wa.me/523334123734";
 const $=id=>document.getElementById(id);
 const delay=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches?0:480;
 let jobs=[],selected=null,phase="loading",version=0,busy=false;
+let flyReady=false,flySession=crypto.randomUUID(),flyHistory=[],flyQuestionBusy=false;
 const answers={experience_level:"",experience:"",availability:"",preferred_zone:"",name:"",phone:"",consent:false,website:""};
 const labels={si:"Sí",no:"No",prefiero_comentarlo:"Prefiero comentarlo con Astrid",consultar:"Necesito consultarlo"};
 function scrollChat(){const box=$("messages");box.scrollTop=box.scrollHeight;}
@@ -141,6 +142,7 @@ async function showJobs(){
 }
 async function selectJob(job,fromLink=false){
  selected=job;
+ flyHistory=[];
  answers.experience_level="";answers.experience="";answers.availability="";answers.preferred_zone="";
  if(!fromLink)say("Me interesa "+job.title+".");
  const text="¡Perfecto! Te cuento un poco sobre "+job.title+". Está en "+job.location+
@@ -281,6 +283,49 @@ function answerQuestion(question){
  if(/datos|privacidad|consentimiento|guardar|informacion personal/.test(q))return faq.privacy;
  return "Gracias por preguntarme. Prefiero no darte una respuesta que no tenga confirmada. Cuando termines esta primera charla podrás consultarlo directamente con Astrid. ¿Continuamos con tu postulación?";
 }
+async function checkFlyHealth(){
+ try{
+  const r=await fetch(API+"/functions/v1/cl360-fly-chat",{method:"GET",headers:{apikey:KEY},cache:"no-store"});
+  if(!r.ok)throw Error("offline");
+  const info=await r.json();
+  flyReady=info.ready===true;
+ }catch{flyReady=false;}
+ $("fly-consent-wrap").hidden=!flyReady;
+}
+async function replyToOpenQuestion(question){
+ const input=$("candidate-question"),submit=$("question-form").querySelector('button[type="submit"]');
+ const msgError=$("fly-question-error");
+ msgError.textContent="";
+ if(!flyReady||!selected){
+  await reply(answerQuestion(question));
+  return;
+ }
+ if(!$("fly-consent").checked){
+  msgError.textContent="Para responder preguntas libres, necesito tu autorización para procesarlas. Si prefieres no hacerlo, puedes continuar con la preentrevista guiada.";
+  await reply(answerQuestion(question));return;
+ }
+ if(flyQuestionBusy)return;
+ flyQuestionBusy=true;submit.disabled=true;input.disabled=true;
+ const indicator=typing();
+ try{
+  const r=await fetch(API+"/functions/v1/cl360-fly-chat",{
+   method:"POST",
+   headers:{"content-type":"application/json",apikey:KEY},
+   body:JSON.stringify({sessionId:flySession,jobSlug:selected.slug,message:question,history:flyHistory.slice(-8),consent:true})
+  });
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok||data.ok!==true||typeof data.reply!=="string"||!data.reply.trim())throw Error(data.error||"respuesta_no_disponible");
+  indicator.remove();
+  bubble(data.reply.trim());
+  flyHistory.push({role:"user",text:question},{role:"assistant",text:data.reply.trim().slice(0,650)});
+  flyHistory=flyHistory.slice(-8);
+ }catch(error){
+  indicator.remove();
+  if(String(error?.message||"").includes("limite"))msgError.textContent="Llegamos al límite de preguntas por ahora. Puedes seguir con tu postulación y consultar con Astrid.";
+  else msgError.textContent="No pude confirmar una respuesta libre en este momento. Te comparto la información que sí tenemos.";
+  await reply(answerQuestion(question));
+ }finally{flyQuestionBusy=false;submit.disabled=false;input.disabled=false;}
+}
 function focusChat(){
  const chat=document.querySelector(".chat");
  if(chat&&typeof chat.scrollIntoView==="function")chat.scrollIntoView({behavior:"smooth",block:"start"});
@@ -292,10 +337,11 @@ document.querySelectorAll("[data-faq]").forEach(button=>button.addEventListener(
 $("question-form").addEventListener("submit",async(event)=>{
  event.preventDefault();
  const input=$("candidate-question");
- const question=input.value.trim();if(!question)return;
+ const question=input.value.trim();if(!question||flyQuestionBusy)return;
  if(question.length>240)return;
- input.value="";say(question);focusChat();await reply(answerQuestion(question));
+ input.value="";say(question);focusChat();await replyToOpenQuestion(question);
 });
+checkFlyHealth();
 fetchJobs();
 })();
 </script>
