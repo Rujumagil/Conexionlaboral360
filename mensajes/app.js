@@ -96,6 +96,7 @@ function updateComposer(){
  $("send-inapp").disabled=!direct||!reply;
  wa.removeAttribute("href");wa.classList.add("disabled-link");wa.setAttribute("aria-disabled","true");
  if(whatsApp&&reply){wa.href="https://wa.me/"+phone(c.phone)+"?text="+encodeURIComponent(reply);wa.classList.remove("disabled-link");wa.setAttribute("aria-disabled","false");}
+ $("channel-state").textContent=!owner?"· Esperando toma humana":direct?"· Chat interno habilitado":whatsApp?"· Solo WhatsApp":"· Sin canal activo";
  $("reply-hint").textContent=!owner?"Toma primero el control de la conversación.":
   !direct&&whatsApp?"Esta postulación no tiene chat interno vinculado. Puedes responder por WhatsApp.":
   direct?"Enviar aquí entrega la respuesta al chat vinculado del candidato. WhatsApp abre otra aplicación y debes pulsar Enviar allí.":"No hay un canal de respuesta habilitado.";
@@ -106,6 +107,7 @@ async function openConversation(id,changeLayout=true,preserveDraft=false){
  const oldScroll=preserveDraft?$("timeline").scrollTop:0;
  const oldHeight=preserveDraft?$("timeline").scrollHeight:0;
  activeId=id;renderThreads();
+ if(changeLayout){$("context-panel").classList.add("hidden");$("info-toggle").setAttribute("aria-expanded","false");}
  const c=candidate(t.candidate_id);
  $("chat-avatar").textContent=(c?.full_name||"C").charAt(0).toUpperCase();
  $("person").textContent=c?.full_name||"Candidato";
@@ -183,11 +185,33 @@ $("signin-form").addEventListener("submit",async event=>{
  button.disabled=false;$("password").value="";
  if(error){$("signin-error").textContent="Correo o contraseña incorrectos.";return;}await authenticate();
 });
-$("signout").addEventListener("click",async()=>{await db?.auth.signOut();user=null;activeId=null;threads=[];showApp(false);});
+$("signout").addEventListener("click",async()=>{if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null;}await db?.auth.signOut();user=null;activeId=null;threads=[];showApp(false);$("app-menu").classList.add("hidden");});
 $("refresh").addEventListener("click",refresh);
-$("filter").addEventListener("change",renderThreads);
+$("filter").addEventListener("change",()=>setFilter($("filter").value));
+document.querySelectorAll("[data-filter]").forEach(btn=>btn.addEventListener("click",()=>setFilter(btn.dataset.filter)));
+document.querySelectorAll("[data-tab]").forEach(btn=>btn.addEventListener("click",()=>setFilter(btn.dataset.tab)));
+$("menu-toggle").addEventListener("click",()=>{
+ const open=$("app-menu").classList.toggle("hidden")===false;
+ $("menu-toggle").setAttribute("aria-expanded",String(open));
+});
+$("menu-refresh").addEventListener("click",()=>{$("app-menu").classList.add("hidden");refresh();});
+$("install-menu").addEventListener("click",()=>{$("app-menu").classList.add("hidden");$("install").click();});
+document.addEventListener("pointerdown",event=>{if(!event.target.closest(".header-actions")&&!event.target.closest("#app-menu")){$("app-menu").classList.add("hidden");$("menu-toggle").setAttribute("aria-expanded","false");}});
+document.addEventListener("keydown",event=>{if(event.key==="Escape"){$("app-menu").classList.add("hidden");$("context-panel").classList.add("hidden");$("info-toggle").setAttribute("aria-expanded","false");}});
+$("info-toggle").addEventListener("click",()=>{
+ const isOpen=!$("context-panel").classList.toggle("hidden");
+ $("info-toggle").setAttribute("aria-expanded",String(isOpen));
+});
+$("info-close").addEventListener("click",()=>{
+ $("context-panel").classList.add("hidden");
+ $("info-toggle").setAttribute("aria-expanded","false");
+});
 $("search").addEventListener("input",renderThreads);
-$("back").addEventListener("click",()=>{$("conversation-section").classList.add("hidden-mobile");$("inbox-section").classList.remove("hidden-mobile");});
+$("back").addEventListener("click",()=>{
+ $("context-panel").classList.add("hidden");
+ $("info-toggle").setAttribute("aria-expanded","false");
+ $("conversation-section").classList.add("hidden-mobile");$("inbox-section").classList.remove("hidden-mobile");
+});
 $("reply").addEventListener("input",updateComposer);
 $("send-inapp").addEventListener("click",async()=>{
  const t=threads.find(x=>x.id===activeId),body=$("reply").value.trim();
