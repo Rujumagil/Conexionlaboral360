@@ -43,6 +43,7 @@ header{background:var(--dark);color:#fff}.head{max-width:1080px;margin:auto;min-
 @media(max-width:600px){.controls .action{flex:0 0 auto;min-height:40px}.controls .job{max-width:100%}.chat-head{align-items:flex-start}.intro{margin-bottom:16px}}
 
 @media(max-width:600px){.chat>.question-form{padding:12px 14px}}
+.compact-chat{background:#fff}.compact-chat .container{padding:0;max-width:840px}.compact-chat .chat{border-radius:16px;box-shadow:none}.compact-chat .chat-head{padding:12px 15px}.compact-chat .chat-head strong:before{content:"A";display:inline-grid;place-items:center;background:#ffce35;color:#092645;width:32px;height:32px;border-radius:50%;margin-right:8px}.compact-chat .messages{background:#edf3f7;min-height:180px;max-height:360px;padding:14px}.compact-chat .bubble{padding:10px 13px;margin-bottom:9px}.compact-chat .bubble.assistant{background:#fff}.compact-chat .controls{padding:10px 14px}.compact-chat .question-form{padding:10px 14px}.compact-chat .question-row{flex-direction:row;align-items:center}.compact-chat .question-row .action{width:auto;border-radius:22px}.compact-chat .question-row .field{border-radius:22px}.compact-chat .notice{padding:0 12px;margin:10px auto;font-size:.74rem}.compact-chat .footnote{font-size:.75rem}.compact-chat .choice-label{font-size:.72rem}@media(max-width:600px){.compact-chat .chat{border-radius:0}.compact-chat .messages{max-height:46dvh;min-height:160px}.compact-chat .steps{font-size:.7rem}.compact-chat .chat-head small{font-size:.68rem}}
 </style>
 </head>
 <body>
@@ -54,7 +55,7 @@ header{background:var(--dark);color:#fff}.head{max-width:1080px;margin:auto;min-
 <div class="progress"><span id="progress" style="width:0%"></span></div>
 <div class="messages" id="messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
 <div id="controls" class="controls"></div>
-<form id="question-form" class="question-form"><label class="label" for="candidate-question">Tu mensaje</label><div class="question-row"><input class="field" id="candidate-question" maxlength="240" placeholder="Escribe aquí… Ej. ¿Qué vacantes tienen?" autocomplete="off" aria-describedby="question-help"><button class="action secondary" type="submit">Enviar</button></div><p class="footnote" id="question-help">Puedes escribir como en una conversación. Las opciones son sugerencias, no pasos obligatorios.</p><label class="privacy" id="fly-consent-wrap" hidden style="margin-top:12px"><input type="checkbox" id="fly-consent"><span>Autorizo el procesamiento automatizado de mis preguntas. Si completo mi postulación, autorizo también que se guarden las preguntas y respuestas generadas por el asistente en mi expediente privado para revisión humana. Evitaré compartir documentos o datos sensibles. <a href="../aviso-candidatos.html" target="_blank" rel="noopener noreferrer">Información de privacidad</a>.</span></label><p class="error" id="fly-question-error" role="alert"></p></form>
+<form id="question-form" class="question-form"><label class="label" for="candidate-question">Tu mensaje</label><div class="question-row"><input class="field" id="candidate-question" maxlength="240" placeholder="Escribe un mensaje…" autocomplete="off" aria-describedby="question-help"><button class="action secondary" type="submit">Enviar</button></div><p class="footnote" id="question-help">Puedes escribir como en una conversación. Las opciones son sugerencias, no pasos obligatorios.</p><label class="privacy" id="fly-consent-wrap" hidden style="margin-top:12px"><input type="checkbox" id="fly-consent"><span>Autorizo el procesamiento automatizado de mis preguntas. Si completo mi postulación, autorizo también que se guarden las preguntas y respuestas generadas por el asistente en mi expediente privado para revisión humana. Evitaré compartir documentos o datos sensibles. <a href="../aviso-candidatos.html" target="_blank" rel="noopener noreferrer">Información de privacidad</a>.</span></label><p class="error" id="fly-question-error" role="alert"></p></form>
 </section>
 <section class="faq" aria-label="Información general" hidden>
 <h2>¿Te quedó alguna duda? Podemos platicarla</h2>
@@ -68,10 +69,10 @@ header{background:var(--dark);color:#fff}.head{max-width:1080px;margin:auto;min-
 const API="https://qwxydjotwhniahaovrff.supabase.co";
 const KEY="sb_publishable_17NekbDHp_ssL_Pf-CnqPg_v0acxqn3";
 const WS="c7ab2a78-08e0-4a29-8a3b-fadaf244002f";
-const WA="https://wa.me/523319708528";
+const WA=new URLSearchParams(location.search).get("campana")==="guardias-de-seguridad"?"https://wa.me/523334123734":"https://wa.me/523319708528";
 const $=id=>document.getElementById(id);
 const securityCampaign=new URLSearchParams(location.search).get("campana")==="guardias-de-seguridad";
-if(new URLSearchParams(location.search).get("embed")==="1"){document.querySelector("header").hidden=true;document.querySelector(".intro").hidden=true;document.querySelector("main").style.margin="8px auto";}
+if(new URLSearchParams(location.search).get("embed")==="1"||new URLSearchParams(location.search).get("mobile")==="1"){document.body.classList.add("compact-chat");document.querySelector("header").hidden=true;document.querySelector(".intro").hidden=true;document.querySelector("main").style.margin="8px auto";}
 const delay=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches?0:480;
 let jobs=[],selected=null,pendingIntroJob=null,phase="loading",version=0,busy=false;
 let flyReady=false,flySession=crypto.randomUUID(),flyHistory=[],flyQuestionBusy=false,flyUsedWithConsent=false,chatInputBusy=false;
@@ -127,7 +128,7 @@ function firstName(){return(answers.name||"").split(/\s+/)[0]||"";}
 function suggestOptions(items){
  const controls=$("controls");controls.replaceChildren();
  if(!items.length)return;
- const label=document.createElement("p");label.className="choice-label";label.textContent="Puedes responder escribiendo o elegir una opción:";
+ const label=document.createElement("p");label.className="choice-label";label.textContent="También puedes elegir:";
  const group=document.createElement("div");group.className="choices";controls.append(label,group);
  items.forEach(([caption,handler,primary])=>{
    const btn=document.createElement("button");btn.type="button";btn.className="action "+(primary?"gold":"secondary");
@@ -156,13 +157,13 @@ function finishIntroduction(){
  return showJobs();
 }
 async function promptIntroPhone(){
- await stage("introPhone","Mucho gusto, "+firstName()+". 😊 Si te interesa que Astrid pueda darte seguimiento, ¿me compartes tu número de teléfono o WhatsApp? Es opcional y solo lo registraré en el CRM si después confirmas tu postulación y autorizas usar tus datos.",()=>{
+ await stage("introPhone","Mucho gusto, "+firstName()+". 😊 ¿Me compartes tu teléfono o WhatsApp para que Astrid pueda darte seguimiento? Es opcional; solo lo guardaré si autorizas tu postulación.",()=>{
   suggestOptions([["Prefiero continuar sin dar mi número",()=>finishIntroduction(),true],["Ver vacantes",()=>showJobs(),false]]);
  });
 }
 async function startIntroduction(job=null){
  pendingIntroJob=job;
- await stage("introName","¡Hola! 👋 Soy Andy, tu asistente virtual de Conexión Laboral 360. "+(securityCampaign?"Gracias por tu interés en las vacantes de guardias de seguridad. ":"")+"¿Con quién tengo el gusto de platicar? Puedes decirme tu nombre. Si solo quieres consultar vacantes, no necesitas compartir datos personales.",()=>{
+ await stage("introName","¡Hola! 👋 Soy Andy, tu asistente virtual de Conexión Laboral 360. "+(securityCampaign?"Te ayudo a encontrar una vacante de guardia de seguridad. ":"")+"¿Con quién tengo el gusto? Si solo quieres consultar vacantes, puedes continuar sin compartir datos.",()=>{
   suggestOptions([[job?"Ver la vacante sin dar datos":"Ver vacantes sin dar datos",()=>finishIntroduction(),true]]);
  });
 }
