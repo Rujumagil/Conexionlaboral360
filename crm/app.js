@@ -346,6 +346,43 @@ async function refreshExecutiveGoals(){
  form.onsubmit=async e=>{e.preventDefault();if(!valid()||save.disabled)return;save.disabled=true;try{const result=await db.from("cl360_weekly_goals").upsert({workspace_id:WS,week_start:start,applications_target:Number(inputs[0].value),contacts_target:Number(inputs[1].value)},{onConflict:"workspace_id,week_start"});if(!valid())return;if(result.error){status.textContent="No se pudieron guardar los objetivos.";return;}await refreshExecutiveGoals();}catch{if(valid())status.textContent="Error al guardar objetivos.";}finally{save.disabled=false;}};
  }catch{if(valid())status.textContent="No se pudieron consultar los objetivos.";}
 }
+function mountExecutiveReports(){
+ const panel=document.createElement("details");panel.id="executive-reports";panel.style.cssText="border:1px solid #dce6f1;border-radius:12px;padding:14px;margin:12px 0";
+ const heading=document.createElement("summary");heading.textContent="Centro de reportes ejecutivos";heading.style.cssText="font-weight:700;cursor:pointer";panel.append(heading);
+ const desc=document.createElement("p");desc.className="small";desc.textContent="Reportes bajo demanda con indicadores agregados del CRM. No consumen cuota de Gemini. Los periodos usan horario de Ciudad de México.";panel.append(desc);
+ const select=document.createElement("select");select.className="field";select.setAttribute("aria-label","Tipo de reporte");
+ for(const [value,label] of [["morning","Inicio del día"],["close","Cierre del día"],["week","Semana actual"],["month","Mes actual"]]){const o=document.createElement("option");o.value=value;o.textContent=label;select.append(o);}
+ const controls=document.createElement("div");controls.style.cssText="display:flex;gap:8px;flex-wrap:wrap";const generate=document.createElement("button");generate.type="button";generate.className="btn yellow";generate.textContent="Generar reporte";const download=document.createElement("button");download.type="button";download.className="btn ghost";download.textContent="Descargar TXT";download.disabled=true;controls.append(select,generate,download);panel.append(controls);
+ const output=document.createElement("div");output.setAttribute("role","status");output.style.cssText="margin-top:12px;white-space:pre-wrap;overflow-wrap:anywhere";panel.append(output);
+ let saved="",filename="",version=0;
+ select.onchange=()=>{version++;saved="";download.disabled=true;generate.disabled=false;output.textContent="Genera un reporte para el periodo seleccionado.";};
+ download.onclick=()=>{if(!saved||!canLoad||!panel.isConnected)return;const href=window.URL.createObjectURL(new Blob([saved],{type:"text/plain;charset=utf-8"}));const a=document.createElement("a");a.href=href;a.download=filename;a.click();setTimeout(()=>window.URL.revokeObjectURL(href),1000);};
+ generate.onclick=async()=>{
+ if(!canLoad||!panel.isConnected||!["owner","admin","manager"].includes(staffRole))return;
+ const owner=user?.id,run=++version,kind=select.value,valid=()=>canLoad&&panel.isConnected&&user?.id===owner&&run===version;
+ generate.disabled=true;download.disabled=true;saved="";output.textContent="Consultando indicadores…";
+ try{
+ const now=new Date(),parts=Object.fromEntries(new Intl.DateTimeFormat("en-CA",{timeZone:"America/Mexico_City",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(now).map(x=>[x.type,x.value]));
+ const day=new Date(parts.year+"-"+parts.month+"-"+parts.day+"T00:00:00Z"),today=day.toISOString().slice(0,10),monday=new Date(day);monday.setUTCDate(day.getUTCDate()-((day.getUTCDay()+6)%7));const weekStart=monday.toISOString().slice(0,10);
+ if(kind==="week")day.setTime(monday.getTime());if(kind==="month")day.setUTCDate(1);
+ const start=day.toISOString().slice(0,10),from=start+"T00:00:00-06:00",until=now.toISOString();
+ const count=async(table,filter)=>{try{const result=await filter(db.from(table).select("id",{count:"exact",head:true}).eq("workspace_id",WS));return result.error?null:result.count;}catch{return null;}};
+ const period=(q,field)=>q.gte(field,from).lte(field,until);
+ const [apps,contacts,tasks,overdue,waiting,fresh,goals,ads]=await Promise.all([
+ count("cl360_candidates",q=>period(q,"created_at")),count("cl360_candidates",q=>period(q,"last_contact_at")),count("cl360_followups",q=>period(q,"created_at")),count("cl360_followups",q=>q.eq("status","pending").lt("due_at",until)),count("cl360_conversations",q=>q.eq("status","waiting")),count("cl360_candidates",q=>q.eq("stage","new")),
+ Promise.resolve(db.from("cl360_weekly_goals").select("applications_target,contacts_target").eq("workspace_id",WS).eq("week_start",weekStart).maybeSingle()).catch(()=>({error:true})),
+ Promise.resolve(db.from("evolution_meta_assigned_metrics").select("period_start,period_end,currency,spend,impressions,clicks,synced_at").eq("workspace_id",WS).limit(20)).catch(()=>({error:true}))
+ ]);
+ if(!valid())return;const v=n=>n==null?"No disponible":String(n);const lines=["CONEXIÓN LABORAL 360 · "+select.options[select.selectedIndex].textContent.toUpperCase(),"Generado: "+now.toLocaleString("es-MX",{timeZone:"America/Mexico_City"}),"Periodo operativo: "+start+" hasta el momento de consulta ("+today+").","", "RESULTADOS DEL PERIODO","Postulaciones nuevas: "+v(apps),"Expedientes cuya última fecha de contacto cae en el periodo: "+v(contacts),"Seguimientos creados: "+v(tasks),"","PENDIENTES ACTUALES (no históricos)","Seguimientos vencidos: "+v(overdue),"Conversaciones en espera: "+v(waiting),"Expedientes en etapa nueva: "+v(fresh)];
+ if(kind==="week"){lines.push("","METAS SEMANALES");if(goals.error)lines.push("No disponibles");else if(!goals.data)lines.push("Sin metas configuradas");else for(const [label,actual,target] of [["Postulaciones",apps,goals.data.applications_target],["Contactos",contacts,goals.data.contacts_target]])lines.push(label+": "+v(actual)+" / "+target+(actual==null?"":" · "+Math.round(actual/target*100)+"% · faltan "+Math.max(0,target-actual)));}
+ lines.push("","MARKETING · Periodos independientes del reporte operativo");if(ads.error||!ads.data?.length)lines.push("Datos no disponibles");else for(const a of ads.data)lines.push(a.period_start+" a "+a.period_end+" · inversión "+v(a.spend)+" "+(a.currency||"")+" · impresiones "+v(a.impressions)+" · clics "+v(a.clicks)+" · "+(!Number.isFinite(Date.parse(a.synced_at))||now.getTime()-Date.parse(a.synced_at)>10800000?"sincronización desactualizada":"sincronización reciente"));
+ lines.push("","PRIORIDADES RECOMENDADAS (reglas Compás Fly)");if(overdue>0)lines.push("• Atender seguimientos vencidos.");if(waiting>0)lines.push("• Atender conversaciones en espera.");if(fresh>0)lines.push("• Organizar el primer contacto de expedientes nuevos.");if([overdue,waiting,fresh].some(x=>x==null))lines.push("• Verificar indicadores no disponibles.");if(overdue===0&&waiting===0&&fresh===0)lines.push("• Mantener seguimiento de la operación.");
+ lines.push("","Notas: no se contabilizan entrevistas ni contrataciones del periodo sin fechas específicas. Contactos no equivale a número de llamadas. No se suman periodos publicitarios superpuestos. Este reporte no es un histórico inmutable.");
+ saved=lines.join("\n");filename="CL360-"+kind+"-"+today+".txt";output.textContent=saved;download.disabled=false;
+ }catch{if(valid())output.textContent="No fue posible generar el reporte.";}finally{if(valid())generate.disabled=false;}
+ };
+ return panel;
+}
 function mountAndyExecutive(){
  if(!canLoad)return;
  const view=$("view-executive");if(!view||$("andy-executive"))return;
@@ -387,7 +424,7 @@ function mountAndyExecutive(){
  };
  for(const question of ["¿Qué pendientes tengo hoy?","¿Qué candidatos no he contactado?","¿Hay conversaciones pendientes?","¿Cómo va mi publicidad?","¿Qué seguimientos están vencidos?","¿Qué resultados tuve esta semana?"]){const b=document.createElement("button");b.className="btn ghost";b.type="button";b.textContent=question;b.onclick=()=>void ask(question);shortcuts.append(b);}
  form.onsubmit=e=>{e.preventDefault();if(busy)return;const q=input.value.trim();if(q){input.value="";void ask(q);}};
- const clear=document.createElement("button");clear.type="button";clear.className="btn ghost";clear.textContent="Limpiar chat";clear.onclick=()=>{if(!busy){log.replaceChildren();executiveHistory=[];}};const brief=document.createElement("section");brief.id="executive-brief";brief.style.cssText="border:1px solid #dce6f1;border-radius:12px;padding:14px;margin:12px 0";const heading=document.createElement("h3");heading.textContent="Tu día con Andy · Prioridades";const content=document.createElement("div");content.dataset.briefContent="true";const refresh=document.createElement("button");refresh.type="button";refresh.className="btn ghost";refresh.textContent="Actualizar prioridades";refresh.onclick=()=>void refreshExecutiveBrief();brief.append(heading,content,refresh);const goals=document.createElement("section");goals.id="executive-goals";goals.style.cssText="border:1px solid #dce6f1;border-radius:12px;padding:14px;margin:12px 0";if(["owner","admin","manager"].includes(staffRole))panel.append(goals);panel.append(brief,log,form,shortcuts,clear);view.prepend(panel);
+ const clear=document.createElement("button");clear.type="button";clear.className="btn ghost";clear.textContent="Limpiar chat";clear.onclick=()=>{if(!busy){log.replaceChildren();executiveHistory=[];}};const brief=document.createElement("section");brief.id="executive-brief";brief.style.cssText="border:1px solid #dce6f1;border-radius:12px;padding:14px;margin:12px 0";const heading=document.createElement("h3");heading.textContent="Tu día con Andy · Prioridades";const content=document.createElement("div");content.dataset.briefContent="true";const refresh=document.createElement("button");refresh.type="button";refresh.className="btn ghost";refresh.textContent="Actualizar prioridades";refresh.onclick=()=>void refreshExecutiveBrief();brief.append(heading,content,refresh);const goals=document.createElement("section");goals.id="executive-goals";goals.style.cssText="border:1px solid #dce6f1;border-radius:12px;padding:14px;margin:12px 0";if(["owner","admin","manager"].includes(staffRole))panel.append(goals);if(["owner","admin","manager"].includes(staffRole))panel.append(mountExecutiveReports());panel.append(brief,log,form,shortcuts,clear);view.prepend(panel);
 }
 function renderFlyAgents(){
  if(!canLoad)return;
