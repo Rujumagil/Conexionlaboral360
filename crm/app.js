@@ -325,6 +325,27 @@ async function refreshExecutiveBrief(){
  else{const stale=ads.data.filter(x=>!Number.isFinite(Date.parse(x.synced_at))||now.getTime()-Date.parse(x.synced_at)>10800000).length;const missing=ads.data.filter(x=>x.spend==null||x.impressions==null||x.clicks==null).length;if(stale||missing){alerts++;content.append(flyActionRow("P2 · Marketing",stale+" resúmenes desactualizados; "+missing+" con métricas incompletas. No evalúes el rendimiento hasta verificar los datos.",()=>navigate("marketing"),"Revisar"));}}
  if(!alerts&&!unknown)content.append(flyActionRow("Sin pendientes detectados","No se encontraron alertas en los indicadores consultados."));
 }
+async function refreshExecutiveGoals(){
+ const panel=$("executive-goals");if(!panel||!canLoad||!["owner","admin","manager"].includes(staffRole))return;
+ const owner=user?.id,valid=()=>canLoad&&panel.isConnected&&user?.id===owner;
+ const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"America/Mexico_City",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());
+ const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));const day=new Date(p.year+"-"+p.month+"-"+p.day+"T00:00:00Z");day.setUTCDate(day.getUTCDate()-((day.getUTCDay()+6)%7));const start=day.toISOString().slice(0,10);day.setUTCDate(day.getUTCDate()+7);const end=day.toISOString().slice(0,10);
+ const from=start+"T00:00:00-06:00",until=end+"T00:00:00-06:00";
+ panel.replaceChildren();const h=document.createElement("h3");h.textContent="Objetivos de la semana";panel.append(h);const note=document.createElement("p");note.className="small";note.textContent="Semana desde "+start+" hasta antes del "+end+" · Ciudad de México. Contactos: expedientes cuya última fecha de contacto corresponde a esta semana, no número de llamadas.";panel.append(note);
+ const status=document.createElement("p");status.setAttribute("role","status");status.textContent="Consultando metas…";panel.append(status);
+ try{
+ const count=field=>db.from("cl360_candidates").select("id",{count:"exact",head:true}).eq("workspace_id",WS).gte(field,from).lt(field,until);
+ const [goal,apps,contacts]=await Promise.all([db.from("cl360_weekly_goals").select("applications_target,contacts_target").eq("workspace_id",WS).eq("week_start",start).maybeSingle(),count("created_at"),count("last_contact_at")]);
+ if(!valid())return;if(goal.error){status.textContent="No fue posible cargar metas. Verifica permisos.";return;}
+ status.textContent=goal.data?"Metas registradas":"Configura las metas de esta semana.";
+ const form=document.createElement("form");form.style.cssText="display:grid;gap:10px";
+ const fields=[["Postulaciones nuevas",goal.data?.applications_target,apps],["Expedientes contactados",goal.data?.contacts_target,contacts]];
+ const inputs=[];
+ for(const [name,target,result] of fields){const label=document.createElement("label");label.textContent=name+" · avance: "+(result.error||result.count==null?"No disponible":result.count)+(target?" / "+target:"");const input=document.createElement("input");input.type="number";input.min="1";input.max="10000";input.step="1";input.required=true;input.className="field";input.value=target??"";input.placeholder="Meta semanal";label.append(input);form.append(label);inputs.push(input);if(target&&!result.error&&result.count!=null){const progress=document.createElement("progress");progress.max=target;progress.value=Math.min(target,result.count);progress.style.width="100%";progress.setAttribute("aria-label",name);form.append(progress);}}
+ const save=document.createElement("button");save.type="submit";save.className="btn yellow";save.textContent="Guardar objetivos";form.append(save);panel.append(form);
+ form.onsubmit=async e=>{e.preventDefault();if(!valid()||save.disabled)return;save.disabled=true;try{const result=await db.from("cl360_weekly_goals").upsert({workspace_id:WS,week_start:start,applications_target:Number(inputs[0].value),contacts_target:Number(inputs[1].value)},{onConflict:"workspace_id,week_start"});if(!valid())return;if(result.error){status.textContent="No se pudieron guardar los objetivos.";return;}await refreshExecutiveGoals();}catch{if(valid())status.textContent="Error al guardar objetivos.";}finally{save.disabled=false;}};
+ }catch{if(valid())status.textContent="No se pudieron consultar los objetivos.";}
+}
 function mountAndyExecutive(){
  if(!canLoad)return;
  const view=$("view-executive");if(!view||$("andy-executive"))return;
@@ -366,7 +387,7 @@ function mountAndyExecutive(){
  };
  for(const question of ["¿Qué pendientes tengo hoy?","¿Qué candidatos no he contactado?","¿Hay conversaciones pendientes?","¿Cómo va mi publicidad?","¿Qué seguimientos están vencidos?","¿Qué resultados tuve esta semana?"]){const b=document.createElement("button");b.className="btn ghost";b.type="button";b.textContent=question;b.onclick=()=>void ask(question);shortcuts.append(b);}
  form.onsubmit=e=>{e.preventDefault();if(busy)return;const q=input.value.trim();if(q){input.value="";void ask(q);}};
- const clear=document.createElement("button");clear.type="button";clear.className="btn ghost";clear.textContent="Limpiar chat";clear.onclick=()=>{if(!busy){log.replaceChildren();executiveHistory=[];}};const brief=document.createElement("section");brief.id="executive-brief";brief.style.cssText="border:1px solid #dce6f1;border-radius:12px;padding:14px;margin:12px 0";const heading=document.createElement("h3");heading.textContent="Tu día con Andy · Prioridades";const content=document.createElement("div");content.dataset.briefContent="true";const refresh=document.createElement("button");refresh.type="button";refresh.className="btn ghost";refresh.textContent="Actualizar prioridades";refresh.onclick=()=>void refreshExecutiveBrief();brief.append(heading,content,refresh);panel.append(brief,log,form,shortcuts,clear);view.prepend(panel);
+ const clear=document.createElement("button");clear.type="button";clear.className="btn ghost";clear.textContent="Limpiar chat";clear.onclick=()=>{if(!busy){log.replaceChildren();executiveHistory=[];}};const brief=document.createElement("section");brief.id="executive-brief";brief.style.cssText="border:1px solid #dce6f1;border-radius:12px;padding:14px;margin:12px 0";const heading=document.createElement("h3");heading.textContent="Tu día con Andy · Prioridades";const content=document.createElement("div");content.dataset.briefContent="true";const refresh=document.createElement("button");refresh.type="button";refresh.className="btn ghost";refresh.textContent="Actualizar prioridades";refresh.onclick=()=>void refreshExecutiveBrief();brief.append(heading,content,refresh);const goals=document.createElement("section");goals.id="executive-goals";goals.style.cssText="border:1px solid #dce6f1;border-radius:12px;padding:14px;margin:12px 0";if(["owner","admin","manager"].includes(staffRole))panel.append(goals);panel.append(brief,log,form,shortcuts,clear);view.prepend(panel);
 }
 function renderFlyAgents(){
  if(!canLoad)return;
@@ -773,7 +794,7 @@ function navigate(view,candidateId=null,fromHistory=false){
  if(view==="conversaciones")renderInbox();
  if(view==="inicio"){renderHome();renderFlyAgents();}
  if(view==="fly")renderFlyAgents();
- if(view==="executive"){mountAndyExecutive();void refreshExecutiveBrief();}
+ if(view==="executive"){mountAndyExecutive();void refreshExecutiveBrief();void refreshExecutiveGoals();}
  if(view==="marketing"){renderMarketing();void loadMarketingMeta();}
  if(view==="ajustes")$("settings-user").textContent=(user?.email||"Cuenta autorizada")+" · "+(staffRole||"");
  document.title=appViews[view]+" · Conexión Laboral 360";
