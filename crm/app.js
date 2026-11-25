@@ -553,6 +553,23 @@ function flyMarketingAdvice(r,counts,other){
  advice.push(["Medición de candidatos","El costo por registro atribuido es orientativo: usa etiquetas UTM y fecha de creación del expediente, no conversiones verificadas por Meta."]);
  return advice;
 }
+async function marketingDailyReport(r){
+ const day=new Intl.DateTimeFormat("en-CA",{timeZone:"America/Mexico_City",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());
+ const parts=Object.fromEntries(day.map(p=>[p.type,p.value]));
+ const date=parts.year+"-"+parts.month+"-"+parts.day;
+ const daily={...r,period_start:date,period_end:date};
+ const [count,paid,other]=await Promise.all([marketingCandidateCount(daily),marketingFunnelCounts(daily),marketingFunnelCounts(daily,"unattributed")]);
+ return {date,count,paid,other};
+}
+function appendDailyMarketingReport(card,r,daily,funnel,other){
+ if(!daily.paid)return;
+ const fmt=v=>v==null?"No disponible":String(v);
+ const lines=["REPORTE DIARIO · FLY MARKETING","Fecha: "+daily.date+" (Ciudad de México)","Campaña: "+r.campaign_name,"","HOY · actividad registrada", "Visitas autorizadas (campaña): "+fmt(daily.paid[0]),"Clics en postularse: "+fmt(daily.paid[1]),"Interacciones con Andy: "+fmt(daily.paid[2]),"Postulaciones atribuidas: "+fmt(daily.count),"Visitas sin atribución al piloto: "+fmt(daily.other?.[0]),"Interacciones sin atribución al piloto: "+fmt(daily.other?.[2]),"","META ADS · periodo "+r.period_start+" a "+r.period_end,"Inversión del periodo: "+(r.spend==null?"No disponible":String(r.spend)+" "+(r.currency||"")),"Impresiones del periodo: "+fmt(r.impressions),"Clics del periodo: "+fmt(r.clicks),"Última sincronización: "+new Date(r.synced_at).toLocaleString("es-MX",{timeZone:"America/Mexico_City"}),"","ACCIONES RECOMENDADAS (diagnóstico del periodo)",...flyMarketingAdvice(r,funnel,other).map(([t,d])=>t+": "+d),"","Medición opcional; conteos independientes, no conversiones certificadas. Los datos del día pueden cambiar. No modifica campañas ni presupuestos."];
+ const section=document.createElement("section");section.style.cssText="margin:16px 0;padding:16px;border:1px solid #dce6f1;border-radius:12px;background:#fff";
+ const title=document.createElement("h3");title.textContent="Reporte diario de Astrid";section.append(title);
+ const pre=document.createElement("div");pre.style.cssText="white-space:pre-wrap;font-size:.9rem;line-height:1.6;margin:12px 0";pre.textContent=lines.join("\n");section.append(pre);
+ const button=document.createElement("button");button.type="button";button.className="btn ghost";button.textContent="Descargar reporte (.txt)";button.onclick=()=>{const url=URL.createObjectURL(new Blob([lines.join("\n")],{type:"text/plain;charset=utf-8"}));const a=document.createElement("a");a.href=url;a.download="fly-marketing-"+daily.date+".txt";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};section.append(button);card.append(section);
+}
 function appendFlyMarketingAdvice(card,r,counts,other){
  const section=document.createElement("section");section.style.cssText="margin-top:16px;padding:14px;border-radius:12px;background:#f2f6fb";
  const heading=document.createElement("h3");heading.textContent="Fly Marketing · diagnóstico y acciones";section.append(heading);
@@ -575,7 +592,7 @@ async function loadMarketingMeta(){
  if(!rows.length){status.textContent="No hay estadísticas disponibles para esta sesión. Compás Evolution debe sincronizar las campañas asignadas; si persiste, verifica los permisos.";return;}
  status.textContent="Estadísticas de Meta Ads · resumen de siete días por campaña. El periodo de postulaciones se controla por separado.";
  for(const r of rows){
- const [count,funnel,other]=await Promise.all([marketingCandidateCount(r),marketingFunnelCounts(r),marketingFunnelCounts(r,"unattributed")]);
+ const [count,funnel,other,daily]=await Promise.all([marketingCandidateCount(r),marketingFunnelCounts(r),marketingFunnelCounts(r,"unattributed"),marketingDailyReport(r)]);
  if(version!==marketingMetaVersion)return;
  const card=document.createElement("article");card.style.cssText="grid-column:1/-1;border:1px solid #dce6f1;border-radius:12px;padding:16px";
  const title=document.createElement("h3");title.textContent=r.campaign_name;card.append(title);
@@ -586,7 +603,7 @@ async function loadMarketingMeta(){
  values.push(["Registros atribuidos por UTM",fmt(count)],["Costo por registro atribuido",count>0&&r.spend!=null&&r.currency?(Number(r.spend)/count).toLocaleString("es-MX",{minimumFractionDigits:2,maximumFractionDigits:2})+" "+r.currency:"—"]);
  const grid=document.createElement("div");grid.style.cssText="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px";
  for(const [label,value] of values){const cell=document.createElement("div");const l=document.createElement("div");l.className="small";l.textContent=label;const v=document.createElement("strong");v.textContent=value;v.style.cssText="font-size:1.4rem;display:block";cell.append(l,v);grid.append(cell);}
- card.append(grid);appendMarketingFunnel(card,r,funnel,count,other);appendFlyMarketingAdvice(card,r,funnel,other);panel.append(card);
+ card.append(grid);appendMarketingFunnel(card,r,funnel,count,other);appendFlyMarketingAdvice(card,r,funnel,other);appendDailyMarketingReport(card,r,daily,funnel,other);panel.append(card);
  }
  }catch{if(version===marketingMetaVersion)status.textContent="No fue posible consultar las estadísticas asignadas. Consulta con Compás Evolution.";}
 }
