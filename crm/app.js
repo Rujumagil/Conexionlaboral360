@@ -301,6 +301,30 @@ async function renderFlySupervisor(r){
  add("Fly Reporting","Consulta y descarga el reporte diario en Marketing.","marketing");
  }catch{if(version===supervisorMarketingVersion&&canLoad)status.textContent="Fly Marketing: no fue posible consultar estadísticas.";}
 }
+let executiveBriefVersion=0;
+async function refreshExecutiveBrief(){
+ const panel=$("executive-brief");if(!panel||!canLoad||activeView!=="executive")return;
+ const owner=user?.id,version=++executiveBriefVersion;
+ const valid=()=>canLoad&&panel.isConnected&&user?.id===owner&&version===executiveBriefVersion;
+ const content=panel.querySelector("[data-brief-content]");content.textContent="Consultando prioridades…";
+ const count=async(table,filters)=>{try{let q=db.from(table).select("id",{count:"exact",head:true}).eq("workspace_id",WS);q=filters(q);const result=await q;return result.error?null:result.count;}catch{return null;}};
+ const now=new Date(),date=now.toISOString();
+ const [overdue,waiting,fresh,upcoming,ads]=await Promise.all([
+ count("cl360_followups",q=>q.eq("status","pending").lt("due_at",date)),
+ count("cl360_conversations",q=>q.eq("status","waiting")),
+ count("cl360_candidates",q=>q.eq("stage","new")),
+ count("cl360_followups",q=>q.eq("status","pending").gte("due_at",date).lte("due_at",new Date(now.getTime()+86400000).toISOString())),
+ (async()=>{try{return await db.from("evolution_meta_assigned_metrics").select("synced_at,spend,impressions,clicks").eq("workspace_id",WS);}catch{return {error:true};}})()
+ ]);
+ if(!valid())return;
+ content.replaceChildren();const dateLabel=document.createElement("p");dateLabel.className="small";dateLabel.textContent="Consultado: "+now.toLocaleString("es-MX",{timeZone:"America/Mexico_City"})+" · Diagnóstico por reglas, sin consumir cuota de Gemini.";content.append(dateLabel);
+ const rows=[[overdue,"P1 · Seguimientos vencidos","Revisa primero las tareas atrasadas.","seguimientos"],[waiting,"P1 · Conversaciones en espera","Atiende las conversaciones pendientes de intervención humana.","conversaciones"],[fresh,"P2 · Candidatos nuevos","Revisa expedientes y organiza el primer contacto.","candidatos"],[upcoming,"P2 · Próximas 24 horas","Consulta la agenda de seguimientos.","seguimientos"]];
+ let alerts=0,unknown=false;
+ for(const [n,label,detail,target] of rows){if(n===null){unknown=true;content.append(flyActionRow(label,"Datos no disponibles. Verifica conexión y permisos.",()=>navigate(target),"Revisar"));}else if(n>0){alerts++;content.append(flyActionRow(label+" · "+n,detail,()=>navigate(target),"Abrir"));}}
+ if(ads.error||!ads.data?.length){unknown=true;content.append(flyActionRow("P2 · Marketing","Estadísticas no disponibles. Revisa sincronización y permisos.",()=>navigate("marketing"),"Revisar"));}
+ else{const stale=ads.data.filter(x=>!Number.isFinite(Date.parse(x.synced_at))||now.getTime()-Date.parse(x.synced_at)>10800000).length;const missing=ads.data.filter(x=>x.spend==null||x.impressions==null||x.clicks==null).length;if(stale||missing){alerts++;content.append(flyActionRow("P2 · Marketing",stale+" resúmenes desactualizados; "+missing+" con métricas incompletas. No evalúes el rendimiento hasta verificar los datos.",()=>navigate("marketing"),"Revisar"));}}
+ if(!alerts&&!unknown)content.append(flyActionRow("Sin pendientes detectados","No se encontraron alertas en los indicadores consultados."));
+}
 function mountAndyExecutive(){
  if(!canLoad)return;
  const view=$("view-executive");if(!view||$("andy-executive"))return;
@@ -342,7 +366,7 @@ function mountAndyExecutive(){
  };
  for(const question of ["¿Qué pendientes tengo hoy?","¿Qué candidatos no he contactado?","¿Hay conversaciones pendientes?","¿Cómo va mi publicidad?","¿Qué seguimientos están vencidos?","¿Qué resultados tuve esta semana?"]){const b=document.createElement("button");b.className="btn ghost";b.type="button";b.textContent=question;b.onclick=()=>void ask(question);shortcuts.append(b);}
  form.onsubmit=e=>{e.preventDefault();if(busy)return;const q=input.value.trim();if(q){input.value="";void ask(q);}};
- const clear=document.createElement("button");clear.type="button";clear.className="btn ghost";clear.textContent="Limpiar chat";clear.onclick=()=>{if(!busy){log.replaceChildren();executiveHistory=[];}};panel.append(log,form,shortcuts,clear);view.prepend(panel);
+ const clear=document.createElement("button");clear.type="button";clear.className="btn ghost";clear.textContent="Limpiar chat";clear.onclick=()=>{if(!busy){log.replaceChildren();executiveHistory=[];}};const brief=document.createElement("section");brief.id="executive-brief";brief.style.cssText="border:1px solid #dce6f1;border-radius:12px;padding:14px;margin:12px 0";const heading=document.createElement("h3");heading.textContent="Tu día con Andy · Prioridades";const content=document.createElement("div");content.dataset.briefContent="true";const refresh=document.createElement("button");refresh.type="button";refresh.className="btn ghost";refresh.textContent="Actualizar prioridades";refresh.onclick=()=>void refreshExecutiveBrief();brief.append(heading,content,refresh);panel.append(brief,log,form,shortcuts,clear);view.prepend(panel);
 }
 function renderFlyAgents(){
  if(!canLoad)return;
@@ -749,7 +773,7 @@ function navigate(view,candidateId=null,fromHistory=false){
  if(view==="conversaciones")renderInbox();
  if(view==="inicio"){renderHome();renderFlyAgents();}
  if(view==="fly")renderFlyAgents();
- if(view==="executive")mountAndyExecutive();
+ if(view==="executive"){mountAndyExecutive();void refreshExecutiveBrief();}
  if(view==="marketing"){renderMarketing();void loadMarketingMeta();}
  if(view==="ajustes")$("settings-user").textContent=(user?.email||"Cuenta autorizada")+" · "+(staffRole||"");
  document.title=appViews[view]+" · Conexión Laboral 360";
@@ -766,7 +790,7 @@ window.addEventListener("popstate",()=>{
  if(candidateId&&candidates.some(c=>c.id===candidateId))selected=candidateId;
  navigate(viewFromLocation(),candidateId,true);
 });
-$("global-refresh").addEventListener("click",async()=>{await load();await loadConversations();});
+$("global-refresh").addEventListener("click",async()=>{await load();await loadConversations();if(activeView==="executive")void refreshExecutiveBrief();});
 $("job-add-shortcut").addEventListener("click",()=>{
  if(!["owner","admin","manager"].includes(staffRole))return err({message:"Tu perfil no tiene permiso para administrar vacantes."});
  $("new-job-form").classList.remove("hide");
