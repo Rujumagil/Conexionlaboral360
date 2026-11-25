@@ -276,9 +276,35 @@ async function pollDueTasks(){
  if(activeView==="fly")renderFlyAgents();
  if(activeView==="seguimientos")renderFollowups();
 }
+let supervisorMarketingVersion=0;
+async function renderFlySupervisor(r){
+ const review=$("fly-review-list");if(!review||!canLoad)return;
+ const view=review.closest("[data-view]");if(!view)return;
+ let panel=$("fly-supervisor");if(!panel){panel=document.createElement("section");panel.id="fly-supervisor";panel.className="panel";view.prepend(panel);}
+ const version=++supervisorMarketingVersion;
+ panel.replaceChildren();
+ const heading=document.createElement("h2");heading.textContent="Fly Supervisor · Prioridades del equipo";panel.append(heading);
+ const note=document.createElement("p");note.className="small";note.textContent="Coordinación por reglas sobre los registros disponibles del CRM. Astrid conserva el control de las decisiones y acciones.";panel.append(note);
+ const items=document.createElement("div");panel.append(items);
+ const add=(agent,detail,target)=>items.append(flyActionRow(agent,detail,()=>navigate(target),"Revisar"));
+ if(r.overdue.length)add("P1 · Fly Operations",r.overdue.length+" seguimientos vencidos.","seguimientos");
+ if(conversationsLoadError)add("P1 · Andy","Bandeja no disponible; actualiza antes de evaluar pendientes.","conversaciones");
+ else {const waiting=threads.filter(t=>t.status==="waiting").length;const human=threads.filter(t=>t.status==="human").length;add(waiting?"P1 · Andy":"Andy",waiting+" conversaciones en espera; "+human+" tomadas por una persona (bandeja cargada).","conversaciones");}
+ add(r.newCandidates.length?"P2 · Fly Recruitment":"Fly Recruitment",r.newCandidates.length+" expedientes nuevos sin contactar.","candidatos");
+ add("P2 · Fly Operations",r.dueSoon.length+" seguimientos próximos en 24 horas.","seguimientos");
+ const status=document.createElement("p");status.className="small";status.textContent="Fly Marketing: consultando sincronización…";items.append(status);
+ try{const result=await db.from("evolution_meta_assigned_metrics").select("campaign_name,synced_at,spend,impressions,clicks").eq("workspace_id",WS);
+ if(version!==supervisorMarketingVersion||!canLoad)return;
+ status.remove();
+ if(result.error||!result.data?.length)add("P2 · Fly Marketing","Estadísticas no disponibles; verifica sincronización y permisos.","marketing");
+ else {const rows=result.data;const stale=rows.filter(x=>!Number.isFinite(Date.parse(x.synced_at))||Date.now()-Date.parse(x.synced_at)>3*3600000).length;const missing=rows.filter(x=>x.spend==null||x.impressions==null||x.clicks==null).length;add(stale||missing?"P2 · Fly Marketing":"Fly Marketing",rows.length+" campañas con resumen; "+stale+" desactualizadas y "+missing+" con métricas incompletas.","marketing");}
+ add("Fly Reporting","Consulta y descarga el reporte diario en Marketing.","marketing");
+ }catch{if(version===supervisorMarketingVersion&&canLoad)status.textContent="Fly Marketing: no fue posible consultar estadísticas.";}
+}
 function renderFlyAgents(){
  if(!canLoad)return;
  const current=Date.now(),r=flyInsightsAt(current);
+ if(activeView==="fly")void renderFlySupervisor(r);
  const review=$("fly-review-list"),tasks=$("fly-followup-list"),performance=$("fly-performance"),home=$("fly-home-alerts");
  if(!review||!tasks||!performance||!home)return;
  $("fly-review-count").textContent=r.newCandidates.length+" por revisar";
