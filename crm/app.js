@@ -519,6 +519,24 @@ async function marketingCandidateCount(r){
  const result=await db.from("cl360_candidates").select("id",{count:"exact",head:true}).eq("workspace_id",WS).gte("created_at",from).lt("created_at",until).eq("campaign_attribution->>utm_source","meta").eq("campaign_attribution->>utm_medium","paid_social").eq("campaign_attribution->>utm_campaign",alias);
  return result.error?null:result.count;
 }
+async function marketingFunnelCounts(r){
+ const alias=marketingPilotAlias[r.external_campaign_id];if(!alias)return null;
+ const end=new Date(r.period_end+"T00:00:00Z");end.setUTCDate(end.getUTCDate()+1);
+ const from=r.period_start+"T00:00:00-06:00",until=end.toISOString().slice(0,10)+"T00:00:00-06:00";
+ const types=["landing_view","cta_click","chat_start"];
+ const results=await Promise.all(types.map(type=>db.from("cl360_funnel_events").select("visit_id",{count:"exact",head:true}).eq("workspace_id",WS).eq("campaign",alias).eq("event_type",type).gte("created_at",from).lt("created_at",until)));
+ return results.map(x=>x.error?null:x.count);
+}
+function appendMarketingFunnel(card,r,counts,candidatesCount){
+ if(!counts)return;
+ const section=document.createElement("section");section.style.cssText="margin-top:16px;border:1px solid #dce6f1;border-radius:12px;padding:16px";
+ const title=document.createElement("h3");title.textContent="Embudo de reclutamiento · visitas autorizadas";section.append(title);
+ const names=["Visitas","Clics en postularse","Interacciones con Andy","Postulaciones atribuidas"];
+ const values=[...counts,candidatesCount],max=Math.max(1,...values.filter(x=>x!=null));
+ names.forEach((name,i)=>{const row=document.createElement("div");row.style.cssText="margin:12px 0";const label=document.createElement("div");label.style.cssText="display:flex;justify-content:space-between;gap:8px";const a=document.createElement("span"),b=document.createElement("strong");a.textContent=name;b.textContent=values[i]==null?"—":String(values[i]);label.append(a,b);row.append(label);const track=document.createElement("div");track.style.cssText="height:10px;background:#e6edf5;border-radius:5px;overflow:hidden";const bar=document.createElement("div");bar.style.cssText="height:100%;background:#155486;border-radius:5px";bar.style.width=(values[i]==null?0:100*values[i]/max)+"%";track.append(bar);row.append(track);section.append(row);});
+ const cost=document.createElement("p");cost.textContent="Costo por interacción medida: "+(counts[2]>0&&r.spend!=null&&r.currency?(Number(r.spend)/counts[2]).toFixed(2)+" "+r.currency:"—");section.append(cost);
+ const note=document.createElement("p");note.className="small";note.textContent="Conteos independientes por fecha y UTM, no una cohorte de personas. Las visitas e interacciones requieren consentimiento; las postulaciones usan su propia atribución. Los datos pueden no coincidir. — indica dato no disponible.";section.append(note);card.append(section);
+}
 function flyMarketingAdvice(r){
  const advice=[];
  const age=Date.now()-new Date(r.synced_at).getTime();
@@ -556,7 +574,7 @@ async function loadMarketingMeta(){
  if(!rows.length){status.textContent="No hay estadísticas disponibles para esta sesión. Compás Evolution debe sincronizar las campañas asignadas; si persiste, verifica los permisos.";return;}
  status.textContent="Estadísticas de Meta Ads · resumen de siete días por campaña. El periodo de postulaciones se controla por separado.";
  for(const r of rows){
- const count=await marketingCandidateCount(r);
+ const [count,funnel]=await Promise.all([marketingCandidateCount(r),marketingFunnelCounts(r)]);
  if(version!==marketingMetaVersion)return;
  const card=document.createElement("article");card.style.cssText="grid-column:1/-1;border:1px solid #dce6f1;border-radius:12px;padding:16px";
  const title=document.createElement("h3");title.textContent=r.campaign_name;card.append(title);
@@ -567,7 +585,7 @@ async function loadMarketingMeta(){
  values.push(["Registros atribuidos por UTM",fmt(count)],["Costo por registro atribuido",count>0&&r.spend!=null&&r.currency?(Number(r.spend)/count).toLocaleString("es-MX",{minimumFractionDigits:2,maximumFractionDigits:2})+" "+r.currency:"—"]);
  const grid=document.createElement("div");grid.style.cssText="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px";
  for(const [label,value] of values){const cell=document.createElement("div");const l=document.createElement("div");l.className="small";l.textContent=label;const v=document.createElement("strong");v.textContent=value;v.style.cssText="font-size:1.4rem;display:block";cell.append(l,v);grid.append(cell);}
- card.append(grid);appendFlyMarketingAdvice(card,r);panel.append(card);
+ card.append(grid);appendMarketingFunnel(card,r,funnel,count);appendFlyMarketingAdvice(card,r);panel.append(card);
  }
  }catch{if(version===marketingMetaVersion)status.textContent="No fue posible consultar las estadísticas asignadas. Consulta con Compás Evolution.";}
 }
