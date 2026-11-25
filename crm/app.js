@@ -303,16 +303,16 @@ async function renderFlySupervisor(r){
 }
 function mountAndyExecutive(){
  if(!canLoad)return;
- const review=$("fly-review-list"),view=review?.closest("[data-view]");if(!view||$("andy-executive"))return;
+ const view=$("view-executive");if(!view||$("andy-executive"))return;
  const panel=document.createElement("section");panel.className="panel";panel.id="andy-executive";
  const title=document.createElement("h2");title.textContent="Andy Executive · Asistente privado";panel.append(title);
  const intro=document.createElement("p");intro.className="small";intro.textContent="Consulta indicadores del CRM mediante preguntas predefinidas y variantes de lenguaje natural. Solo lectura; no envía datos a modelos externos.";panel.append(intro);
- const log=document.createElement("div");log.setAttribute("role","log");log.setAttribute("aria-live","polite");log.style.cssText="max-height:340px;overflow:auto;padding:12px;background:#f2f6fb;border-radius:12px";
- const bubble=(who,message)=>{const row=document.createElement("div");row.style.cssText="margin:8px 0;padding:10px;border-radius:10px;background:"+(who==="Tú"?"#e0ecfa":"white");const label=document.createElement("strong");label.textContent=who;const body=document.createElement("p");body.style.whiteSpace="pre-wrap";body.textContent=message;row.append(label,body);log.append(row);while(log.children.length>20)log.firstChild.remove();log.scrollTop=log.scrollHeight;};
+ const log=document.createElement("div");log.setAttribute("role","log");log.setAttribute("aria-live","polite");log.style.cssText="height:clamp(280px,52vh,650px);overflow:auto;padding:16px;background:#f2f6fb;border-radius:12px";
+ const bubble=(who,message)=>{const row=document.createElement("div");row.style.cssText="margin:10px 0;padding:12px;border-radius:14px;max-width:88%;overflow-wrap:anywhere;background:"+(who==="Tú"?"#e0ecfa;margin-left:auto":"white;margin-right:auto");const label=document.createElement("strong");label.textContent=who;const body=document.createElement("p");body.style.whiteSpace="pre-wrap";body.textContent=message;row.append(label,body);log.append(row);while(log.children.length>20)log.firstChild.remove();log.scrollTop=log.scrollHeight;};
  bubble("Andy Executive","Hola. Puedo ayudarte a revisar tus prioridades, candidatos, conversaciones, publicidad y resultados de los últimos siete días.");
  const form=document.createElement("form");form.style.cssText="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap";
- const input=document.createElement("input");input.className="field";input.placeholder="¿Qué pendientes tengo hoy?";input.setAttribute("aria-label","Pregunta para Andy Executive");input.maxLength=240;input.required=true;input.style.flex="1 1 200px";
- const send=document.createElement("button");send.className="btn yellow";send.type="submit";send.textContent="Preguntar";form.append(input,send);
+ const input=document.createElement("input");input.className="field";input.placeholder="Escribe tu pregunta a Andy Executive…";input.setAttribute("aria-label","Pregunta para Andy Executive");input.maxLength=240;input.required=true;input.style.flex="1 1 200px";
+ const send=document.createElement("button");send.className="btn yellow";send.type="submit";send.textContent="Enviar";form.append(input,send);
  const shortcuts=document.createElement("div");shortcuts.style.cssText="display:flex;flex-wrap:wrap;gap:6px;margin:12px 0";
  let busy=false;
  const ask=async(question)=>{
@@ -339,12 +339,12 @@ function mountAndyExecutive(){
  };
  for(const question of ["¿Qué pendientes tengo hoy?","¿Qué candidatos no he contactado?","¿Hay conversaciones pendientes?","¿Cómo va mi publicidad?","¿Qué seguimientos están vencidos?","¿Qué resultados tuve esta semana?"]){const b=document.createElement("button");b.className="btn ghost";b.type="button";b.textContent=question;b.onclick=()=>void ask(question);shortcuts.append(b);}
  form.onsubmit=e=>{e.preventDefault();if(busy)return;const q=input.value.trim();if(q){input.value="";void ask(q);}};
- const clear=document.createElement("button");clear.type="button";clear.className="btn ghost";clear.textContent="Limpiar chat";clear.onclick=()=>{if(!busy)log.replaceChildren();};panel.append(shortcuts,log,form,clear);view.prepend(panel);
+ const clear=document.createElement("button");clear.type="button";clear.className="btn ghost";clear.textContent="Limpiar chat";clear.onclick=()=>{if(!busy)log.replaceChildren();};panel.append(log,form,shortcuts,clear);view.prepend(panel);
 }
 function renderFlyAgents(){
  if(!canLoad)return;
  const current=Date.now(),r=flyInsightsAt(current);
- if(activeView==="fly"){void renderFlySupervisor(r);mountAndyExecutive();}
+ if(activeView==="fly")void renderFlySupervisor(r);
  const review=$("fly-review-list"),tasks=$("fly-followup-list"),performance=$("fly-performance"),home=$("fly-home-alerts");
  if(!review||!tasks||!performance||!home)return;
  $("fly-review-count").textContent=r.newCandidates.length+" por revisar";
@@ -569,8 +569,10 @@ $("search").addEventListener("input",renderCandidates);$("filter-stage").addEven
 /* App navigation, pipeline and internal conversations */
 const appViews={
  inicio:"Centro de operaciones",vacantes:"Vacantes",candidatos:"Candidatos",pipeline:"Pipeline de reclutamiento",
- conversaciones:"Mensajes y atención humana",seguimientos:"Seguimientos",fly:"Andy · Compás Fly",marketing:"Marketing y campañas",ajustes:"Configuración"
+ conversaciones:"Mensajes y atención humana",seguimientos:"Seguimientos",fly:"Andy · Compás Fly",executive:"Andy Executive",marketing:"Marketing y campañas",ajustes:"Configuración"
 };
+
+(()=>{const settings=$("view-ajustes");if(!settings)return;const nav=document.querySelector('[data-nav="fly"]');if(nav){const b=document.createElement("button");b.type="button";b.className="nav-item";b.dataset.nav="executive";b.innerHTML='<span class="nav-icon" aria-hidden="true">✦</span> Andy Executive';nav.after(b);}const view=document.createElement("section");view.id="view-executive";view.dataset.view="executive";view.className="app-view hide";settings.before(view);})();
 
 /* Marketing: métricas de expedientes cargados, sin simulaciones ni píxel. */
 (()=>{
@@ -744,6 +746,7 @@ function navigate(view,candidateId=null,fromHistory=false){
  if(view==="conversaciones")renderInbox();
  if(view==="inicio"){renderHome();renderFlyAgents();}
  if(view==="fly")renderFlyAgents();
+ if(view==="executive")mountAndyExecutive();
  if(view==="marketing"){renderMarketing();void loadMarketingMeta();}
  if(view==="ajustes")$("settings-user").textContent=(user?.email||"Cuenta autorizada")+" · "+(staffRole||"");
  document.title=appViews[view]+" · Conexión Laboral 360";
