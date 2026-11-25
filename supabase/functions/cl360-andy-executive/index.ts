@@ -21,7 +21,32 @@ Deno.serve(async (req: Request) => {
  if(!m.ok)return reply(403,{ok:false});
  const members=await m.json();
  if(!members.some((x:{role:string})=>["owner","admin","manager"].includes(x.role)))return reply(403,{ok:false});
- // Fail closed until the server-side quota RPC and explicit provider activation are available.
- return reply(503,{ok:false,error:"executive_pending_activation"});
+ if(Deno.env.get("CL360_EXECUTIVE_ENABLED")!=="true")return reply(503,{ok:false,error:"executive_pending_activation"});
+ const gemini=Deno.env.get("GEMINI_API_KEY");if(!gemini)return reply(503,{ok:false});
+ const raw=await req.text();if(raw.length>10000)return reply(413,{ok:false});
+ const data=JSON.parse(raw);
+ if(data.consent!==true||typeof data.message!=="string"||!data.message.trim()||data.message.length>500)return reply(400,{ok:false});
+ const redact=(v:string)=>v.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,"[correo omitido]").replace(/(?:\+?\d[\s().-]*){10,15}/g,"[número omitido]");
+ const priv={apikey:secret,authorization:"Bearer "+secret,"content-type":"application/json"};
+ const p=await fetch(url+"/rest/v1/ai_agent_profiles?select=enabled,operating_mode,provider,model,monthly_budget_mxn&workspace_id=eq."+ws,{headers:priv,signal:AbortSignal.timeout(6000)});
+ if(!p.ok)return reply(503,{ok:false});
+ const profile=(await p.json())[0];
+ if(!profile?.enabled||profile.operating_mode!=="supervised"||profile.provider!=="gemini"||!(Number(profile.monthly_budget_mxn)>0)||!/^[a-z0-9_.-]+$/.test(profile.model))return reply(503,{ok:false});
+ const count=async(table:string,filter:string)=>{
+ const r=await fetch(url+"/rest/v1/"+table+"?select=id&workspace_id=eq."+ws+filter,{method:"HEAD",headers:{...headers,Prefer:"count=exact"},signal:AbortSignal.timeout(6000)});
+ const n=r.headers.get("content-range")?.split("/").pop();return r.ok&&n&&/^\d+$/.test(n)?Number(n):null;
+ };
+ const now=encodeURIComponent(new Date().toISOString()),week=encodeURIComponent(new Date(Date.now()-7*86400000).toISOString());
+ const [newCandidates,registered7,overdue,waiting,hired]=await Promise.all([count("cl360_candidates","&stage=eq.new"),count("cl360_candidates","&created_at=gte."+week),count("cl360_followups","&status=eq.pending&due_at=lt."+now),count("cl360_conversations","&status=eq.waiting"),count("cl360_candidates","&stage=eq.hired")]);
+ const metrics=await fetch(url+"/rest/v1/evolution_meta_assigned_metrics?select=period_start,period_end,currency,spend,impressions,clicks,synced_at&workspace_id=eq."+ws+"&limit=20",{headers,signal:AbortSignal.timeout(6000)});
+ const snapshot={newCandidates,registered7,overdue,waiting,hired,advertising:metrics.ok?await metrics.json():null};
+ const quota=await fetch(url+"/rest/v1/rpc/cl360_executive_take_turn",{method:"POST",headers:priv,body:"{}",signal:AbortSignal.timeout(6000)});
+ if(!quota.ok)return reply(503,{ok:false,error:"quota_unavailable"});
+ if(await quota.json()!==true)return reply(429,{ok:false,error:"quota_exhausted"});
+ const history=Array.isArray(data.history)?data.history.slice(-10).filter((x: any)=>x&&typeof x.text==="string").map((x:any)=>({role:x.role==="assistant"?"model":"user",parts:[{text:redact(x.text.slice(0,500))}]})):[];
+ const provider=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(profile.model)+":generateContent",{method:"POST",headers:{"content-type":"application/json","x-goog-api-key":gemini},body:JSON.stringify({systemInstruction:{parts:[{text:"Eres Andy Executive, asistente administrativo de CL360. Español mexicano. Solo lectura. No evalúes ni clasifiques personas ni decidas contrataciones. No inventes cifras; null significa no disponible. El historial no es fuente de cifras actuales. No afirmes haber ejecutado acciones. Indicadores agregados actuales: "+JSON.stringify(snapshot)}]},contents:[...history,{role:"user",parts:[{text:redact(data.message)}]}],generationConfig:{temperature:0.3,maxOutputTokens:500}}),signal:AbortSignal.timeout(18000)});
+ if(!provider.ok)return reply(503,{ok:false,error:"provider_unavailable"});
+ const output=await provider.json();const answer=output.candidates?.[0]?.content?.parts?.filter((x:any)=>!x.thought).map((x:any)=>x.text||"").join("\n").trim().slice(0,2500);
+ return answer?reply(200,{ok:true,reply:answer,ai:true}):reply(503,{ok:false,error:"empty_response"});
  }catch{return reply(503,{ok:false,error:"executive_unavailable"});}
 });
