@@ -301,10 +301,50 @@ async function renderFlySupervisor(r){
  add("Fly Reporting","Consulta y descarga el reporte diario en Marketing.","marketing");
  }catch{if(version===supervisorMarketingVersion&&canLoad)status.textContent="Fly Marketing: no fue posible consultar estadísticas.";}
 }
+function mountAndyExecutive(){
+ if(!canLoad)return;
+ const review=$("fly-review-list"),view=review?.closest("[data-view]");if(!view||$("andy-executive"))return;
+ const panel=document.createElement("section");panel.className="panel";panel.id="andy-executive";
+ const title=document.createElement("h2");title.textContent="Andy Executive · Asistente privado";panel.append(title);
+ const intro=document.createElement("p");intro.className="small";intro.textContent="Consulta indicadores del CRM mediante preguntas predefinidas y variantes de lenguaje natural. Solo lectura; no envía datos a modelos externos.";panel.append(intro);
+ const log=document.createElement("div");log.setAttribute("role","log");log.setAttribute("aria-live","polite");log.style.cssText="max-height:340px;overflow:auto;padding:12px;background:#f2f6fb;border-radius:12px";
+ const bubble=(who,message)=>{const row=document.createElement("div");row.style.cssText="margin:8px 0;padding:10px;border-radius:10px;background:"+(who==="Tú"?"#e0ecfa":"white");const label=document.createElement("strong");label.textContent=who;const body=document.createElement("p");body.style.whiteSpace="pre-wrap";body.textContent=message;row.append(label,body);log.append(row);while(log.children.length>20)log.firstChild.remove();log.scrollTop=log.scrollHeight;};
+ bubble("Andy Executive","Hola. Puedo ayudarte a revisar tus prioridades, candidatos, conversaciones, publicidad y resultados de los últimos siete días.");
+ const form=document.createElement("form");form.style.cssText="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap";
+ const input=document.createElement("input");input.className="field";input.placeholder="¿Qué pendientes tengo hoy?";input.setAttribute("aria-label","Pregunta para Andy Executive");input.maxLength=240;input.required=true;input.style.flex="1 1 200px";
+ const send=document.createElement("button");send.className="btn yellow";send.type="submit";send.textContent="Preguntar";form.append(input,send);
+ const shortcuts=document.createElement("div");shortcuts.style.cssText="display:flex;flex-wrap:wrap;gap:6px;margin:12px 0";
+ let busy=false;
+ const ask=async(question)=>{
+ if(busy||!canLoad||!question.trim())return;busy=true;send.disabled=true;bubble("Tú",question);
+ const q=question.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+ const now=Date.now(),r=flyInsightsAt(now);let answer="",target=null;
+ const day=new Intl.DateTimeFormat("en-CA",{timeZone:"America/Mexico_City",year:"numeric",month:"2-digit",day:"2-digit"});
+ const today=followups.filter(f=>f.status==="pending"&&Date.parse(f.due_at)>=now&&day.format(new Date(f.due_at))===day.format(now)).length;
+ try{
+ if(/publicidad|campana|marketing|meta|anuncio|inversion/.test(q)){
+ target="marketing";const result=await db.from("evolution_meta_assigned_metrics").select("campaign_name,period_start,period_end,spend,currency,impressions,clicks,synced_at").eq("workspace_id",WS);
+ if(result.error||!result.data?.length)answer="No tengo estadísticas publicitarias disponibles. Revisa sincronización y permisos en Marketing.";
+ else answer=result.data.map(x=>x.campaign_name+" · "+x.period_start+" a "+x.period_end+"\nInversión: "+(x.spend==null?"No disponible":x.spend+" "+(x.currency||""))+" · Impresiones: "+(x.impressions??"No disponible")+" · Clics: "+(x.clicks??"No disponible")+"\n"+(Date.now()-Date.parse(x.synced_at)>3*3600000?"Sincronización desactualizada; revisa Compás Evolution.":"Consulta el embudo en Marketing.")).join("\n\n");
+ }else if(/semana|resultados|rendimiento/.test(q)){target="fly";answer="Últimos siete días: "+r.registered7+" postulaciones registradas. Actualmente hay "+r.activeCount+" candidatos en proceso y "+r.hiredCount+" contrataciones registradas en total (no necesariamente de esta semana).";}
+ else if(/conversacion|mensaje|bandeja/.test(q)){target="conversaciones";answer=conversationsLoadError?"No puedo consultar la bandeja actualmente.":"En la bandeja cargada hay "+threads.filter(t=>t.status==="waiting").length+" conversaciones en espera y "+threads.filter(t=>t.status==="human").length+" tomadas por una persona.";}
+ else if(/atrasad|vencid/.test(q)){target="seguimientos";answer="Hay "+r.overdue.length+" seguimientos vencidos. Revisa primero los más antiguos en la agenda.";}
+ else if(/candidato|contactad|contacto/.test(q)){target="candidatos";answer="Hay "+r.newCandidates.length+" expedientes en etapa nueva. Revisa el primer contacto antes de cambiar su estado.";}
+ else if(/pendiente|hoy|agenda|prioridad|seguimiento|entrevista/.test(q)){target="seguimientos";answer="Prioridades de hoy: "+r.overdue.length+" seguimientos vencidos, "+today+" tareas pendientes para el resto del día y "+r.newCandidates.length+" expedientes nuevos. Revisa primero los vencimientos y luego las conversaciones en espera.";}
+ else answer="Todavía no puedo responder esa pregunta. Prueba con pendientes de hoy, candidatos sin contactar, conversaciones, publicidad o resultados de la semana.";
+ if(!canLoad||!panel.isConnected)return;
+ bubble("Andy Executive",answer+"\n\nDatos disponibles en el CRM; los conteos locales pueden estar limitados a los registros cargados.");
+ if(target){const b=document.createElement("button");b.className="btn ghost";b.type="button";b.textContent="Abrir módulo relacionado";b.onclick=()=>navigate(target);log.lastChild.append(b);}
+ }catch{if(canLoad&&panel.isConnected)bubble("Andy Executive","No pude consultar los datos. Intenta actualizar el CRM.");}finally{busy=false;send.disabled=false;}
+ };
+ for(const question of ["¿Qué pendientes tengo hoy?","¿Qué candidatos no he contactado?","¿Hay conversaciones pendientes?","¿Cómo va mi publicidad?","¿Qué seguimientos están vencidos?","¿Qué resultados tuve esta semana?"]){const b=document.createElement("button");b.className="btn ghost";b.type="button";b.textContent=question;b.onclick=()=>void ask(question);shortcuts.append(b);}
+ form.onsubmit=e=>{e.preventDefault();if(busy)return;const q=input.value.trim();if(q){input.value="";void ask(q);}};
+ const clear=document.createElement("button");clear.type="button";clear.className="btn ghost";clear.textContent="Limpiar chat";clear.onclick=()=>{if(!busy)log.replaceChildren();};panel.append(shortcuts,log,form,clear);view.prepend(panel);
+}
 function renderFlyAgents(){
  if(!canLoad)return;
  const current=Date.now(),r=flyInsightsAt(current);
- if(activeView==="fly")void renderFlySupervisor(r);
+ if(activeView==="fly"){void renderFlySupervisor(r);mountAndyExecutive();}
  const review=$("fly-review-list"),tasks=$("fly-followup-list"),performance=$("fly-performance"),home=$("fly-home-alerts");
  if(!review||!tasks||!performance||!home)return;
  $("fly-review-count").textContent=r.newCandidates.length+" por revisar";
