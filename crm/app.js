@@ -507,6 +507,31 @@ const appViews={
  }
 })();
 let marketingMetaVersion=0;
+function flyMarketingAdvice(r){
+ const advice=[];
+ const age=Date.now()-new Date(r.synced_at).getTime();
+ if(!Number.isFinite(age)||age>4*3600000)advice.push(["Actualización pendiente","Revisa la sincronización con Compás Evolution; el resumen no es reciente."]);
+ if(r.spend==null||r.impressions==null||r.clicks==null){
+  advice.push(["Sin datos suficientes","Meta todavía no ha devuelto todas las métricas. Verifica la entrega del anuncio antes de evaluar su rendimiento."]);
+ }else{
+  const spend=Number(r.spend),impressions=Number(r.impressions),clicks=Number(r.clicks);
+  if(impressions===0)advice.push(["Sin impresiones registradas","Comprueba aprobación, fechas y entrega en Meta Ads."]);
+  if(clicks>0&&Number.isFinite(spend))advice.push(["Costo por clic (todos)",(spend/clicks).toLocaleString("es-MX",{maximumFractionDigits:2,minimumFractionDigits:2})+" "+(r.currency||"")+" por clic registrado. No equivale a costo por visita ni por candidato."]);
+  if(impressions>0&&clicks===0)advice.push(["Sin clics registrados","Revisa el anuncio y su llamada a la acción; no cambies el presupuesto basándote únicamente en esta cifra."]);
+ }
+ advice.push(["Medición de candidatos","El costo por candidato requiere vincular el identificador de Meta con la atribución de Andy y comparar el mismo periodo."]);
+ return advice;
+}
+function appendFlyMarketingAdvice(card,r){
+ const section=document.createElement("section");section.style.cssText="margin-top:16px;padding:14px;border-radius:12px;background:#f2f6fb";
+ const heading=document.createElement("h3");heading.textContent="Fly Marketing · análisis inicial";section.append(heading);
+ for(const [title,detail] of flyMarketingAdvice(r)){
+ const item=document.createElement("div");item.style.cssText="margin:10px 0";
+ const label=document.createElement("strong");label.textContent=title;
+ const text=document.createElement("p");text.className="small";text.textContent=detail;item.append(label,text);section.append(item);
+ }
+ const note=document.createElement("p");note.className="small";note.textContent="Diagnóstico por reglas, solo lectura. No modifica campañas ni presupuestos.";section.append(note);card.append(section);
+}
 async function loadMarketingMeta(){
  const status=$("marketing-meta-status"),panel=$("marketing-meta-metrics");if(!status||!panel||!canLoad)return;
  const version=++marketingMetaVersion;
@@ -527,7 +552,7 @@ async function loadMarketingMeta(){
  const values=[["Inversión real",money],["Impresiones",fmt(r.impressions)],["Clics (todos)",fmt(r.clicks)],["CTR (todos)",r.clicks!=null&&Number(r.impressions)>0?(100*Number(r.clicks)/Number(r.impressions)).toFixed(2)+"%":"—"]];
  const grid=document.createElement("div");grid.style.cssText="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px";
  for(const [label,value] of values){const cell=document.createElement("div");const l=document.createElement("div");l.className="small";l.textContent=label;const v=document.createElement("strong");v.textContent=value;v.style.cssText="font-size:1.4rem;display:block";cell.append(l,v);grid.append(cell);}
- card.append(grid);panel.append(card);
+ card.append(grid);appendFlyMarketingAdvice(card,r);panel.append(card);
  }
  }catch{if(version===marketingMetaVersion)status.textContent="No fue posible consultar las estadísticas asignadas. Consulta con Compás Evolution.";}
 }
