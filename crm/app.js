@@ -507,6 +507,18 @@ const appViews={
  }
 })();
 let marketingMetaVersion=0;
+// Explicit pilot mapping: the UTM alias is not a Meta campaign ID.
+const marketingPilotAlias={"120248808734660436":"guardias_seguridad"};
+async function marketingCandidateCount(r){
+ const alias=marketingPilotAlias[r.external_campaign_id];
+ if(!alias)return null;
+ // Count distinct CRM records created in the corresponding Mexico City dates.
+ const from=r.period_start+"T00:00:00-06:00";
+ const end=new Date(r.period_end+"T00:00:00Z");end.setUTCDate(end.getUTCDate()+1);
+ const until=end.toISOString().slice(0,10)+"T00:00:00-06:00";
+ const result=await db.from("cl360_candidates").select("id",{count:"exact",head:true}).eq("workspace_id",WS).gte("created_at",from).lt("created_at",until).eq("campaign_attribution->>utm_source","meta").eq("campaign_attribution->>utm_medium","paid_social").eq("campaign_attribution->>utm_campaign",alias);
+ return result.error?null:result.count;
+}
 function flyMarketingAdvice(r){
  const advice=[];
  const age=Date.now()-new Date(r.synced_at).getTime();
@@ -519,7 +531,7 @@ function flyMarketingAdvice(r){
   if(clicks>0&&Number.isFinite(spend))advice.push(["Costo por clic (todos)",(spend/clicks).toLocaleString("es-MX",{maximumFractionDigits:2,minimumFractionDigits:2})+" "+(r.currency||"")+" por clic registrado. No equivale a costo por visita ni por candidato."]);
   if(impressions>0&&clicks===0)advice.push(["Sin clics registrados","Revisa el anuncio y su llamada a la acción; no cambies el presupuesto basándote únicamente en esta cifra."]);
  }
- advice.push(["Medición de candidatos","El costo por candidato requiere vincular el identificador de Meta con la atribución de Andy y comparar el mismo periodo."]);
+ advice.push(["Medición de candidatos","El costo por registro atribuido es orientativo: usa etiquetas UTM y fecha de creación del expediente, no conversiones verificadas por Meta."]);
  return advice;
 }
 function appendFlyMarketingAdvice(card,r){
@@ -544,12 +556,15 @@ async function loadMarketingMeta(){
  if(!rows.length){status.textContent="No hay estadísticas disponibles para esta sesión. Compás Evolution debe sincronizar las campañas asignadas; si persiste, verifica los permisos.";return;}
  status.textContent="Estadísticas de Meta Ads · resumen de siete días por campaña. El periodo de postulaciones se controla por separado.";
  for(const r of rows){
+ const count=await marketingCandidateCount(r);
+ if(version!==marketingMetaVersion)return;
  const card=document.createElement("article");card.style.cssText="grid-column:1/-1;border:1px solid #dce6f1;border-radius:12px;padding:16px";
  const title=document.createElement("h3");title.textContent=r.campaign_name;card.append(title);
  const meta=document.createElement("p");meta.className="small";meta.textContent=r.period_start+" a "+r.period_end+" · Actualizado: "+new Date(r.synced_at).toLocaleString("es-MX");card.append(meta);
  const money=r.spend==null?"—":Number(r.spend).toLocaleString("es-MX",{minimumFractionDigits:2,maximumFractionDigits:2})+" "+(r.currency||"moneda sin confirmar");
  const fmt=v=>v==null?"—":Number(v).toLocaleString("es-MX");
  const values=[["Inversión real",money],["Impresiones",fmt(r.impressions)],["Clics (todos)",fmt(r.clicks)],["CTR (todos)",r.clicks!=null&&Number(r.impressions)>0?(100*Number(r.clicks)/Number(r.impressions)).toFixed(2)+"%":"—"]];
+ values.push(["Registros atribuidos por UTM",fmt(count)],["Costo por registro atribuido",count>0&&r.spend!=null&&r.currency?(Number(r.spend)/count).toLocaleString("es-MX",{minimumFractionDigits:2,maximumFractionDigits:2})+" "+r.currency:"—"]);
  const grid=document.createElement("div");grid.style.cssText="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px";
  for(const [label,value] of values){const cell=document.createElement("div");const l=document.createElement("div");l.className="small";l.textContent=label;const v=document.createElement("strong");v.textContent=value;v.style.cssText="font-size:1.4rem;display:block";cell.append(l,v);grid.append(cell);}
  card.append(grid);appendFlyMarketingAdvice(card,r);panel.append(card);
