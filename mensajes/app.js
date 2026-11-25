@@ -5,7 +5,7 @@ const db=window.supabase?.createClient(URL,KEY,{auth:{persistSession:true,autoRe
 const $=id=>document.getElementById(id);
 const fmt=s=>s?new Date(s).toLocaleString("es-MX",{dateStyle:"short",timeStyle:"short"}):"—";
 const statusNames={waiting:"Pendiente",bot:"Andy",human:"Atención humana",closed:"Cerrada"};
-let user=null,threads=[],candidates=[],jobs=[],previews=[],activeId=null,loading=false,installPrompt=null,refreshTimer=null;
+let user=null,threads=[],candidates=[],jobs=[],previews=[],activeId=null,loading=false,installPrompt=null,refreshTimer=null,messengerReadError=false;
 const candidate=id=>candidates.find(c=>c.id===id);
 const job=slug=>jobs.find(j=>j.slug===slug)?.title||slug||"Postulación";
 const phone=p=>{const digits=String(p||"").replace(/\D/g,"");return digits.length===10?"52"+digits:digits;};
@@ -35,15 +35,23 @@ async function refresh(silent=false){
  if(!user||loading)return;
  loading=true;$("refresh").disabled=true;
  if(!silent)$("count").textContent="Actualizando conversaciones…";
- const [t,c,j,m]=await Promise.all([
+ const [t,c,j,m,fb]=await Promise.all([
   db.from("cl360_conversations").select("id,candidate_id,status,handler_id,last_message_at,fly_session_hash,live_chat_enabled").eq("workspace_id",WS).order("last_message_at",{ascending:false}).limit(300),
   db.from("cl360_candidates").select("id,full_name,phone,job_slug,stage").eq("workspace_id",WS).limit(500),
   db.from("cl360_jobs").select("slug,title").eq("workspace_id",WS).limit(100),
-  db.from("cl360_chat_messages").select("conversation_id,source,visibility,body,created_at").eq("workspace_id",WS).order("created_at",{ascending:false}).limit(500)
+  db.from("cl360_chat_messages").select("conversation_id,source,visibility,body,created_at").eq("workspace_id",WS).order("created_at",{ascending:false}).limit(500),
+  db.rpc("cl360_messenger_inbox")
  ]);
  loading=false;$("refresh").disabled=false;
  if(t.error||c.error||j.error){$("count").textContent="Error al cargar. Pulsa ↻ para reintentar.";return;}
+ messengerReadError=!!fb.error;
  threads=t.data||[];candidates=c.data||[];jobs=j.data||[];previews=m.error?[]:(m.data||[]);
+ for(const x of fb.data||[]){
+  const id="messenger:"+x.id;
+  threads.push({id,externalId:x.id,channel:"messenger",candidate_id:id,status:x.status==="closed"?"closed":x.assigned_user_id?"human":"waiting",handler_id:x.assigned_user_id,last_message_at:x.last_message_at});
+  candidates.push({id,full_name:x.display_name||"Contacto de Facebook",job_slug:"Facebook Messenger"});
+  if(x.last_message_preview)previews.push({conversation_id:id,source:"candidate",visibility:"candidate",body:x.last_message_preview});
+ }
  renderThreads();
  if(activeId&&threads.some(x=>x.id===activeId))await openConversation(activeId,false,true);
  else if(activeId){activeId=null;setActiveChat(false);$("conversation-section").classList.add("hidden-mobile");$("inbox-section").classList.remove("hidden-mobile");}
@@ -64,7 +72,7 @@ function renderThreads(){
   const allowed=filter==="all"||filter==="human"?(filter==="all"||(t.status==="human"&&t.handler_id===user?.id)):t.status===filter;
   return allowed&&(!q||String(c?.full_name||"").toLocaleLowerCase("es-MX").includes(q)||job(c?.job_slug).toLocaleLowerCase("es-MX").includes(q)||(digits.length>=3&&String(c?.phone||"").replace(/\D/g,"").includes(digits)));
  }).sort((a,b)=>{const priority=t=>t.status==="waiting"?0:t.status==="human"&&t.handler_id===user?.id?1:t.status==="bot"?2:t.status==="human"?3:4;return priority(a)-priority(b)||new Date(b.last_message_at||0)-new Date(a.last_message_at||0);});
- $("count").textContent=filtered.length+" "+(filtered.length===1?"conversación":"conversaciones");
+ $("count").textContent=filtered.length+" "+(filtered.length===1?"conversación":"conversaciones")+(messengerReadError?" · Messenger no disponible":"");
  const waiting=threads.filter(t=>t.status==="waiting").length;
  const counts={all:threads.length,waiting,human:threads.filter(t=>t.status==="human"&&t.handler_id===user?.id).length,bot:threads.filter(t=>t.status==="bot").length,closed:threads.filter(t=>t.status==="closed").length};
  document.querySelectorAll("[data-filter]").forEach(button=>{const type=button.dataset.filter;const name={all:"Todos",waiting:"Pendientes",human:"Mis chats",bot:"Andy",closed:"Cerrados"}[type];if(name)button.textContent=name+" ("+counts[type]+")";});
@@ -90,7 +98,7 @@ function renderThreads(){
    (m.source==="candidate"||m.source==="fly"||(m.source==="staff"&&m.visibility==="candidate")));
   if(last){
    const preview=document.createElement("span");preview.className="thread-preview";
-   const who=document.createElement("span");who.className="preview-author";who.textContent=last.source==="candidate"?"Candidato: ":last.source==="fly"?"Andy: ":"Astrid: ";
+   const who=document.createElement("span");who.className="preview-author";who.textContent=t.channel==="messenger"?"Messenger: ":last.source==="candidate"?"Candidato: ":last.source==="fly"?"Andy: ":"Astrid: ";
    preview.append(who,document.createTextNode(last.body||""));info.append(preview);
   }
   const state=document.createElement("span");state.className="state "+t.status;state.textContent=statusNames[t.status]||t.status;info.append(state);
@@ -99,6 +107,11 @@ function renderThreads(){
 }
 function updateComposer(){
  const t=threads.find(x=>x.id===activeId),c=t&&candidate(t.candidate_id);
+ if(t?.channel==="messenger"){
+  $("reply").disabled=true;$("copy").disabled=true;$("send-inapp").disabled=true;
+  const wa=$("send-whatsapp");wa.removeAttribute("href");wa.classList.add("disabled-link");wa.setAttribute("aria-disabled","true");
+  $("channel-state").textContent="· Facebook Messenger";$("reply-hint").textContent="Historial de Messenger disponible. El envío directo todavía no está habilitado.";return;
+ }
  const owner=t?.status==="human"&&t.handler_id===user?.id;
  const direct=!!owner&&!!t.fly_session_hash&&t.live_chat_enabled===true;
  const whatsApp=!!owner&&!!c?.phone;
@@ -128,7 +141,9 @@ async function openConversation(id,changeLayout=true,preserveDraft=false){
  $("timeline").textContent="Cargando historial…";
  $("reply").value=draft;resizeReply();updateComposer();
  if(changeLayout){$("conversation-section").classList.remove("hidden-mobile");$("inbox-section").classList.add("hidden-mobile");}
- const {data,error}=await db.from("cl360_chat_messages").select("id,source,visibility,body,created_at").eq("workspace_id",WS).eq("conversation_id",id).order("created_at",{ascending:true}).limit(150);
+ const response=t.channel==="messenger"?await db.rpc("cl360_messenger_inbox",{p_conversation:t.externalId}):await db.from("cl360_chat_messages").select("id,source,visibility,body,created_at").eq("workspace_id",WS).eq("conversation_id",id).order("created_at",{ascending:true}).limit(150);
+ const error=response.error;
+ const data=t.channel==="messenger"?(response.data||[]).map(m=>({...m,source:m.direction==="incoming"?"candidate":"staff",visibility:"candidate",body:m.body||"["+ (m.message_type||"Mensaje") +"]"})):response.data;
  if(activeId!==id)return;
  const timeline=$("timeline");timeline.replaceChildren();
  if(error||!data?.length){const p=document.createElement("p");p.className="conversation-empty";p.textContent=error?"No se pudo consultar el historial.":"Todavía no hay mensajes guardados en este expediente.";timeline.append(p);}
@@ -141,7 +156,7 @@ async function openConversation(id,changeLayout=true,preserveDraft=false){
   if(m.source==="system")return;
   const bubble=document.createElement("div");bubble.className="bubble "+(m.source==="fly"?"andy":m.source==="candidate"?"candidate":m.source==="staff"?"staff":"system");
   if(m.source==="staff"&&m.visibility==="internal")bubble.classList.add("internal-note");
-  const author=document.createElement("b");author.textContent=({fly:"Andy",candidate:"Candidato",staff:m.visibility==="candidate"?"Astrid · enviado en el chat":"Nota interna",system:"Sistema"})[m.source]||"Mensaje";
+  const author=document.createElement("b");author.textContent=({fly:"Andy",candidate:"Candidato",staff:m.visibility==="candidate"?(t.channel==="messenger"?"Página · "+(m.status||""):"Astrid · enviado en el chat"):"Nota interna",system:"Sistema"})[m.source]||"Mensaje";
   const text=document.createElement("p");text.textContent=m.body;
   const date=document.createElement("small");date.textContent=fmt(m.created_at);
   bubble.append(author,text,date);timeline.append(bubble);
@@ -174,6 +189,7 @@ function renderContext(t,messages){
 }
 function renderActions(t){
  const wrap=$("human-controls");wrap.replaceChildren();
+ if(t.channel==="messenger"){const info=document.createElement("span");info.className="control-note";info.textContent="Facebook Messenger · Consulta del historial. Responde temporalmente desde la bandeja de Meta.";wrap.append(info);updateComposer();return;}
  const c=candidate(t.candidate_id),mine=t.status==="human"&&t.handler_id===user?.id;
  const info=document.createElement("span");info.className="control-note";
  info.textContent=mine?"Tienes el control. Andy no responderá a esta conversación vinculada.":t.status==="human"?"El caso está asignado a otra persona.":t.status==="closed"?"Este caso está cerrado.":"Puedes tomar este caso para intervenir.";
@@ -232,7 +248,7 @@ $("reply").addEventListener("keydown",event=>{
 });
 $("send-inapp").addEventListener("click",async()=>{
  const t=threads.find(x=>x.id===activeId),body=$("reply").value.trim();
- if(!t||t.status!=="human"||t.handler_id!==user?.id||!t.fly_session_hash||t.live_chat_enabled!==true||!body)return;
+ if(!t||t.channel==="messenger"||t.status!=="human"||t.handler_id!==user?.id||!t.fly_session_hash||t.live_chat_enabled!==true||!body)return;
  const button=$("send-inapp");button.disabled=true;
  const {error}=await db.rpc("cl360_staff_send_candidate_message",{p_conversation:t.id,p_body:body});
  if(error){$("reply-hint").textContent=error.message?.includes("candidate_channel")?"La sesión del candidato está caducada o no vinculada; utiliza WhatsApp.":"No pude enviar el mensaje. Intenta nuevamente.";button.disabled=false;return;}
