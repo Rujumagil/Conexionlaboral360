@@ -71,7 +71,7 @@ function candidateIntakeSummary(candidate){
 const stageNames={new:"Sin contactar",contacted:"Contactado",screening:"Filtrado",interview:"Entrevista",qualified:"Calificado",hired:"Contratado",rejected:"No seleccionado",archived:"Archivado"};
 let user=null, staffRole=null, candidates=[], followups=[], jobs=[], selected=null, canLoad=false;
 const working=(msg)=>{if($("detail"))$("detail").innerHTML='<p class="loading">'+safe(msg)+'</p>'};
-function authScreen(show){if(show)$("andy-executive")?.remove();$("auth-screen").classList.toggle("hide",!show);$("dashboard").classList.toggle("hide",show);$("signout").classList.toggle("hide",show);}
+function authScreen(show){if(show){$("andy-executive")?.remove();browserReminderEnabled=false;executiveAlertCounts={};executiveAlertOwner=null;previousReminderSignature="";$("crm-alerts-list")?.replaceChildren();}$("auth-screen").classList.toggle("hide",!show);$("dashboard").classList.toggle("hide",show);$("signout").classList.toggle("hide",show);}
 function err(error){alert(error?.message||"No se pudo completar la operación. Reintenta.");}
 async function checkFlyAvailability(){
  try{
@@ -98,7 +98,7 @@ async function checkAuth(){
   if(error||!membership||!["owner","admin","manager","sales","support"].includes(membership.role)){
     await db.auth.signOut();authScreen(true);$("login-error").textContent="Tu cuenta todavía no tiene acceso a este CRM.";return;
   }
-  user=activeUser;staffRole=membership.role;canLoad=true;navigate(viewFromLocation(),null,true);void checkFlyAvailability();$("signed").textContent=activeUser.email||"";authScreen(false);await load();
+  user=activeUser;staffRole=membership.role;canLoad=true;navigate(viewFromLocation(),null,true);void checkFlyAvailability();$("signed").textContent=activeUser.email||"";authScreen(false);await load();void pollExecutiveNotifications();
 }
 async function load(){
  if(!canLoad)return;
@@ -253,6 +253,33 @@ function renderCrmAlerts(){
   row.append(info,button);list.append(row);
  }
  if(overdue.length>10){const note=document.createElement("p");note.className="small";note.textContent="Hay "+(overdue.length-10)+" vencimientos adicionales. Revisa la agenda.";list.append(note);}
+}
+let executiveAlertRunning=false,executiveAlertOwner=null,executiveAlertCounts={};
+async function pollExecutiveNotifications(){
+ if(!canLoad||!user?.id||!["owner","admin","manager"].includes(staffRole)||executiveAlertRunning)return;
+ executiveAlertRunning=true;const owner=user.id;
+ const valid=()=>canLoad&&user?.id===owner;
+ try{
+ const count=async(table,field,value)=>{try{const result=await db.from(table).select("id",{count:"exact",head:true}).eq("workspace_id",WS).eq(field,value);return result.error?null:result.count;}catch{return null;}};
+ const [waiting,fresh]=await Promise.all([count("cl360_conversations","status","waiting"),count("cl360_candidates","stage","new")]);
+ if(!valid())return;if(executiveAlertOwner!==owner){executiveAlertOwner=owner;executiveAlertCounts={};}
+ const list=$("crm-alerts-list");if(!list)return;
+ list.querySelector("[data-executive-alerts]")?.remove();
+ const section=document.createElement("div");section.dataset.executiveAlerts="true";
+ const items=[[waiting,"Conversaciones en espera","conversaciones","waiting"],[fresh,"Candidatos nuevos","candidatos","fresh"]];
+ for(const [n,label,target,key] of items){
+ if(n==null){section.append(flyActionRow(label,"Datos no disponibles",()=>navigate(target),"Revisar"));continue;}
+ if(n>0)section.append(flyActionRow(label+" · "+n,"Pendientes actuales",()=>{navigate(target);$("crm-alerts-panel").classList.add("hide");},"Abrir"));
+ const previous=executiveAlertCounts[key];
+ if(n>0&&(previous===undefined||n>previous)&&browserReminderEnabled&&window.Notification&&Notification.permission==="granted"){
+ try{const registration=await navigator.serviceWorker?.getRegistration();if(!valid())return;
+ if(registration)await registration.showNotification("Conexión Laboral 360",{body:label+": revisa el CRM.",tag:"cl360-"+key,data:{cl360View:target},renotify:false});
+ else{const notification=new Notification("Conexión Laboral 360",{body:label+": revisa el CRM.",tag:"cl360-"+key});notification.onclick=()=>{if(valid()){window.focus();navigate(target);}notification.close();};}
+ }catch{}}
+ if(!valid())return;executiveAlertCounts[key]=n;
+ }
+ if(!valid())return;list.prepend(section);const badge=$("crm-alerts-count");const total=alertItems().length+(waiting??0)+(fresh??0);badge.hidden=!total;badge.textContent=String(total);
+ }finally{executiveAlertRunning=false;}
 }
 function maybeNotifyOverdue(){
  if(!browserReminderEnabled||!canLoad||!window.Notification||Notification.permission!=="granted")return;
@@ -869,7 +896,7 @@ $("crm-enable-notifications").addEventListener("click",async()=>{
  const permission=await Notification.requestPermission();
  if(permission!=="granted"){$("crm-notification-status").textContent="No se concedió permiso. Las alertas siguen disponibles en el CRM.";return;}
  browserReminderEnabled=true;$("crm-notification-status").textContent="Avisos activados mientras la app esté abierta. No se envían con la app cerrada.";
- previousReminderSignature="";maybeNotifyOverdue();
+ previousReminderSignature="";executiveAlertCounts={};maybeNotifyOverdue();void pollExecutiveNotifications();
 });
 
 $("inbox-filter").addEventListener("change",renderInbox);
@@ -1081,7 +1108,7 @@ async function changeConversationStatus(id,action){
 }
 
 setupCrmInstall();
-alertTimer=window.setInterval(pollDueTasks,60000);
+alertTimer=window.setInterval(async()=>{await pollDueTasks();await pollExecutiveNotifications();},60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)pollDueTasks();});
 checkAuth().catch(error=>{$("login-error").textContent="Error de conexión. Actualiza la página.";console.error(error?.message||"Error");});
 })();
