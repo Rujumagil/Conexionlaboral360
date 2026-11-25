@@ -13,6 +13,9 @@ Deno.serve(async req=>{
  const data=JSON.parse(body);
  if(!data||data.consent!==true||!["landing_view","cta_click","chat_start"].includes(data.event)||!["guardias_seguridad","unattributed"].includes(data.campaign)||typeof data.visitId!=="string"||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.visitId))return reply(400,false);
  const db=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,{auth:{persistSession:false}});
+ const quota=await db.rpc("cl360_funnel_take_quota");
+ if(quota.error)return reply(503,false);
+ if(quota.data!==true)return reply(429,false);
  const {error}=await db.from("cl360_funnel_events").insert({workspace_id:ws,visit_id:data.visitId,event_type:data.event,campaign:data.campaign});
  if(error&&error.code!=="23505")return reply(503,false);
  return reply(200,true);
