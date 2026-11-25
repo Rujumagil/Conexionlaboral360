@@ -71,7 +71,7 @@ function candidateIntakeSummary(candidate){
 const stageNames={new:"Sin contactar",contacted:"Contactado",screening:"Filtrado",interview:"Entrevista",qualified:"Calificado",hired:"Contratado",rejected:"No seleccionado",archived:"Archivado"};
 let user=null, staffRole=null, candidates=[], followups=[], jobs=[], selected=null, canLoad=false;
 const working=(msg)=>{if($("detail"))$("detail").innerHTML='<p class="loading">'+safe(msg)+'</p>'};
-function authScreen(show){$("auth-screen").classList.toggle("hide",!show);$("dashboard").classList.toggle("hide",show);$("signout").classList.toggle("hide",show);}
+function authScreen(show){if(show)$("andy-executive")?.remove();$("auth-screen").classList.toggle("hide",!show);$("dashboard").classList.toggle("hide",show);$("signout").classList.toggle("hide",show);}
 function err(error){alert(error?.message||"No se pudo completar la operación. Reintenta.");}
 async function checkFlyAvailability(){
  try{
@@ -306,17 +306,20 @@ function mountAndyExecutive(){
  const view=$("view-executive");if(!view||$("andy-executive"))return;
  const panel=document.createElement("section");panel.className="panel";panel.id="andy-executive";
  const title=document.createElement("h2");title.textContent="Andy Executive · Asistente privado";panel.append(title);
- const intro=document.createElement("p");intro.className="small";intro.textContent="Consulta indicadores del CRM mediante preguntas predefinidas y variantes de lenguaje natural. Solo lectura; no envía datos a modelos externos.";panel.append(intro);
+ const intro=document.createElement("p");intro.className="small";intro.textContent="Asistente de solo lectura. Puedes activar Gemini para preguntas abiertas: se enviarán tus preguntas, contexto reciente e indicadores agregados. No incluyas nombres ni datos personales de candidatos.";panel.append(intro);
+ const consent=document.createElement("input");consent.type="checkbox";consent.disabled=!["owner","admin","manager"].includes(staffRole);const consentLabel=document.createElement("label");consentLabel.style.cssText="display:flex;gap:8px;align-items:center;margin:12px 0";consentLabel.append(consent,document.createTextNode("Usar IA generativa (Gemini)"));panel.append(consentLabel);const mode=document.createElement("p");mode.className="small";mode.setAttribute("role","status");mode.textContent="Modo guiado";panel.append(mode);let executiveHistory=[];consent.onchange=()=>{executiveHistory=[];mode.textContent=consent.checked?"IA solicitada · pendiente de respuesta":"Modo guiado";};
  const log=document.createElement("div");log.setAttribute("role","log");log.setAttribute("aria-live","polite");log.style.cssText="height:clamp(280px,52vh,650px);overflow:auto;padding:16px;background:#f2f6fb;border-radius:12px";
  const bubble=(who,message)=>{const row=document.createElement("div");row.style.cssText="margin:10px 0;padding:12px;border-radius:14px;max-width:88%;overflow-wrap:anywhere;background:"+(who==="Tú"?"#e0ecfa;margin-left:auto":"white;margin-right:auto");const label=document.createElement("strong");label.textContent=who;const body=document.createElement("p");body.style.whiteSpace="pre-wrap";body.textContent=message;row.append(label,body);log.append(row);while(log.children.length>20)log.firstChild.remove();log.scrollTop=log.scrollHeight;};
  bubble("Andy Executive","Hola. Puedo ayudarte a revisar tus prioridades, candidatos, conversaciones, publicidad y resultados de los últimos siete días.");
  const form=document.createElement("form");form.style.cssText="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap";
- const input=document.createElement("input");input.className="field";input.placeholder="Escribe tu pregunta a Andy Executive…";input.setAttribute("aria-label","Pregunta para Andy Executive");input.maxLength=240;input.required=true;input.style.flex="1 1 200px";
+ const input=document.createElement("input");input.className="field";input.placeholder="Escribe tu pregunta a Andy Executive…";input.setAttribute("aria-label","Pregunta para Andy Executive");input.maxLength=500;input.required=true;input.style.flex="1 1 200px";
  const send=document.createElement("button");send.className="btn yellow";send.type="submit";send.textContent="Enviar";form.append(input,send);
  const shortcuts=document.createElement("div");shortcuts.style.cssText="display:flex;flex-wrap:wrap;gap:6px;margin:12px 0";
  let busy=false;
  const ask=async(question)=>{
- if(busy||!canLoad||!question.trim())return;busy=true;send.disabled=true;bubble("Tú",question);
+ if(busy||!canLoad||!question.trim())return;busy=true;send.disabled=true;consent.disabled=true;const owner=user?.id;const valid=()=>canLoad&&panel.isConnected&&user?.id===owner;bubble("Tú",question);
+ if(consent.checked){mode.textContent="Consultando IA…";try{const {data:{session}}=await db.auth.getSession();if(!valid())return;if(!session)throw Error("session");const response=await fetch(URL+"/functions/v1/cl360-andy-executive",{method:"POST",headers:{apikey:KEY,authorization:"Bearer "+session.access_token,"content-type":"application/json"},body:JSON.stringify({consent:true,message:question,history:executiveHistory.slice(-10)}),signal:AbortSignal.timeout(45000)});const result=await response.json();if(!valid())return;if(response.ok&&result.ai===true&&typeof result.reply==="string"&&result.reply.trim()){bubble("Andy Executive · IA generativa",result.reply);executiveHistory=[...executiveHistory,{role:"user",text:question},{role:"assistant",text:result.reply}].slice(-10);mode.textContent="Última respuesta: IA generativa";busy=false;send.disabled=false;consent.disabled=false;return;}mode.textContent=response.status===429?"Cuota agotada · respuesta guiada":"IA no disponible · respuesta guiada";}catch{if(!valid())return;mode.textContent="IA no disponible · respuesta guiada";}}else mode.textContent="Modo guiado";
+ if(!valid())return;
  const q=question.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
  const now=Date.now(),r=flyInsightsAt(now);let answer="",target=null;
  const day=new Intl.DateTimeFormat("en-CA",{timeZone:"America/Mexico_City",year:"numeric",month:"2-digit",day:"2-digit"});
@@ -333,13 +336,13 @@ function mountAndyExecutive(){
  else if(/pendiente|hoy|agenda|prioridad|seguimiento|entrevista/.test(q)){target="seguimientos";answer="Prioridades de hoy: "+r.overdue.length+" seguimientos vencidos, "+today+" tareas pendientes para el resto del día y "+r.newCandidates.length+" expedientes nuevos. Revisa primero los vencimientos y luego las conversaciones en espera.";}
  else answer="Todavía no puedo responder esa pregunta. Prueba con pendientes de hoy, candidatos sin contactar, conversaciones, publicidad o resultados de la semana.";
  if(!canLoad||!panel.isConnected)return;
- bubble("Andy Executive",answer+"\n\nDatos disponibles en el CRM; los conteos locales pueden estar limitados a los registros cargados.");
+ bubble("Andy Executive · respuesta guiada",answer+"\n\nDatos disponibles en el CRM; los conteos locales pueden estar limitados a los registros cargados.");
  if(target){const b=document.createElement("button");b.className="btn ghost";b.type="button";b.textContent="Abrir módulo relacionado";b.onclick=()=>navigate(target);log.lastChild.append(b);}
- }catch{if(canLoad&&panel.isConnected)bubble("Andy Executive","No pude consultar los datos. Intenta actualizar el CRM.");}finally{busy=false;send.disabled=false;}
+ }catch{if(canLoad&&panel.isConnected)bubble("Andy Executive","No pude consultar los datos. Intenta actualizar el CRM.");}finally{busy=false;send.disabled=false;consent.disabled=!["owner","admin","manager"].includes(staffRole);}
  };
  for(const question of ["¿Qué pendientes tengo hoy?","¿Qué candidatos no he contactado?","¿Hay conversaciones pendientes?","¿Cómo va mi publicidad?","¿Qué seguimientos están vencidos?","¿Qué resultados tuve esta semana?"]){const b=document.createElement("button");b.className="btn ghost";b.type="button";b.textContent=question;b.onclick=()=>void ask(question);shortcuts.append(b);}
  form.onsubmit=e=>{e.preventDefault();if(busy)return;const q=input.value.trim();if(q){input.value="";void ask(q);}};
- const clear=document.createElement("button");clear.type="button";clear.className="btn ghost";clear.textContent="Limpiar chat";clear.onclick=()=>{if(!busy)log.replaceChildren();};panel.append(log,form,shortcuts,clear);view.prepend(panel);
+ const clear=document.createElement("button");clear.type="button";clear.className="btn ghost";clear.textContent="Limpiar chat";clear.onclick=()=>{if(!busy){log.replaceChildren();executiveHistory=[];}};panel.append(log,form,shortcuts,clear);view.prepend(panel);
 }
 function renderFlyAgents(){
  if(!canLoad)return;
