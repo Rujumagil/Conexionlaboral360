@@ -8,3 +8,5 @@ self.addEventListener("fetch",event=>{
  // Todas las páginas y recursos se solicitan a la red, sin caché persistente de candidatos.
  event.respondWith(fetch(req));
 });
+
+self.addEventListener("notificationclick",event=>{event.notification.close();const view=event.notification.data?.cl360View;if(!["conversaciones","candidatos","seguimientos"].includes(view))return;event.waitUntil((async()=>{const destination=new URL(view+"/",self.registration.scope).href;const clients=await self.clients.matchAll({type:"window",includeUncontrolled:true});const existing=clients.find(c=>c.url.startsWith(self.registration.scope));if(existing){await existing.navigate(destination);await existing.focus();}else await self.clients.openWindow(destination);})());});
