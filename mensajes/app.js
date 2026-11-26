@@ -38,7 +38,7 @@ async function refresh(silent=false){
  const [t,c,j,m,fb]=await Promise.all([
   db.from("cl360_conversations").select("id,candidate_id,status,handler_id,last_message_at,fly_session_hash,live_chat_enabled").eq("workspace_id",WS).order("last_message_at",{ascending:false}).limit(300),
   db.from("cl360_candidates").select("id,full_name,phone,job_slug,stage").eq("workspace_id",WS).limit(500),
-  db.from("cl360_jobs").select("slug,title").eq("workspace_id",WS).limit(100),
+  db.from("cl360_jobs").select("slug,title,status").eq("workspace_id",WS).limit(100),
   db.from("cl360_chat_messages").select("conversation_id,source,visibility,body,created_at").eq("workspace_id",WS).order("created_at",{ascending:false}).limit(500),
   db.rpc("cl360_messenger_inbox")
  ]);
@@ -217,9 +217,48 @@ function renderContext(t,messages){
  }
 }
 let andyDraftBusy=false;
+function appendAndyMemoryControls(wrap,t){
+ if(t.status==="closed"||(t.handler_id&&t.handler_id!==user?.id))return;
+ const b=document.createElement("button");b.type="button";b.className="subtle";b.textContent="Memoria de Andy";
+ b.onclick=async()=>{
+  if(activeId!==t.id||!user||b.disabled)return;
+  const actor=user.id;b.disabled=true;
+  try{
+   const {data:mem,error}=await db.rpc("cl360_messenger_memory",{p_conversation:t.externalId});
+   if(error||!mem||activeId!==t.id||user?.id!==actor)return;
+   const dialog=document.createElement("dialog");dialog.style.cssText="max-width:min(440px,92vw);width:100%;padding:20px;border:1px solid #cbd5e1;border-radius:14px;color:inherit;background:var(--surface,#fff)";
+   const heading=document.createElement("h2");heading.textContent="Memoria de Andy";dialog.append(heading);
+   const intro=document.createElement("p");intro.textContent="Marca únicamente los datos confirmados durante la conversación.";dialog.append(intro);
+   const check=(label,checked)=>{const row=document.createElement("label");row.style.cssText="display:flex;gap:8px;margin:12px 0;align-items:center";const input=document.createElement("input");input.type="checkbox";input.checked=!!checked;row.append(input,document.createTextNode(label));dialog.append(row);return input;};
+   const name=check("Nombre confirmado",mem.name_confirmed);
+   const jobLabel=document.createElement("label");jobLabel.textContent="Vacante de interés";jobLabel.style.display="block";
+   const jobSelect=document.createElement("select");jobSelect.style.cssText="display:block;width:100%;margin:8px 0";jobLabel.append(jobSelect);
+   const none=document.createElement("option");none.value="";none.textContent="Sin confirmar";jobSelect.append(none);
+   for(const job of jobs.filter(j=>j.status==="active")){const o=document.createElement("option");o.value=job.slug;o.textContent=job.title;jobSelect.append(o);}
+   jobSelect.value=mem.job_slug||"";dialog.append(jobLabel);
+   const shift=check("Turno conversado",mem.shift_discussed&&!!jobSelect.value);
+   jobSelect.onchange=()=>{shift.checked=false;shift.disabled=!jobSelect.value;};shift.disabled=!jobSelect.value;
+   const human=check("Solicita atención humana",mem.human_requested);
+   const hint=document.createElement("p");hint.setAttribute("role","status");dialog.append(hint);
+   const buttons=document.createElement("div");buttons.style.cssText="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap";
+   const cancel=document.createElement("button");cancel.type="button";cancel.textContent="Cancelar";cancel.className="subtle";cancel.onclick=()=>dialog.close();
+   const save=document.createElement("button");save.type="button";save.textContent="Guardar memoria";save.className="subtle";
+   save.onclick=async()=>{
+    if(activeId!==t.id||user?.id!==actor){dialog.close();return;}
+    save.disabled=true;hint.textContent="Guardando…";
+    const {error}=await db.rpc("cl360_messenger_memory",{p_conversation:t.externalId,p_patch:{revision:mem.revision,name_confirmed:name.checked,job_slug:jobSelect.value,shift_discussed:shift.checked,human_requested:human.checked}});
+    if(error){hint.textContent="No se guardó. Cierra y vuelve a abrir la memoria para revisar la información actual.";save.disabled=false;return;}
+    dialog.close();if(activeId===t.id&&user?.id===actor)$("reply-hint").textContent="Memoria actualizada. Andy utilizará el siguiente tema confirmado.";
+   };
+   buttons.append(cancel,save);dialog.append(buttons);dialog.addEventListener("close",()=>dialog.remove(),{once:true});document.body.append(dialog);dialog.showModal();
+  }catch{if(activeId===t.id)$("reply-hint").textContent="No se pudo consultar la memoria.";}
+  finally{b.disabled=false;}
+ };
+ wrap.append(b);
+}
 function appendAndyDraftControls(wrap,t){
  if(t.status==="closed"||(t.handler_id&&t.handler_id!==user?.id))return;
- const topics={greeting:"Saludo y nombre",vacancies:"Vacantes disponibles",schedule:"Turnos y disponibilidad",experience:"Experiencia laboral",handoff:"Derivar a Astrid"};
+ const topics={auto:"Siguiente paso según memoria",greeting:"Saludo y nombre",vacancies:"Vacantes disponibles",schedule:"Turnos y disponibilidad",experience:"Experiencia laboral",handoff:"Derivar a Astrid"};
  const select=document.createElement("select");select.setAttribute("aria-label","Tema de respuesta de Andy");
  for(const [value,label] of Object.entries(topics)){const option=document.createElement("option");option.value=value;option.textContent=label;select.append(option);}
  const button=document.createElement("button");button.type="button";button.className="subtle";button.textContent=andyDraftBusy?"Preparando borrador…":"Sugerir con Andy";button.disabled=andyDraftBusy||!!messengerPending(t)||messengerSending;
@@ -231,7 +270,12 @@ function appendAndyDraftControls(wrap,t){
   try{
    const {data:{session},error}=await db.auth.getSession();
    if(error||!session||session.user.id!==actor)throw Error("SESSION");
-   const response=await fetch(URL+"/functions/v1/cl360-messenger-draft",{method:"POST",headers:{apikey:KEY,Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"},body:JSON.stringify({conversationId:t.externalId,topic:select.value,jobSlug:""})});
+   const {data:mem,error:memoryError}=await db.rpc("cl360_messenger_memory",{p_conversation:t.externalId});
+   if(memoryError||!mem)throw Error("MEMORY");
+   if(activeId!==t.id||user?.id!==actor)return;
+   const topic=select.value==="auto"?mem.next_topic:select.value;
+   if(!["greeting","vacancies","schedule","experience","handoff"].includes(topic))throw Error("TOPIC");
+   const response=await fetch(URL+"/functions/v1/cl360-messenger-draft",{method:"POST",headers:{apikey:KEY,Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"},body:JSON.stringify({conversationId:t.externalId,topic,jobSlug:mem.job_slug||""})});
    const result=await response.json().catch(()=>null);
    if(!response.ok||result?.ok!==true||typeof result.draft!=="string")throw Error(result?.code||"UNAVAILABLE");
    if(activeId!==t.id||user?.id!==actor||$("reply").value!==initial||messengerPending(t)||messengerSending)return;
@@ -252,6 +296,7 @@ function renderActions(t){
   wrap.append(b);
   const auto=document.createElement("button");auto.type="button";auto.className="subtle";auto.disabled=true;auto.textContent="Andy automático · Próximamente";wrap.append(auto);
  }
+ appendAndyMemoryControls(wrap,t);
  if(!t.handler_id)appendAndyDraftControls(wrap,t);if(messengerPending(t)&&messengerPending(t)!=="unavailable"){const b=document.createElement("button");b.type="button";b.className="subtle";b.textContent="Verifiqué en Meta";b.onclick=()=>{if(messengerSending)return;if(confirm("Confirma que revisaste el historial en Meta. Esto desbloquea un nuevo envío, no reenvía el anterior.")){sessionStorage.removeItem(messengerKey(t));updateComposer();renderActions(t);}};wrap.append(b);}updateComposer();return;}
  const c=candidate(t.candidate_id),mine=t.status==="human"&&t.handler_id===user?.id;
  const info=document.createElement("span");info.className="control-note";
