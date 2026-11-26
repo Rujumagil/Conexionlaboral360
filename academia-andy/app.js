@@ -14,7 +14,7 @@ start:["¿Cuándo y cómo se realiza el ingreso?","Indica fechas o disponibilida
 interview:["¿Cómo se coordina una entrevista?","Explica el proceso y cómo contactar al equipo humano."],
 application:["¿Qué pasos debe seguir una persona interesada?","Describe la postulación, el consentimiento y la atención humana; no pidas documentos sensibles en el chat."],
 faq:["¿Qué duda frecuente tiene una respuesta oficial?","Escribe una pregunta habitual y su respuesta confirmada, sin datos de candidatos."]};
-const compatible=new Set(["functions","faq","schedule","experience","requirements","interview","application"]);
+const compatible=new Set(Object.keys(topics));
 const keys=Object.keys(topics);
 let jobs=[],entries=[],busy=false,loaded=false,editingJob="",editingTopic=keys[0];
 function lookup(job,topic){return entries.find(e=>e.job_slug===job&&e.topic===topic);}
@@ -29,7 +29,7 @@ const option=(v,t)=>{const o=document.createElement("option");o.value=v;o.textCo
 const selected=()=>entries.find(e=>e.job_slug===$("job").value&&e.topic===$("topic").value);
 const cell=(r,t)=>{const td=document.createElement("td");td.textContent=t;r.append(td);return td;};
 function setButtons(){const e=selected();$("save").disabled=busy||!loaded;$("review").disabled=busy||!loaded||e?.state!=="draft"||$("answer").value!==e.answer;$("remove").disabled=busy||!loaded||!e;$("job").disabled=busy;$("topic").disabled=busy;$("answer").disabled=busy;$("prev").disabled=busy||!loaded||keys.indexOf(editingTopic)===0;$("next").disabled=busy||!loaded||keys.indexOf(editingTopic)===keys.length-1;$("next-pending").disabled=busy||!loaded;for(const b of document.querySelectorAll("#topic-list button,#progress-grid button,#entries button"))b.disabled=busy||!loaded||b.dataset.inactive==="true";countChars();}
-function showEditor(){editingJob=$("job").value;editingTopic=$("topic").value;const e=selected();$("answer").value=e?.answer||"";$("current").textContent=e?(e.state==="reviewed"?"Revisada · apta para borradores supervisados":"Borrador")+" · revisión "+e.revision:"Sin información confirmada";$("question").textContent=prompts[editingTopic][0];$("hint").textContent=prompts[editingTopic][1];$("coverage").textContent=compatible.has(editingTopic)?"Disponible para borradores supervisados del tema correspondiente.":"Se guarda para capacitación futura; todavía no se consulta desde Messenger.";topicButtons();setButtons();}
+function showEditor(){editingJob=$("job").value;editingTopic=$("topic").value;const e=selected();$("answer").value=e?.answer||"";$("current").textContent=e?(e.state==="reviewed"?"Revisada · apta para borradores supervisados":"Borrador")+" · revisión "+e.revision:"Sin información confirmada";$("question").textContent=prompts[editingTopic][0];$("hint").textContent=prompts[editingTopic][1];$("coverage").textContent=compatible.has(editingTopic)?"Disponible para borradores supervisados del tema correspondiente cuando Messenger v3 esté desplegado.":"Se guarda para capacitación futura; todavía no se consulta desde Messenger.";topicButtons();setButtons();}
 function render(){const job=$("job").value,topic=$("topic").value;$("job").replaceChildren(option("","General"));
 for(const j of jobs)$("job").append(option(j.slug,j.title));
 if(jobs.some(j=>j.slug===job))$("job").value=job;
