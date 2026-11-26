@@ -237,8 +237,15 @@ function appendAndyMemoryControls(wrap,t){
    for(const job of jobs.filter(j=>j.status==="active")){const o=document.createElement("option");o.value=job.slug;o.textContent=job.title;jobSelect.append(o);}
    jobSelect.value=mem.job_slug||"";dialog.append(jobLabel);
    const shift=check("Turno conversado",mem.shift_discussed&&!!jobSelect.value);
-   jobSelect.onchange=()=>{shift.checked=false;shift.disabled=!jobSelect.value;};shift.disabled=!jobSelect.value;
-   const human=check("Solicita atención humana",mem.human_requested);
+   const experience=check("Experiencia laboral conversada",mem.experience_discussed&&!!jobSelect.value);
+   const application=check("Proceso de postulación explicado",mem.application_discussed&&!!jobSelect.value);
+   const milestones=[shift,experience,application];
+   jobSelect.onchange=()=>{for(const item of milestones){item.checked=false;item.disabled=!jobSelect.value;}};
+   for(const item of milestones)item.disabled=!jobSelect.value;
+   const summary=document.createElement("p");summary.setAttribute("aria-live","polite");dialog.append(summary);
+   const updateSummary=()=>{const next=human.checked?"Atención de Astrid":!name.checked?"Preguntar nombre":!jobSelect.value?"Elegir vacante":!shift.checked?"Conversar turno":!experience.checked?"Conversar experiencia":!application.checked?"Explicar postulación":"Ofrecer seguimiento humano";summary.textContent="Siguiente paso sugerido: "+next;};
+   const oldChange=jobSelect.onchange;jobSelect.onchange=()=>{oldChange();updateSummary();};
+   const human=check("Solicita atención humana",mem.human_requested);for(const item of [name,shift,experience,application,human])item.onchange=updateSummary;updateSummary();
    const hint=document.createElement("p");hint.setAttribute("role","status");dialog.append(hint);
    const buttons=document.createElement("div");buttons.style.cssText="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap";
    const cancel=document.createElement("button");cancel.type="button";cancel.textContent="Cancelar";cancel.className="subtle";cancel.onclick=()=>dialog.close();
@@ -246,7 +253,7 @@ function appendAndyMemoryControls(wrap,t){
    save.onclick=async()=>{
     if(activeId!==t.id||user?.id!==actor){dialog.close();return;}
     save.disabled=true;hint.textContent="Guardando…";
-    const {error}=await db.rpc("cl360_messenger_memory",{p_conversation:t.externalId,p_patch:{revision:mem.revision,name_confirmed:name.checked,job_slug:jobSelect.value,shift_discussed:shift.checked,human_requested:human.checked}});
+    const {error}=await db.rpc("cl360_messenger_memory",{p_conversation:t.externalId,p_patch:{revision:mem.revision,name_confirmed:name.checked,job_slug:jobSelect.value,shift_discussed:shift.checked,human_requested:human.checked,experience_discussed:experience.checked,application_discussed:application.checked}});
     if(error){hint.textContent="No se guardó. Cierra y vuelve a abrir la memoria para revisar la información actual.";save.disabled=false;return;}
     dialog.close();if(activeId===t.id&&user?.id===actor)$("reply-hint").textContent="Memoria actualizada. Andy utilizará el siguiente tema confirmado.";
    };
@@ -258,7 +265,7 @@ function appendAndyMemoryControls(wrap,t){
 }
 function appendAndyDraftControls(wrap,t){
  if(t.status==="closed"||(t.handler_id&&t.handler_id!==user?.id))return;
- const topics={auto:"Siguiente paso según memoria",greeting:"Saludo y nombre",vacancies:"Vacantes disponibles",schedule:"Turnos y disponibilidad",experience:"Experiencia laboral",pay_frequency:"Frecuencia de pago",benefits:"Prestaciones",uniform:"Uniforme y equipo",start:"Proceso de ingreso",handoff:"Derivar a Astrid"};
+ const topics={auto:"Siguiente paso según memoria",greeting:"Saludo y nombre",vacancies:"Vacantes disponibles",schedule:"Turnos y disponibilidad",experience:"Experiencia laboral",pay_frequency:"Frecuencia de pago",benefits:"Prestaciones",uniform:"Uniforme y equipo",start:"Proceso de ingreso",application:"Cómo postularse",handoff:"Derivar a Astrid"};
  const select=document.createElement("select");select.setAttribute("aria-label","Tema de respuesta de Andy");
  for(const [value,label] of Object.entries(topics)){const option=document.createElement("option");option.value=value;option.textContent=label;select.append(option);}
  const button=document.createElement("button");button.type="button";button.className="subtle";button.textContent=andyDraftBusy?"Preparando borrador…":"Sugerir con Andy";button.disabled=andyDraftBusy||!!messengerPending(t)||messengerSending;
@@ -274,7 +281,7 @@ function appendAndyDraftControls(wrap,t){
    if(memoryError||!mem)throw Error("MEMORY");
    if(activeId!==t.id||user?.id!==actor)return;
    const topic=select.value==="auto"?mem.next_topic:select.value;
-   if(!["greeting","vacancies","schedule","experience","pay_frequency","benefits","uniform","start","handoff"].includes(topic))throw Error("TOPIC");
+   if(!["greeting","vacancies","schedule","experience","pay_frequency","benefits","uniform","start","application","handoff"].includes(topic))throw Error("TOPIC");
    const response=await fetch(URL+"/functions/v1/cl360-messenger-draft",{method:"POST",headers:{apikey:KEY,Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"},body:JSON.stringify({conversationId:t.externalId,topic,jobSlug:mem.job_slug||""})});
    const result=await response.json().catch(()=>null);
    if(!response.ok||result?.ok!==true||typeof result.draft!=="string")throw Error(result?.code||"UNAVAILABLE");
