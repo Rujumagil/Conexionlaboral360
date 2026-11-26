@@ -294,6 +294,33 @@ function appendAndyDraftControls(wrap,t){
  };
  wrap.append(select,button);
 }
+function appendCandidateLink(wrap,t){
+ if(t.status==="closed"||(t.handler_id&&t.handler_id!==user?.id))return;
+ const b=document.createElement("button");b.type="button";b.className="subtle";b.textContent="Expediente CRM";wrap.append(b);
+ b.onclick=async()=>{
+  const actor=user?.id;if(!actor||activeId!==t.id)return;b.disabled=true;
+  try{
+   const {data:link,error}=await db.rpc("cl360_messenger_candidate_link",{p_conversation:t.externalId});
+   if(error||!link)throw Error("LINK");if(activeId!==t.id||user?.id!==actor)return;
+   const dialog=document.createElement("dialog");dialog.style.cssText="width:min(460px,92vw);padding:20px;border:1px solid #cbd5e1;border-radius:14px";
+   const heading=document.createElement("h2");heading.textContent="Expediente de reclutamiento";dialog.append(heading);
+   const hint=document.createElement("p");hint.setAttribute("role","status");
+   const close=document.createElement("button");close.type="button";close.className="subtle";close.textContent="Cerrar";close.onclick=()=>dialog.close();
+   if(link.candidate_id){const linked=candidate(link.candidate_id);hint.textContent=linked?"Vinculado: "+linked.full_name+" · "+job(linked.job_slug):"Existe un expediente vinculado. Consulta el CRM.";const a=document.createElement("a");a.href="../crm/";a.textContent="Abrir CRM";a.target="_blank";a.rel="noopener noreferrer";dialog.append(hint,a,close);}
+   else if(t.handler_id!==actor){hint.textContent="Toma el control humano para vincular un expediente.";dialog.append(hint,close);}
+   else{
+    const label=document.createElement("label");label.textContent="Busca por nombre o teléfono confirmado";const search=document.createElement("input");search.type="search";search.autocomplete="off";search.style.width="100%";label.append(search);
+    const select=document.createElement("select");select.style.width="100%";select.setAttribute("aria-label","Expediente existente");
+    const fill=()=>{select.replaceChildren();const empty=document.createElement("option");empty.value="";empty.textContent="Selecciona un expediente";select.append(empty);const q=search.value.trim().toLocaleLowerCase("es-MX");if(q.length<3)return;for(const c of candidates.filter(c=>!c.id.startsWith("messenger:")&&(c.full_name?.toLocaleLowerCase("es-MX").includes(q)||c.phone?.includes(q))).slice(0,30)){const o=document.createElement("option");o.value=c.id;o.textContent=c.full_name+" · "+job(c.job_slug)+" · tel. termina "+String(c.phone||"").slice(-4);select.append(o);}};
+    search.oninput=fill;fill();
+    const confirmLabel=document.createElement("label");confirmLabel.style.cssText="display:flex;gap:8px;margin:14px 0";const check=document.createElement("input");check.type="checkbox";confirmLabel.append(check,document.createTextNode("Confirmé que corresponde a la misma persona y que autorizó vincular esta conversación con su expediente."));
+    const save=document.createElement("button");save.type="button";save.textContent="Vincular expediente";save.className="subtle";save.onclick=async()=>{if(!select.value||!check.checked){hint.textContent="Selecciona el expediente y confirma identidad y autorización.";return;}if(activeId!==t.id||user?.id!==actor){dialog.close();return;}save.disabled=true;try{const {data,error}=await db.rpc("cl360_messenger_candidate_link",{p_conversation:t.externalId,p_candidate:select.value,p_confirm:true});if(error||!data?.candidate_id)throw Error("LINK");dialog.close();if(activeId===t.id)$("reply-hint").textContent="Expediente vinculado correctamente.";}catch{hint.textContent="No se pudo vincular. Verifica permisos o si ya existe un vínculo.";save.disabled=false;}};
+    hint.textContent="No se crearán nuevos candidatos ni se copiarán mensajes. Si no aparece el expediente, revisa el CRM.";dialog.append(label,select,confirmLabel,hint,save,close);
+   }
+   dialog.addEventListener("close",()=>dialog.remove(),{once:true});document.body.append(dialog);dialog.showModal();
+  }catch{if(activeId===t.id)$("reply-hint").textContent="No se pudo consultar el expediente vinculado.";}finally{b.disabled=false;}
+ };
+}
 function renderActions(t){
  const wrap=$("human-controls");wrap.replaceChildren();
  if(t.channel==="messenger"){const info=document.createElement("span");info.className="control-note";info.textContent=t.status==="closed"?"Conversación cerrada.":t.handler_id===user?.id?"Atención humana · Tienes el control.":t.handler_id?"Atención humana · Asignada a otro integrante.":"Andy supervisado · Solo borradores.";wrap.append(info);
@@ -303,6 +330,7 @@ function renderActions(t){
   wrap.append(b);
   const auto=document.createElement("button");auto.type="button";auto.className="subtle";auto.disabled=true;auto.textContent="Andy automático · Próximamente";wrap.append(auto);
  }
+ appendCandidateLink(wrap,t);
  appendAndyMemoryControls(wrap,t);
  if(!t.handler_id)appendAndyDraftControls(wrap,t);if(messengerPending(t)&&messengerPending(t)!=="unavailable"){const b=document.createElement("button");b.type="button";b.className="subtle";b.textContent="Verifiqué en Meta";b.onclick=()=>{if(messengerSending)return;if(confirm("Confirma que revisaste el historial en Meta. Esto desbloquea un nuevo envío, no reenvía el anterior.")){sessionStorage.removeItem(messengerKey(t));updateComposer();renderActions(t);}};wrap.append(b);}updateComposer();return;}
  const c=candidate(t.candidate_id),mine=t.status==="human"&&t.handler_id===user?.id;
