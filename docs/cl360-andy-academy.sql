@@ -1,4 +1,4 @@
--- First stage: staff-authored knowledge, NOT consumed by live Messenger yet.
+-- Staff-authored knowledge for supervised drafts only; no automatic delivery.
 create table if not exists public.cl360_andy_knowledge (
  workspace_id uuid not null check(workspace_id='c7ab2a78-08e0-4a29-8a3b-fadaf244002f'),
  job_slug text not null check(length(job_slug)<=80),
@@ -12,6 +12,7 @@ create table if not exists public.cl360_andy_knowledge (
 );
 alter table public.cl360_andy_knowledge enable row level security;
 revoke all on public.cl360_andy_knowledge from public,anon,authenticated;
+grant select on public.cl360_andy_knowledge to service_role;
 create or replace function public.cl360_andy_academy(p_action text default 'read',p_job text default '',p_topic text default '',p_answer text default '',p_revision integer default 0)
 returns jsonb language plpgsql security definer set search_path='' as $$
 declare ws constant uuid:='c7ab2a78-08e0-4a29-8a3b-fadaf244002f'; actor uuid:=auth.uid(); row_now public.cl360_andy_knowledge%rowtype;
