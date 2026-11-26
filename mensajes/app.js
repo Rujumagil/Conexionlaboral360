@@ -105,12 +105,41 @@ function renderThreads(){
   button.append(avatar,info);button.addEventListener("click",()=>openConversation(t.id));list.append(button);
  });
 }
+let messengerSending=false;
+function messengerKey(t){return "cl360-send-pending:"+user?.id+":"+t.externalId;}
+function messengerPending(t){try{return sessionStorage.getItem(messengerKey(t));}catch{return "unavailable";}}
+async function sendFacebook(t,body){
+ if(messengerSending||messengerPending(t)||t.status==="closed"||(t.handler_id&&t.handler_id!==user?.id)||body.length>2000)return;
+ const key=messengerKey(t),requestId=crypto.randomUUID(),sender=user?.id;
+ messengerSending=true;
+ try{
+  const {data:{session},error}=await db.auth.getSession();
+  if(error||!session||session.user.id!==sender){if(activeId===t.id)$("reply-hint").textContent="Inicia sesión nuevamente.";return;}
+  sessionStorage.setItem(key,requestId);
+  updateComposer();
+  const response=await fetch("https://app.proyectocompas.app/api/integrations/meta/messenger/cl360-send",{method:"POST",headers:{Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"},body:JSON.stringify({conversationId:t.externalId,requestId,body}),redirect:"error"});
+  const result=await response.json().catch(()=>null);
+  if(response.ok&&result?.ok===true){
+   sessionStorage.removeItem(key);
+   if(activeId===t.id&&user?.id===sender&&$("reply").value.trim()===body){$("reply").value="";resizeReply();}
+   await refresh(true);
+   if(activeId===t.id&&user?.id===sender)$("reply-hint").textContent=result.code==="SENT_HISTORY_PENDING"?"Meta confirmó el envío; historial pendiente de sincronizar.":"Mensaje enviado a Facebook.";
+  }else if(["ORIGIN","SESSION","ROLE","INPUT","WORKSPACE","CONVERSATION","ASSIGNED","PAGE","WINDOW_CLOSED","RECIPIENT","CONFIG"].includes(result?.code)){
+   sessionStorage.removeItem(key);
+   if(activeId===t.id)$("reply-hint").textContent=result.code==="WINDOW_CLOSED"?"La ventana de 24 horas está cerrada.":"Envío no autorizado: "+result.code;
+  }
+ }catch{/* Uncertain delivery: keep the attempt blocked; never retry automatically. */}
+ finally{messengerSending=false;const hint=$("reply-hint").textContent;updateComposer();if(activeId===t.id&&!messengerPending(t)&&hint)$("reply-hint").textContent=hint;}
+}
 function updateComposer(){
  const t=threads.find(x=>x.id===activeId),c=t&&candidate(t.candidate_id);
  if(t?.channel==="messenger"){
-  $("reply").disabled=true;$("copy").disabled=true;$("send-inapp").disabled=true;
+  const blocked=t.status==="closed"||(t.handler_id&&t.handler_id!==user?.id);
+  const pending=messengerPending(t);
+  $("reply").disabled=!!blocked||!!pending||messengerSending;
+  $("copy").disabled=true;$("send-inapp").disabled=!!blocked||!!pending||messengerSending||!$("reply").value.trim();
   const wa=$("send-whatsapp");wa.removeAttribute("href");wa.classList.add("disabled-link");wa.setAttribute("aria-disabled","true");
-  $("channel-state").textContent="· Facebook Messenger";$("reply-hint").textContent="Historial de Messenger disponible. El envío directo todavía no está habilitado.";return;
+  $("channel-state").textContent="· Facebook Messenger";$("reply-hint").textContent=blocked?"Conversación cerrada o asignada a otra persona.":pending?"Envío sin confirmar. Verifica en Meta antes de repetirlo.":messengerSending?"Enviando a Messenger…":"La respuesta se enviará a Facebook Messenger.";return;
  }
  const owner=t?.status==="human"&&t.handler_id===user?.id;
  const direct=!!owner&&!!t.fly_session_hash&&t.live_chat_enabled===true;
@@ -189,7 +218,7 @@ function renderContext(t,messages){
 }
 function renderActions(t){
  const wrap=$("human-controls");wrap.replaceChildren();
- if(t.channel==="messenger"){const info=document.createElement("span");info.className="control-note";info.textContent="Facebook Messenger · Consulta del historial. Responde temporalmente desde la bandeja de Meta.";wrap.append(info);updateComposer();return;}
+ if(t.channel==="messenger"){const info=document.createElement("span");info.className="control-note";info.textContent="Facebook Messenger · Atención manual. Andy no está habilitado para este canal.";wrap.append(info);if(messengerPending(t)&&messengerPending(t)!=="unavailable"){const b=document.createElement("button");b.type="button";b.className="subtle";b.textContent="Verifiqué en Meta";b.onclick=()=>{if(messengerSending)return;if(confirm("Confirma que revisaste el historial en Meta. Esto desbloquea un nuevo envío, no reenvía el anterior.")){sessionStorage.removeItem(messengerKey(t));updateComposer();renderActions(t);}};wrap.append(b);}updateComposer();return;}
  const c=candidate(t.candidate_id),mine=t.status==="human"&&t.handler_id===user?.id;
  const info=document.createElement("span");info.className="control-note";
  info.textContent=mine?"Tienes el control. Andy no responderá a esta conversación vinculada.":t.status==="human"?"El caso está asignado a otra persona.":t.status==="closed"?"Este caso está cerrado.":"Puedes tomar este caso para intervenir.";
@@ -248,7 +277,8 @@ $("reply").addEventListener("keydown",event=>{
 });
 $("send-inapp").addEventListener("click",async()=>{
  const t=threads.find(x=>x.id===activeId),body=$("reply").value.trim();
- if(!t||t.channel==="messenger"||t.status!=="human"||t.handler_id!==user?.id||!t.fly_session_hash||t.live_chat_enabled!==true||!body)return;
+ if(t?.channel==="messenger"){if(body)await sendFacebook(t,body);return;}
+ if(!t||t.status!=="human"||t.handler_id!==user?.id||!t.fly_session_hash||t.live_chat_enabled!==true||!body)return;
  const button=$("send-inapp");button.disabled=true;
  const {error}=await db.rpc("cl360_staff_send_candidate_message",{p_conversation:t.id,p_body:body});
  if(error){$("reply-hint").textContent=error.message?.includes("candidate_channel")?"La sesión del candidato está caducada o no vinculada; utiliza WhatsApp.":"No pude enviar el mensaje. Intenta nuevamente.";button.disabled=false;return;}
