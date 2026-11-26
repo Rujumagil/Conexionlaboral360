@@ -258,7 +258,7 @@ function appendAndyMemoryControls(wrap,t){
 }
 function appendAndyDraftControls(wrap,t){
  if(t.status==="closed"||(t.handler_id&&t.handler_id!==user?.id))return;
- const topics={auto:"Siguiente paso según memoria",greeting:"Saludo y nombre",vacancies:"Vacantes disponibles",schedule:"Turnos y disponibilidad",experience:"Experiencia laboral",handoff:"Derivar a Astrid"};
+ const topics={auto:"Siguiente paso según memoria",greeting:"Saludo y nombre",vacancies:"Vacantes disponibles",schedule:"Turnos y disponibilidad",experience:"Experiencia laboral",pay_frequency:"Frecuencia de pago",benefits:"Prestaciones",uniform:"Uniforme y equipo",start:"Proceso de ingreso",handoff:"Derivar a Astrid"};
  const select=document.createElement("select");select.setAttribute("aria-label","Tema de respuesta de Andy");
  for(const [value,label] of Object.entries(topics)){const option=document.createElement("option");option.value=value;option.textContent=label;select.append(option);}
  const button=document.createElement("button");button.type="button";button.className="subtle";button.textContent=andyDraftBusy?"Preparando borrador…":"Sugerir con Andy";button.disabled=andyDraftBusy||!!messengerPending(t)||messengerSending;
@@ -274,7 +274,7 @@ function appendAndyDraftControls(wrap,t){
    if(memoryError||!mem)throw Error("MEMORY");
    if(activeId!==t.id||user?.id!==actor)return;
    const topic=select.value==="auto"?mem.next_topic:select.value;
-   if(!["greeting","vacancies","schedule","experience","handoff"].includes(topic))throw Error("TOPIC");
+   if(!["greeting","vacancies","schedule","experience","pay_frequency","benefits","uniform","start","handoff"].includes(topic))throw Error("TOPIC");
    const response=await fetch(URL+"/functions/v1/cl360-messenger-draft",{method:"POST",headers:{apikey:KEY,Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"},body:JSON.stringify({conversationId:t.externalId,topic,jobSlug:mem.job_slug||""})});
    const result=await response.json().catch(()=>null);
    if(!response.ok||result?.ok!==true||typeof result.draft!=="string")throw Error(result?.code||"UNAVAILABLE");
