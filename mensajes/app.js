@@ -216,9 +216,36 @@ function renderContext(t,messages){
   panel.append(detail);
  }
 }
+let andyDraftBusy=false;
+function appendAndyDraftControls(wrap,t){
+ if(t.status==="closed"||(t.handler_id&&t.handler_id!==user?.id))return;
+ const topics={greeting:"Saludo y nombre",vacancies:"Vacantes disponibles",schedule:"Turnos y disponibilidad",experience:"Experiencia laboral",handoff:"Derivar a Astrid"};
+ const select=document.createElement("select");select.setAttribute("aria-label","Tema de respuesta de Andy");
+ for(const [value,label] of Object.entries(topics)){const option=document.createElement("option");option.value=value;option.textContent=label;select.append(option);}
+ const button=document.createElement("button");button.type="button";button.className="subtle";button.textContent=andyDraftBusy?"Preparando borrador…":"Sugerir con Andy";button.disabled=andyDraftBusy||!!messengerPending(t)||messengerSending;
+ button.onclick=async()=>{
+  if(andyDraftBusy||messengerPending(t)||messengerSending||activeId!==t.id)return;
+  const initial=$("reply").value,actor=user?.id;
+  if(initial.trim()&&!confirm("¿Quieres reemplazar el borrador actual por una sugerencia de Andy?"))return;
+  andyDraftBusy=true;button.disabled=true;button.textContent="Preparando borrador…";
+  try{
+   const {data:{session},error}=await db.auth.getSession();
+   if(error||!session||session.user.id!==actor)throw Error("SESSION");
+   const response=await fetch(URL+"/functions/v1/cl360-messenger-draft",{method:"POST",headers:{apikey:KEY,Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"},body:JSON.stringify({conversationId:t.externalId,topic:select.value,jobSlug:""})});
+   const result=await response.json().catch(()=>null);
+   if(!response.ok||result?.ok!==true||typeof result.draft!=="string")throw Error(result?.code||"UNAVAILABLE");
+   if(activeId!==t.id||user?.id!==actor||$("reply").value!==initial||messengerPending(t)||messengerSending)return;
+   const current=threads.find(x=>x.id===t.id);
+   if(!current||current.status==="closed"||(current.handler_id&&current.handler_id!==actor))return;
+   $("reply").value=result.draft;resizeReply();updateComposer();$("reply-hint").textContent="Borrador de Andy. Revisa y edita antes de enviar; aún no se ha enviado.";
+  }catch{if(activeId===t.id&&user?.id===actor)$("reply-hint").textContent="Andy no pudo preparar la sugerencia. Puedes escribir una respuesta manual.";}
+  finally{andyDraftBusy=false;button.disabled=false;button.textContent="Sugerir con Andy";if(activeId===t.id&&user?.id===actor){const hint=$("reply-hint").textContent;const current=threads.find(x=>x.id===t.id);if(current)renderActions(current);$("reply-hint").textContent=hint;}}
+ };
+ wrap.append(select,button);
+}
 function renderActions(t){
  const wrap=$("human-controls");wrap.replaceChildren();
- if(t.channel==="messenger"){const info=document.createElement("span");info.className="control-note";info.textContent="Facebook Messenger · Atención manual. Andy no está habilitado para este canal.";wrap.append(info);if(messengerPending(t)&&messengerPending(t)!=="unavailable"){const b=document.createElement("button");b.type="button";b.className="subtle";b.textContent="Verifiqué en Meta";b.onclick=()=>{if(messengerSending)return;if(confirm("Confirma que revisaste el historial en Meta. Esto desbloquea un nuevo envío, no reenvía el anterior.")){sessionStorage.removeItem(messengerKey(t));updateComposer();renderActions(t);}};wrap.append(b);}updateComposer();return;}
+ if(t.channel==="messenger"){const info=document.createElement("span");info.className="control-note";info.textContent="Facebook Messenger · Atención manual. Andy solo sugiere borradores.";wrap.append(info);appendAndyDraftControls(wrap,t);if(messengerPending(t)&&messengerPending(t)!=="unavailable"){const b=document.createElement("button");b.type="button";b.className="subtle";b.textContent="Verifiqué en Meta";b.onclick=()=>{if(messengerSending)return;if(confirm("Confirma que revisaste el historial en Meta. Esto desbloquea un nuevo envío, no reenvía el anterior.")){sessionStorage.removeItem(messengerKey(t));updateComposer();renderActions(t);}};wrap.append(b);}updateComposer();return;}
  const c=candidate(t.candidate_id),mine=t.status==="human"&&t.handler_id===user?.id;
  const info=document.createElement("span");info.className="control-note";
  info.textContent=mine?"Tienes el control. Andy no responderá a esta conversación vinculada.":t.status==="human"?"El caso está asignado a otra persona.":t.status==="closed"?"Este caso está cerrado.":"Puedes tomar este caso para intervenir.";
