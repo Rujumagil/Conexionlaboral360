@@ -63,3 +63,10 @@ test("Selector limitado a personal activo del workspace", () => {
   assert.match(sql,/role::text in \('owner','admin','manager','sales','support'\)/);
   assert.match(js,/appendCandidateRegistration\(wrap,t\)/);
 });
+
+ test("Messenger serializes same vacancy and phone and recognizes Mexican legacy prefixes",()=>{
+ assert.match(sql,/pg_advisory_xact_lock/);
+ assert.match(sql,/length\(normalized_phone\)=13 and left\(normalized_phone,3\)='521'/);
+ assert.match(sql,/in \(normalized_phone,'52'\|\|normalized_phone,'521'\|\|normalized_phone\)/);
+ assert.ok(sql.indexOf("pg_advisory_xact_lock") < sql.indexOf("candidate_already_exists_use_manual_link"));
+ });
