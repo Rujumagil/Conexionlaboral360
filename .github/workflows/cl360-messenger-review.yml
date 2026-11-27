@@ -1,0 +1,23 @@
+name: CL360 · Registro humano Messenger
+on:
+  pull_request:
+    paths:
+      - "mensajes/app.js"
+      - "docs/cl360-messenger-human-registration.sql"
+      - "tests/cl360-messenger-review.test.cjs"
+      - ".github/workflows/cl360-messenger-review.yml"
+  workflow_dispatch:
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Revisar sintaxis JavaScript
+        run: node --check mensajes/app.js
+      - name: Ejecutar pruebas de contrato con datos sintéticos
+        run: node --test tests/cl360-messenger-review.test.cjs
