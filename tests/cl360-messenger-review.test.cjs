@@ -70,3 +70,19 @@ test("Selector limitado a personal activo del workspace", () => {
  assert.match(sql,/in \(normalized_phone,'52'\|\|normalized_phone,'521'\|\|normalized_phone\)/);
  assert.ok(sql.indexOf("pg_advisory_xact_lock") < sql.indexOf("candidate_already_exists_use_manual_link"));
  });
+
+test("El expediente renderiza las tres etiquetas completas y sus respuestas", () => {
+  const source = js.match(/function extractIntakeEvidence\(messages\)\{[\s\S]*?\n\}/)?.[0];
+  const render = js.match(/function appendIntakeReview\(panel,messages\)\{[\s\S]*?\n\}/)?.[0];
+  const element = () => ({children:[],textContent:"",append(...items){this.children.push(...items);}});
+  const document = {createElement:element};
+  const panel = element();
+  vm.runInNewContext(source+"\n"+render+"\nappendIntakeReview(panel,messages)",{document,panel,messages:[
+    {source:"staff",body:"¿Con quién tengo el gusto?"},{source:"candidate",body:"María Ejemplo"},
+    {source:"staff",body:"¿Por qué colonia o zona vives?"},{source:"candidate",body:"Zapopan"},
+    {source:"staff",body:"¿Tienes experiencia trabajando en seguridad privada?"},{source:"candidate",body:"Dos años"}
+  ]});
+  assert.deepEqual(panel.children[0].children.slice(2,5).map(row=>row.children.map(c=>c.textContent)),[
+    ["Nombre declarado","María Ejemplo"],["Zona declarada","Zapopan"],["Experiencia declarada","Dos años"]
+  ]);
+});
