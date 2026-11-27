@@ -216,7 +216,7 @@ function appendIntakeReview(panel,messages){
  const detail=document.createElement("details");detail.className="context-system";detail.open=true;
  const title=document.createElement("summary");title.textContent="Expediente preliminar · "+evidence.size+"/3 datos por revisar";detail.append(title);
  const note=document.createElement("p");note.textContent="Respuestas del chat, no datos verificados. Confirma identidad y consentimiento antes de vincular o registrar un expediente. No se guardan copias automáticamente.";detail.append(note);
- for(const [label] of fields){const row=document.createElement("div");row.className="context-row";const name=document.createElement("small");name.textContent=label;const value=document.createElement("strong");value.textContent=evidence.get(label)||"Por confirmar";row.append(name,value);detail.append(row);}
+ for(const label of fields){const row=document.createElement("div");row.className="context-row";const name=document.createElement("small");name.textContent=label;const value=document.createElement("strong");value.textContent=evidence.get(label)||"Por confirmar";row.append(name,value);detail.append(row);}
  const last=messages.filter(m=>m.source==="candidate").at(-1);
  if(last&&/\b(ll[aá]mame|m[aá]rcame|llamar|llamada|marcarme|contactame)\b/i.test(last.body||"")){const p=document.createElement("p");p.textContent="Próxima acción sugerida: revisar solicitud de llamada. No hay una tarea creada automáticamente.";detail.append(p);}
  panel.append(detail);
@@ -422,10 +422,11 @@ function appendCandidateRegistration(wrap,t){
      if(!permission.checked||!verified.checked){hint.textContent="Debes confirmar autorización y revisión humana.";return;}
      const digits=phoneInput.value.replace(/\D/g,"");const normalized=digits.length===12&&digits.startsWith("52")?digits.slice(2):digits;
      const when=new Date(due.value);
-     if(name.value.trim().length<3||normalized.length!==10||!/^\d{10}$/.test(normalized)||!jobSelect.value||!person.value||!Number.isFinite(when.getTime())||when<=new Date(Date.now()+60000)){
+     if(name.value.trim().length<3||normalized.length!==10||!/^\d{10}$/.test(normalized)||!jobSelect.value||!person.value||!Number.isFinite(when.getTime())||when<=new Date(Date.now()+60000)||when>new Date(Date.now()+30*86400000)){
       hint.textContent="Revisa nombre, teléfono de 10 dígitos, vacante, responsable y fecha futura.";return;
      }
      save.disabled=true;hint.textContent="Registrando y creando seguimiento…";
+     try{
      const {data,error}=await db.rpc("cl360_messenger_candidate_register",{
       p_conversation:t.externalId,p_name:name.value.trim(),p_phone:normalized,p_job_slug:jobSelect.value,
       p_zone:zone.value.trim(),p_experience:experience.value.trim(),
@@ -442,6 +443,7 @@ function appendCandidateRegistration(wrap,t){
       $("reply-hint").textContent=data.already_linked?"El expediente ya estaba vinculado.":"Candidato registrado; seguimiento creado en CRM para el responsable elegido.";
       await refresh(true);
      }
+     }catch{hint.textContent="No se pudo confirmar el registro. Actualiza el chat antes de reintentar.";save.disabled=false;}
     };
     dialog.append(hint,save,cancel);
    }
