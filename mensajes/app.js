@@ -196,7 +196,7 @@ async function openConversation(id,changeLayout=true,preserveDraft=false){
  renderContext(t,data||[]);
 }
 
-function appendIntakeReview(panel,messages){
+function extractIntakeEvidence(messages){
  const fields=[["Nombre declarado",/con qui[eé]n tengo el gusto\?/i],["Zona declarada",/por qu[eé] colonia o zona vives\?/i],["Experiencia declarada",/(has trabajado antes en seguridad privada|tienes experiencia trabajando en seguridad privada)\?/i]];
  const evidence=new Map();
  let pending=null;
@@ -208,6 +208,11 @@ function appendIntakeReview(panel,messages){
    pending=null;
   }
  }
+ return evidence;
+}
+function appendIntakeReview(panel,messages){
+ const fields=["Nombre declarado","Zona declarada","Experiencia declarada"];
+ const evidence=extractIntakeEvidence(messages);
  const detail=document.createElement("details");detail.className="context-system";detail.open=true;
  const title=document.createElement("summary");title.textContent="Expediente preliminar · "+evidence.size+"/3 datos por revisar";detail.append(title);
  const note=document.createElement("p");note.textContent="Respuestas del chat, no datos verificados. Confirma identidad y consentimiento antes de vincular o registrar un expediente. No se guardan copias automáticamente.";detail.append(note);
@@ -344,6 +349,110 @@ function appendCandidateLink(wrap,t){
   }catch{if(activeId===t.id)$("reply-hint").textContent="No se pudo consultar el expediente vinculado.";}finally{b.disabled=false;}
  };
 }
+
+function appendCandidateRegistration(wrap,t){
+ if(t.channel!=="messenger"||t.status==="closed"||t.handler_id!==user?.id)return;
+ const button=document.createElement("button");button.type="button";button.className="subtle";button.textContent="Registrar postulación";wrap.append(button);
+ button.onclick=async()=>{
+  const actor=user?.id;if(!actor||activeId!==t.id||button.disabled)return;
+  button.disabled=true;
+  try{
+   // No usar respuestas preliminares como datos confirmados sin revisión manual.
+   const [existing,transcript,team]=await Promise.all([
+    db.rpc("cl360_messenger_candidate_link",{p_conversation:t.externalId}),
+    db.rpc("cl360_messenger_inbox",{p_conversation:t.externalId}),
+    db.rpc("cl360_messenger_recruiters")
+   ]);
+   if(existing.error||transcript.error||team.error||!Array.isArray(team.data))throw Error("SERVICE_NOT_READY");
+   if(activeId!==t.id||user?.id!==actor)return;
+   const dialog=document.createElement("dialog");
+   dialog.style.cssText="width:min(510px,94vw);max-height:90vh;overflow:auto;padding:20px;border:1px solid #cbd5e1;border-radius:14px;background:var(--surface,#fff);color:inherit";
+   const heading=document.createElement("h2");heading.textContent="Registrar candidato en CRM";dialog.append(heading);
+   const hint=document.createElement("p");hint.setAttribute("role","status");hint.style.minHeight="1.5em";
+   const cancel=document.createElement("button");cancel.type="button";cancel.className="subtle";cancel.textContent="Cerrar";cancel.onclick=()=>dialog.close();
+   if(existing.data?.candidate_id){
+    const p=document.createElement("p");p.textContent="Esta conversación ya tiene un expediente vinculado. Revisa el CRM; no crearemos otro registro.";
+    const link=document.createElement("a");link.href="../crm/";link.target="_blank";link.rel="noopener noreferrer";link.textContent="Abrir CRM";
+    dialog.append(p,link,cancel);
+   }else{
+    const intro=document.createElement("p");
+    intro.textContent="Las respuestas extraídas son solo sugerencias. Verifica cada dato con la persona y confirma su permiso explícito antes de guardar.";
+    dialog.append(intro);
+    const incoming=Array.isArray(transcript.data)?transcript.data.map(m=>({
+     source:m.direction==="incoming"?"candidate":"staff",body:m.body||""
+    })):[];
+    const evidence=extractIntakeEvidence(incoming);
+    const field=(title,value,max,type="text")=>{
+     const label=document.createElement("label");label.style.cssText="display:block;margin:12px 0;font-size:14px;font-weight:600";label.textContent=title;
+     const input=type==="textarea"?document.createElement("textarea"):document.createElement("input");
+     if(type!=="textarea")input.type=type;
+     input.style.cssText="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:9px;border:1px solid #b9c9d7;border-radius:8px";
+     input.maxLength=max;input.value=value||"";label.append(input);dialog.append(label);return input;
+    };
+    const name=field("Nombre confirmado",evidence.get("Nombre declarado"),120);
+    const phoneInput=field("Teléfono proporcionado por el candidato (10 dígitos)","",16,"tel");
+    const zone=field("Zona declarada (revisar)",evidence.get("Zona declarada"),120);
+    const experience=field("Experiencia declarada (no es una evaluación)",evidence.get("Experiencia declarada"),1000,"textarea");
+    const jobLabel=document.createElement("label");jobLabel.style.cssText="display:block;margin:12px 0";jobLabel.textContent="Vacante confirmada";
+    const jobSelect=document.createElement("select");jobSelect.style.cssText="width:100%;display:block;padding:9px;margin-top:6px";
+    const blank=document.createElement("option");blank.value="";blank.textContent="Selecciona la vacante";jobSelect.append(blank);
+    for(const vacancy of jobs.filter(j=>j.status==="active")){const opt=document.createElement("option");opt.value=vacancy.slug;opt.textContent=vacancy.title;jobSelect.append(opt);}
+    jobLabel.append(jobSelect);dialog.append(jobLabel);
+    const teamLabel=document.createElement("label");teamLabel.style.cssText="display:block;margin:12px 0";teamLabel.textContent="Asignar seguimiento a";
+    const person=document.createElement("select");person.style.cssText="width:100%;display:block;padding:9px;margin-top:6px";
+    for(const member of team.data){
+     if(!member.user_id)continue;
+     const opt=document.createElement("option");opt.value=member.user_id;opt.textContent=member.name||"Integrante del equipo";person.append(opt);
+    }
+    const astrid=team.data.find(member=>/astrid.*araiza/i.test(member.name||""));
+    person.value=astrid?.user_id||actor;
+    teamLabel.append(person);dialog.append(teamLabel);
+    const due=field("Fecha y hora del siguiente contacto","",32,"datetime-local");
+    const tomorrow=new Date(Date.now()+24*60*60*1000);
+    due.value=new Date(tomorrow.getTime()-tomorrow.getTimezoneOffset()*60000).toISOString().slice(0,16);
+    const check=(statement)=>{
+     const label=document.createElement("label");label.style.cssText="display:flex;align-items:flex-start;gap:8px;margin:12px 0;font-size:13px";
+     const input=document.createElement("input");input.type="checkbox";label.append(input,document.createTextNode(statement));dialog.append(label);return input;
+    };
+    const permission=check("Confirmo que la persona autorizó explícitamente el registro de sus datos para esta postulación.");
+    const verified=check("Revisé su identidad, teléfono, vacante y respuestas; no estoy usando inferencias de Andy como hechos.");
+    const save=document.createElement("button");save.type="button";save.className="subtle";save.textContent="Confirmar registro y crear seguimiento";
+    save.onclick=async()=>{
+     if(activeId!==t.id||user?.id!==actor){dialog.close();return;}
+     if(!permission.checked||!verified.checked){hint.textContent="Debes confirmar autorización y revisión humana.";return;}
+     const digits=phoneInput.value.replace(/\D/g,"");const normalized=digits.length===12&&digits.startsWith("52")?digits.slice(2):digits;
+     const when=new Date(due.value);
+     if(name.value.trim().length<3||normalized.length!==10||!/^\d{10}$/.test(normalized)||!jobSelect.value||!person.value||!Number.isFinite(when.getTime())||when<=new Date(Date.now()+60000)){
+      hint.textContent="Revisa nombre, teléfono de 10 dígitos, vacante, responsable y fecha futura.";return;
+     }
+     save.disabled=true;hint.textContent="Registrando y creando seguimiento…";
+     const {data,error}=await db.rpc("cl360_messenger_candidate_register",{
+      p_conversation:t.externalId,p_name:name.value.trim(),p_phone:normalized,p_job_slug:jobSelect.value,
+      p_zone:zone.value.trim(),p_experience:experience.value.trim(),
+      p_consent:true,p_review_confirm:true,p_due_at:when.toISOString(),p_assignee:person.value
+     });
+     if(error||!data?.candidate_id){
+      hint.textContent=String(error?.message||"").includes("candidate_already_exists")
+       ?"Ese teléfono ya tiene expediente para esta vacante. Usa «Expediente CRM» para vincularlo."
+       :"No se guardó el registro. Verifica permisos, datos y que el servicio ya esté habilitado.";
+      save.disabled=false;return;
+     }
+     dialog.close();
+     if(activeId===t.id&&user?.id===actor){
+      $("reply-hint").textContent=data.already_linked?"El expediente ya estaba vinculado.":"Candidato registrado; seguimiento creado en CRM para el responsable elegido.";
+      await refresh(true);
+     }
+    };
+    dialog.append(hint,save,cancel);
+   }
+   dialog.addEventListener("close",()=>dialog.remove(),{once:true});
+   document.body.append(dialog);dialog.showModal();
+  }catch{
+   if(activeId===t.id&&user?.id===actor)$("reply-hint").textContent="Registro supervisado aún no disponible. Falta habilitar y probar la función segura del CRM.";
+  }finally{button.disabled=false;}
+ };
+}
+
 function renderActions(t){
  const wrap=$("human-controls");wrap.replaceChildren();
  if(t.channel==="messenger"){const info=document.createElement("span");info.className="control-note";info.textContent=t.status==="closed"?"Conversación cerrada.":t.handler_id===user?.id?"Atención humana · Tienes el control.":t.handler_id?"Atención humana · Asignada a otro integrante.":"Andy supervisado · Solo borradores.";wrap.append(info);
@@ -354,6 +463,7 @@ function renderActions(t){
   const auto=document.createElement("button");auto.type="button";auto.className="subtle";auto.disabled=true;auto.textContent="Andy automático · Próximamente";wrap.append(auto);
  }
  appendCandidateLink(wrap,t);
+ appendCandidateRegistration(wrap,t);
  appendAndyMemoryControls(wrap,t);
  if(!t.handler_id)appendAndyDraftControls(wrap,t);if(messengerPending(t)&&messengerPending(t)!=="unavailable"){const b=document.createElement("button");b.type="button";b.className="subtle";b.textContent="Verifiqué en Meta";b.onclick=()=>{if(messengerSending)return;if(confirm("Confirma que revisaste el historial en Meta. Esto desbloquea un nuevo envío, no reenvía el anterior.")){sessionStorage.removeItem(messengerKey(t));updateComposer();renderActions(t);}};wrap.append(b);}updateComposer();return;}
  const c=candidate(t.candidate_id),mine=t.status==="human"&&t.handler_id===user?.id;
