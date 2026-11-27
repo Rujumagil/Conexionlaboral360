@@ -195,6 +195,28 @@ async function openConversation(id,changeLayout=true,preserveDraft=false){
  renderActions(t);
  renderContext(t,data||[]);
 }
+
+function appendIntakeReview(panel,messages){
+ const fields=[["Nombre declarado",/con qui[eé]n tengo el gusto\?/i],["Zona declarada",/por qu[eé] colonia o zona vives\?/i],["Experiencia declarada",/(has trabajado antes en seguridad privada|tienes experiencia trabajando en seguridad privada)\?/i]];
+ const evidence=new Map();
+ let pending=null;
+ for(const m of messages){
+  if(m.source==="staff"){pending=fields.find(([,pattern])=>pattern.test(m.body||""))?.[0]||null;continue;}
+  if(m.source==="candidate"&&pending){
+   const value=String(m.body||"").trim();
+   if(value&&value.length<=180&&!/[?¿]|\d{7,}|https?:|@/i.test(value)&&! /^(hola|gracias|ok|no gracias|no me interesa)$/i.test(value))evidence.set(pending,value);
+   pending=null;
+  }
+ }
+ const detail=document.createElement("details");detail.className="context-system";detail.open=true;
+ const title=document.createElement("summary");title.textContent="Expediente preliminar · "+evidence.size+"/3 datos por revisar";detail.append(title);
+ const note=document.createElement("p");note.textContent="Respuestas del chat, no datos verificados. Confirma identidad y consentimiento antes de vincular o registrar un expediente. No se guardan copias automáticamente.";detail.append(note);
+ for(const [label] of fields){const row=document.createElement("div");row.className="context-row";const name=document.createElement("small");name.textContent=label;const value=document.createElement("strong");value.textContent=evidence.get(label)||"Por confirmar";row.append(name,value);detail.append(row);}
+ const last=messages.filter(m=>m.source==="candidate").at(-1);
+ if(last&&/\b(ll[aá]mame|m[aá]rcame|llamar|llamada|marcarme|contactame)\b/i.test(last.body||"")){const p=document.createElement("p");p.textContent="Próxima acción sugerida: revisar solicitud de llamada. No hay una tarea creada automáticamente.";detail.append(p);}
+ panel.append(detail);
+}
+
 function renderContext(t,messages){
  const panel=$("context-details");panel.replaceChildren();
  const c=candidate(t.candidate_id);
@@ -207,6 +229,7 @@ function renderContext(t,messages){
   const content=document.createElement("strong");content.textContent=value;
   row.append(name,content);panel.append(row);
  }
+ if(t.channel==="messenger")appendIntakeReview(panel,messages);
  const system=messages.filter(m=>m.source==="system");
  if(system.length){
   const detail=document.createElement("details");detail.className="context-system";
