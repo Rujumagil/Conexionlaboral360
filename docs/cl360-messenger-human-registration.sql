@@ -87,7 +87,9 @@ begin
   end if;
 
   normalized_phone := regexp_replace(coalesce(p_phone,''),'[^0-9]','','g');
-  if length(normalized_phone)=12 and left(normalized_phone,2)='52' then
+  if length(normalized_phone)=13 and left(normalized_phone,3)='521' then
+    normalized_phone := right(normalized_phone,10);
+  elsif length(normalized_phone)=12 and left(normalized_phone,2)='52' then
     normalized_phone := right(normalized_phone,10);
   end if;
   if length(full_name)<3 or length(full_name)>120
@@ -112,10 +114,13 @@ begin
       and m.role::text in ('owner','admin','manager','sales','support')
   ) then raise exception 'assignee_not_available' using errcode='22023'; end if;
 
+  -- Serializa altas Messenger del mismo teléfono/vacante, incluso desde chats distintos.
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(ws::text || ':' || p_job_slug || ':' || normalized_phone, 0));
   -- Nunca vincular de forma silenciosa un número que ya está asociado a la misma vacante.
   if exists(
     select 1 from public.cl360_candidates c
-    where c.workspace_id=ws and c.phone=normalized_phone and c.job_slug=p_job_slug
+    where c.workspace_id=ws and c.job_slug=p_job_slug
+      and regexp_replace(c.phone,'[^0-9]','','g') in (normalized_phone,'52'||normalized_phone,'521'||normalized_phone)
   ) then raise exception 'candidate_already_exists_use_manual_link' using errcode='23505'; end if;
 
   insert into public.cl360_candidates(
