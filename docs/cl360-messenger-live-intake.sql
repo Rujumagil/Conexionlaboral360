@@ -5,7 +5,7 @@ returns jsonb language plpgsql immutable security invoker set search_path='' as 
 declare m jsonb; body text; norm text; pending text; field_key text; value text; digits text; matches text[]; evidence jsonb:='{}'; conflicts jsonb:='{}'; item jsonb; call_requested boolean:=false; declined boolean:=false;
 begin
  if jsonb_typeof(p_messages) is distinct from 'array' then return jsonb_build_object('fields','{}'::jsonb,'conflicts','{}'::jsonb,'call_requested',false,'declined',false); end if;
- for m in select value from jsonb_array_elements(p_messages) loop
+ for m in select x.elem from jsonb_array_elements(p_messages) as x(elem) loop
   body:=btrim(coalesce(m->>'body',''));
   norm:=lower(translate(body,'ÁÉÍÓÚÜÑáéíóúüñ','AEIOUUNaeiouun'));
   if m->>'direction'='outgoing' then
@@ -27,8 +27,8 @@ begin
    if norm ~ '^(mi nombre es|me llamo) ' then field_key:='name';value:=btrim(regexp_replace(body,'^(mi nombre es|me llamo) +','','i'));
    elsif norm ~ '^(vivo en|radico en|mi colonia es) ' then field_key:='zone';value:=btrim(regexp_replace(body,'^(vivo en|radico en|mi colonia es) +','','i'));
    elsif norm ~ '^(si tengo experiencia|tengo experiencia|no tengo experiencia|sin experiencia|he trabajado|no he trabajado)' then field_key:='experience';value:=body;
-   elsif pending in ('name','zone','experience','shift') and norm !~ '^(hola|gracias|ok|sale|perfecto|no gracias|buenas|buenos dias|no me interesa)$' and body !~ '[0-9]{7,}' then
-    if pending='experience' or (pending in ('name','zone','shift') and norm !~ '^(si|no|claro|de acuerdo)$') then field_key:=pending;value:=body; end if;
+   elsif pending in ('name','zone','experience') and norm !~ '^(hola|gracias|ok|sale|perfecto|no gracias|buenas|buenos dias|no me interesa)$' and body !~ '[0-9]{7,}' then
+    if pending='experience' or (pending in ('name','zone') and norm !~ '^(si|no|claro|de acuerdo)$') then field_key:=pending;value:=body; end if;
    end if;
    if field_key='name' and (value ~ '[0-9]' or char_length(value)<3 or norm ~ '(vacante|informacion|sueldo|trabajo|horario|turno)') then field_key:=null;end if;
    if field_key='zone' and norm ~ '(vacante|informacion|sueldo|horario|turno|busco)' then field_key:=null;end if;
@@ -66,7 +66,7 @@ grant execute on function public.cl360_extract_intake(jsonb) to authenticated;
 
 create or replace function public.cl360_messenger_live_intake(p_conversation uuid)
 returns jsonb language sql stable security invoker set search_path='' as $$
- select public.cl360_extract_intake(public.cl360_messenger_inbox(p_conversation));
+ select case when p_conversation is null then public.cl360_extract_intake('[]'::jsonb) else public.cl360_extract_intake(public.cl360_messenger_inbox(p_conversation)) end;
 $$;
 revoke all on function public.cl360_messenger_live_intake(uuid) from public,anon,authenticated;
 grant execute on function public.cl360_messenger_live_intake(uuid) to authenticated;
