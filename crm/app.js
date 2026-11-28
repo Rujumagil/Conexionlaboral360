@@ -941,10 +941,31 @@ function openCandidate(id){
  renderDetail(c);
  $("detail").scrollIntoView({behavior:"smooth",block:"start"});
 }
+let messengerContacts=[],messengerUnavailable=false;
+function messengerState(x){return ["closed","archived"].includes(x.status)?"closed":x.assigned_user_id?"human":"waiting";}
+function openMessenger(x){location.href=new window.URL("../mensajes/?conversation="+encodeURIComponent(x.id),document.baseURI).href;}
+function messengerCard(x,compact=false){
+ const b=document.createElement("button");b.type="button";b.className=compact?"inbox-item":"pipeline-card";
+ const name=document.createElement("b");name.textContent=x.display_name||"Contacto de Facebook";
+ const channel=document.createElement("span");channel.className="small";channel.textContent="Facebook Messenger · "+(x.candidate_id?"Expediente vinculado":"Contacto preliminar");
+ const date=document.createElement("span");date.className="small";date.textContent=fmt(x.last_message_at);
+ const state=document.createElement("span");state.className="pill";state.textContent=conversationLabel(messengerState(x));
+ b.append(name,channel,date,state);
+ if(compact&&x.last_message_preview){const preview=document.createElement("span");preview.className="small";preview.textContent=String(x.last_message_preview).slice(0,150);b.append(preview);}
+ b.addEventListener("click",()=>openMessenger(x));return b;
+}
 const pipelineStages=["new","contacted","screening","interview","qualified","hired","rejected","archived"];
 function renderPipeline(){
  const board=$("pipeline-board");
  board.replaceChildren();
+ const preliminary=document.createElement("section");preliminary.className="pipeline-column";
+ const header=document.createElement("div");header.className="pipeline-column-header";
+ const heading=document.createElement("b");heading.textContent="Contactos Messenger";
+ const pending=messengerContacts.filter(x=>!x.candidate_id&&messengerState(x)!=="closed");
+ const count=document.createElement("span");count.textContent=messengerUnavailable?"—":pending.length;header.append(heading,count);preliminary.append(header);
+ const help=document.createElement("p");help.className="small";help.textContent=messengerUnavailable?"No se pudo consultar Messenger. Actualiza el CRM.":"Contactos por revisar; todavía no son postulaciones confirmadas.";preliminary.append(help);
+ for(const x of pending)preliminary.append(messengerCard(x));
+ board.append(preliminary);
  pipelineStages.forEach(stage=>{
   const col=document.createElement("section");col.className="pipeline-column";
   const header=document.createElement("div");header.className="pipeline-column-header";
@@ -969,21 +990,26 @@ function conversationLabel(s){return({waiting:"Pendiente",bot:"Asistente virtual
 function conversationCandidate(t){return candidates.find(c=>c.id===t.candidate_id);}
 async function loadConversations(){
  if(!canLoad)return;
- const {data,error}=await db.from("cl360_conversations")
-  .select("id,candidate_id,status,handler_id,taken_at,last_message_at,created_at")
-  .eq("workspace_id",WS).order("last_message_at",{ascending:false}).limit(300);
- if(error){conversationsLoadError=true;console.error("No se pudo consultar la bandeja.");return;}
- conversationsLoadError=false;threads=data||[];
- $("nav-inbox-count").textContent=threads.filter(t=>t.status==="waiting").length;
- renderHome();renderInbox();renderFlyAgents();
+ const [internal,external]=await Promise.all([
+  db.from("cl360_conversations").select("id,candidate_id,status,handler_id,taken_at,last_message_at,created_at,live_chat_enabled").eq("workspace_id",WS).order("last_message_at",{ascending:false}).limit(300),
+  db.rpc("cl360_messenger_pipeline")
+ ]);
+ conversationsLoadError=!!internal.error;threads=internal.error?[]:(internal.data||[]);
+ messengerUnavailable=!!external.error;messengerContacts=external.error?[]:(external.data||[]);
+ const linked=new Set(messengerContacts.map(x=>x.candidate_id).filter(Boolean));
+ $("nav-inbox-count").textContent=threads.filter(t=>t.status==="waiting"&&(!linked.has(t.candidate_id)||t.live_chat_enabled)).length+messengerContacts.filter(x=>messengerState(x)==="waiting").length;
+ renderHome();renderInbox();renderFlyAgents();renderPipeline();
 }
 function renderInbox(){
  const list=$("inbox-threads");
  const filter=$("inbox-filter").value;
- const matched=threads.filter(t=>filter==="all"||t.status===filter);
+ const linked=new Set(messengerContacts.map(x=>x.candidate_id).filter(Boolean));
+ const matched=threads.filter(t=>(filter==="all"||t.status===filter)&&(!linked.has(t.candidate_id)||t.live_chat_enabled));
+ const external=messengerContacts.filter(x=>filter==="all"||messengerState(x)===filter);
  list.replaceChildren();
- if(conversationsLoadError){list.innerHTML='<p class="empty">No pudimos cargar la bandeja. Intenta actualizar.</p>';return;}
- if(!matched.length){list.innerHTML='<p class="empty">No hay conversaciones en esta sección todavía.</p>';return;}
+ if(conversationsLoadError||messengerUnavailable){const warning=document.createElement("p");warning.className="empty";warning.textContent="No pudimos cargar uno de los canales. Intenta actualizar.";list.append(warning);}
+ if(!matched.length&&!external.length&&!conversationsLoadError&&!messengerUnavailable){list.innerHTML='<p class="empty">No hay conversaciones en esta sección todavía.</p>';return;}
+ external.forEach(x=>list.append(messengerCard(x,true)));
  matched.forEach(t=>{
   const c=conversationCandidate(t);
   const button=document.createElement("button");button.type="button";
