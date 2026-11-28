@@ -25,6 +25,17 @@ const memory=new Map(),inFlight=new Set();
 const hash=async value=>Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value))),x=>x.toString(16).padStart(2,"0")).join("");
 async function notify(actor,events,valid,scope){
  if(!actor||!events.length||!valid()||!root.Notification||root.Notification.permission!=="granted"||!root.crypto?.subtle||inFlight.has(actor))return;
+ // On this origin, a registered CRM device uses the remote sender instead of duplicate local alerts.
+ try{
+  const marker="cl360-push-active:"+await hash(actor);
+  if(localStorage.getItem(marker)==="1"){
+   const crmScope=new URL("../crm/",scope).href;
+   const crmWorker=await navigator.serviceWorker?.getRegistration(crmScope);
+   if(crmWorker?.scope===crmScope&&await crmWorker.pushManager?.getSubscription())return;
+   localStorage.removeItem(marker);
+  }
+ }catch{}
+ if(!valid()||inFlight.has(actor))return;
  inFlight.add(actor);
  try{
  const run=async()=>{
