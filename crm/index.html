@@ -41,10 +41,10 @@
    <div class="toolbar-actions"><button class="btn ghost" id="install-crm" type="button">⬇ Instalar app</button><span id="install-crm-status" class="small" role="status"></span><button type="button" class="btn ghost alerts-button" id="crm-alerts-toggle" aria-expanded="false" aria-controls="crm-alerts-panel">🔔 Alertas <span id="crm-alerts-count" class="alerts-count" hidden>0</span></button><span id="last-updated" class="stamp">Última actualización —</span><button class="btn ghost" id="global-refresh" type="button">↻ Actualizar</button><a class="btn yellow" href="../asistente/" target="_blank" rel="noopener noreferrer">Ver asistente ↗</a></div>
  </div>
  <div class="crm-alerts-panel hide" id="crm-alerts-panel" aria-label="Centro de alertas">
-  <div class="alerts-head"><div><strong>Alertas de seguimiento</strong><p>Avisos de tareas vencidas y próximas</p></div><button type="button" class="btn ghost" id="crm-alerts-close">Cerrar</button></div>
+  <div class="alerts-head"><div><strong>Alertas de seguimiento</strong><p>Solicitudes de Messenger, entrevistas y seguimientos</p></div><button type="button" class="btn ghost" id="crm-alerts-close">Cerrar</button></div>
   <div id="crm-alerts-list" aria-live="polite">Consultando agenda…</div>
   <button type="button" class="btn ghost" id="crm-enable-notifications">Activar avisos del navegador</button>
-  <p id="crm-notification-status" class="small">Los avisos del navegador funcionan mientras esta app está abierta. No son notificaciones push con la app cerrada.</p>
+  <p id="crm-notification-status" class="small">Activa avisos para solicitudes de llamada, atención humana, expedientes y agenda. Funcionan mientras la app esté abierta.</p>
  </div>
  <div class="app-content">
   <section class="app-view" data-view="inicio" id="view-inicio">
@@ -156,6 +156,6 @@
 </main>
 <!-- Shared application layout: views use separate GitHub Pages URLs. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.min.js"></script>
-<script src="app.js" defer></script>
+<script src="../assets/cl360-alerts.js" defer></script><script src="app.js" defer></script>
 </body>
 </html>
