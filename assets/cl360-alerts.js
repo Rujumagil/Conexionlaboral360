@@ -29,9 +29,11 @@ async function notify(actor,events,valid,scope){
  try{
   const marker="cl360-push-active:"+await hash(actor);
   if(localStorage.getItem(marker)==="1"){
-   const crmScope=new URL("../crm/",scope).href;
-   const crmWorker=await navigator.serviceWorker?.getRegistration(crmScope);
-   if(crmWorker?.scope===crmScope&&await crmWorker.pushManager?.getSubscription())return;
+   for(const app of ["crm","mensajes"]){
+    const appScope=new URL("../"+app+"/",scope).href;
+    const worker=await navigator.serviceWorker?.getRegistration(appScope);
+    if(worker?.scope===appScope&&await worker.pushManager?.getSubscription())return;
+   }
    localStorage.removeItem(marker);
   }
  }catch{}
