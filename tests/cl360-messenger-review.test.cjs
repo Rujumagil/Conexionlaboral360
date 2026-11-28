@@ -77,7 +77,9 @@ test("El expediente renderiza las tres etiquetas completas y sus respuestas", ()
   const element = () => ({children:[],textContent:"",append(...items){this.children.push(...items);}});
   const document = {createElement:element};
   const panel = element();
-  vm.runInNewContext(source+"\n"+render+"\nappendIntakeReview(panel,messages)",{document,panel,messages:[
+  const declarations = js.match(/function extractMessengerDeclarations\(messages\)\{[\s\S]*?\n\}/)?.[0];
+  assert.ok(declarations);
+  vm.runInNewContext(source+"\n"+declarations+"\n"+render+"\nappendIntakeReview(panel,messages)",{document,panel,messages:[
     {source:"staff",body:"¿Con quién tengo el gusto?"},{source:"candidate",body:"María Ejemplo"},
     {source:"staff",body:"¿Por qué colonia o zona vives?"},{source:"candidate",body:"Zapopan"},
     {source:"staff",body:"¿Tienes experiencia trabajando en seguridad privada?"},{source:"candidate",body:"Dos años"}

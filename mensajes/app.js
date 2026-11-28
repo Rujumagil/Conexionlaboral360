@@ -28,6 +28,8 @@ async function authenticate(){
   showApp(false);$("signin-error").textContent="Esta cuenta no tiene permiso para consultar estos mensajes.";return;
  }
  user=current;showApp(true);await refresh();
+ const requested=new URLSearchParams(location.search).get("conversation");
+ if(requested&&threads.some(t=>t.id==="messenger:"+requested))await openConversation("messenger:"+requested);
  if(refreshTimer)clearInterval(refreshTimer);
  refreshTimer=setInterval(()=>{if(document.visibilityState==="visible")refresh(true);},30000);
 }
@@ -40,16 +42,19 @@ async function refresh(silent=false){
   db.from("cl360_candidates").select("id,full_name,phone,job_slug,stage").eq("workspace_id",WS).limit(500),
   db.from("cl360_jobs").select("slug,title,status").eq("workspace_id",WS).limit(100),
   db.from("cl360_chat_messages").select("conversation_id,source,visibility,body,created_at").eq("workspace_id",WS).order("created_at",{ascending:false}).limit(500),
-  db.rpc("cl360_messenger_inbox")
+  db.rpc("cl360_messenger_pipeline")
  ]);
  loading=false;$("refresh").disabled=false;
  if(t.error||c.error||j.error){$("count").textContent="Error al cargar. Pulsa ↻ para reintentar.";return;}
  messengerReadError=!!fb.error;
  threads=t.data||[];candidates=c.data||[];jobs=j.data||[];previews=m.error?[]:(m.data||[]);
+ const linked=new Set((fb.data||[]).map(x=>x.candidate_id).filter(Boolean));
+ threads=threads.filter(t=>!linked.has(t.candidate_id)||t.live_chat_enabled);
  for(const x of fb.data||[]){
   const id="messenger:"+x.id;
-  threads.push({id,externalId:x.id,channel:"messenger",candidate_id:id,status:["closed","archived"].includes(x.status)?"closed":x.assigned_user_id?"human":"waiting",handler_id:x.assigned_user_id,last_message_at:x.last_message_at});
-  candidates.push({id,full_name:x.display_name||"Contacto de Facebook",job_slug:"Facebook Messenger"});
+  const real=x.candidate_id&&candidate(x.candidate_id);
+  threads.push({id,externalId:x.id,channel:"messenger",candidate_id:real?real.id:id,status:["closed","archived"].includes(x.status)?"closed":x.assigned_user_id?"human":"waiting",handler_id:x.assigned_user_id,last_message_at:x.last_message_at});
+  if(!real)candidates.push({id,full_name:x.display_name||"Contacto de Facebook",job_slug:"Facebook Messenger"});
   if(x.last_message_preview)previews.push({conversation_id:id,source:"candidate",visibility:"candidate",body:x.last_message_preview});
  }
  renderThreads();
@@ -210,13 +215,32 @@ function extractIntakeEvidence(messages){
  }
  return evidence;
 }
+function extractMessengerDeclarations(messages){
+ const phones=new Set(),shifts=new Set();
+ for(const m of messages){
+  if(m.source!=="candidate")continue;
+  const body=String(m.body||"");
+  for(const match of body.matchAll(/(?<!\d)(?:(?:\+?52)[ .()-]*(?:1[ .()-]*)?)?(?:\(?\d{2,3}\)?[ .-]*)\d{3,4}[ .-]*\d{4}(?!\d)/g)){
+   let digits=match[0].replace(/\D/g,"");
+   if(digits.length===13&&digits.startsWith("521"))digits=digits.slice(3);
+   else if(digits.length===12&&digits.startsWith("52"))digits=digits.slice(2);
+   if(digits.length===10)phones.add(digits);
+  }
+  for(const match of body.matchAll(/\b(?:24\s*[x×/]\s*48|24\s*[x×/]\s*24|12\s*[x×/]\s*12|12\s*[x×/]\s*24|diurno|nocturno|vespertino)\b/gi))shifts.add(match[0].toLowerCase());
+ }
+ return {phone:phones.size===1?[...phones][0]:"",phoneAmbiguous:phones.size>1,shift:shifts.size===1?[...shifts][0]:"",shiftAmbiguous:shifts.size>1};
+}
 function appendIntakeReview(panel,messages){
  const fields=["Nombre declarado","Zona declarada","Experiencia declarada"];
  const evidence=extractIntakeEvidence(messages);
  const detail=document.createElement("details");detail.className="context-system";detail.open=true;
  const title=document.createElement("summary");title.textContent="Expediente preliminar · "+evidence.size+"/3 datos por revisar";detail.append(title);
+ const declared=extractMessengerDeclarations(messages);
  const note=document.createElement("p");note.textContent="Respuestas del chat, no datos verificados. Confirma identidad y consentimiento antes de vincular o registrar un expediente. No se guardan copias automáticamente.";detail.append(note);
  for(const label of fields){const row=document.createElement("div");row.className="context-row";const name=document.createElement("small");name.textContent=label;const value=document.createElement("strong");value.textContent=evidence.get(label)||"Por confirmar";row.append(name,value);detail.append(row);}
+ for(const [label,value] of [["Teléfono sugerido",declared.phoneAmbiguous?"Varios números; confirmar":declared.phone||"Por confirmar"],["Turno mencionado",declared.shiftAmbiguous?"Varias opciones; confirmar":declared.shift||"Por confirmar"],["Precalificación","Pendiente de revisión humana"]]){
+  const row=document.createElement("div");row.className="context-row";const name=document.createElement("small");name.textContent=label;const content=document.createElement("strong");content.textContent=value;row.append(name,content);detail.append(row);
+ }
  const last=messages.filter(m=>m.source==="candidate").at(-1);
  if(last&&/\b(ll[aá]mame|m[aá]rcame|llamar|llamada|marcarme|contactame)\b/i.test(last.body||"")){const p=document.createElement("p");p.textContent="Próxima acción sugerida: revisar solicitud de llamada. No hay una tarea creada automáticamente.";detail.append(p);}
  panel.append(detail);
@@ -390,7 +414,10 @@ function appendCandidateRegistration(wrap,t){
      input.maxLength=max;input.value=value||"";label.append(input);dialog.append(label);return input;
     };
     const name=field("Nombre confirmado",evidence.get("Nombre declarado"),120);
-    const phoneInput=field("Teléfono proporcionado por el candidato (10 dígitos)","",16,"tel");
+    const declarations=extractMessengerDeclarations(incoming);
+    const phoneInput=field("Teléfono proporcionado por el candidato (10 dígitos)",declarations.phone,16,"tel");
+    const declaredShift=field("Turno declarado (revisar)",declarations.shift,120);
+    if(declarations.shiftAmbiguous){const shiftHint=document.createElement("p");shiftHint.textContent="Se detectaron varias opciones de turno. Confirma con la persona.";dialog.append(shiftHint);}
     const zone=field("Zona declarada (revisar)",evidence.get("Zona declarada"),120);
     const experience=field("Experiencia declarada (no es una evaluación)",evidence.get("Experiencia declarada"),1000,"textarea");
     const jobLabel=document.createElement("label");jobLabel.style.cssText="display:block;margin:12px 0";jobLabel.textContent="Vacante confirmada";
@@ -398,6 +425,15 @@ function appendCandidateRegistration(wrap,t){
     const blank=document.createElement("option");blank.value="";blank.textContent="Selecciona la vacante";jobSelect.append(blank);
     for(const vacancy of jobs.filter(j=>j.status==="active")){const opt=document.createElement("option");opt.value=vacancy.slug;opt.textContent=vacancy.title;jobSelect.append(opt);}
     jobLabel.append(jobSelect);dialog.append(jobLabel);
+    const reviewSelect=(label,options)=>{
+     const row=document.createElement("label");row.style.cssText="display:block;margin:12px 0";row.textContent=label;
+     const select=document.createElement("select");select.style.cssText="width:100%;display:block;padding:9px;margin-top:6px";
+     for(const [value,text] of options){const opt=document.createElement("option");opt.value=value;opt.textContent=text;select.append(opt);}
+     row.append(select);dialog.append(row);return select;
+    };
+    const availability=reviewSelect("Compatibilidad de turno (confirmar con la persona)",[["consultar","Por confirmar"],["si","La persona confirma que le funciona"],["no","La persona indica que no le funciona"]]);
+    const experienceLevel=reviewSelect("Experiencia previa declarada",[["prefiero_comentarlo","Por confirmar / comentar"],["si","Confirma experiencia previa"],["no","Indica que no tiene experiencia previa"]]);
+    jobSelect.onchange=()=>{availability.value="consultar";};
     const teamLabel=document.createElement("label");teamLabel.style.cssText="display:block;margin:12px 0";teamLabel.textContent="Asignar seguimiento a";
     const person=document.createElement("select");person.style.cssText="width:100%;display:block;padding:9px;margin-top:6px";
     for(const member of team.data){
@@ -420,17 +456,18 @@ function appendCandidateRegistration(wrap,t){
     save.onclick=async()=>{
      if(activeId!==t.id||user?.id!==actor){dialog.close();return;}
      if(!permission.checked||!verified.checked){hint.textContent="Debes confirmar autorización y revisión humana.";return;}
-     const digits=phoneInput.value.replace(/\D/g,"");const normalized=digits.length===12&&digits.startsWith("52")?digits.slice(2):digits;
+     const digits=phoneInput.value.replace(/\D/g,"");const normalized=digits.length===13&&digits.startsWith("521")?digits.slice(3):digits.length===12&&digits.startsWith("52")?digits.slice(2):digits;
      const when=new Date(due.value);
      if(name.value.trim().length<3||normalized.length!==10||!/^\d{10}$/.test(normalized)||!jobSelect.value||!person.value||!Number.isFinite(when.getTime())||when<=new Date(Date.now()+60000)||when>new Date(Date.now()+30*86400000)){
       hint.textContent="Revisa nombre, teléfono de 10 dígitos, vacante, responsable y fecha futura.";return;
      }
      save.disabled=true;hint.textContent="Registrando y creando seguimiento…";
      try{
-     const {data,error}=await db.rpc("cl360_messenger_candidate_register",{
+     const {data,error}=await db.rpc("cl360_messenger_candidate_register_v2",{
       p_conversation:t.externalId,p_name:name.value.trim(),p_phone:normalized,p_job_slug:jobSelect.value,
       p_zone:zone.value.trim(),p_experience:experience.value.trim(),
-      p_consent:true,p_review_confirm:true,p_due_at:when.toISOString(),p_assignee:person.value
+      p_consent:true,p_review_confirm:true,p_due_at:when.toISOString(),p_assignee:person.value,
+      p_shift_declared:declaredShift.value.trim(),p_availability:availability.value,p_experience_level:experienceLevel.value
      });
      if(error||!data?.candidate_id){
       hint.textContent=String(error?.message||"").includes("candidate_already_exists")
