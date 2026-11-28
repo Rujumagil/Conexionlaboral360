@@ -20,9 +20,9 @@ self.addEventListener("push",event=>{
   const counts=payload?.counts;
   const body=counts&&typeof counts==="object"?Object.entries(labels).filter(([k])=>Number.isInteger(counts[k])&&counts[k]>0&&counts[k]<=1000).map(([k,label])=>counts[k]+" · "+label).join(" | "):"";
   if(!body)return;
-  event.waitUntil(self.registration.showNotification("Conexión Laboral 360",{body,tag:"cl360-operations",renotify:false,data:{cl360View:"seguimientos"}}));return;
+  event.waitUntil(self.registration.showNotification("Conexión Laboral 360",{body,tag:"cl360-operations",renotify:false,silent:false,data:{cl360View:"seguimientos"}}));return;
  }
  if(!Object.prototype.hasOwnProperty.call(types,type))return;
  const item=types[type];
- event.waitUntil(self.registration.showNotification("Conexión Laboral 360",{body:item.body,tag:"cl360-push-"+type,data:{cl360View:item.view==="inicio"?"seguimientos":item.view}}));
+ event.waitUntil(self.registration.showNotification("Conexión Laboral 360",{body:item.body,tag:"cl360-push-"+type,silent:false,data:{cl360View:item.view==="inicio"?"seguimientos":item.view}}));
 });
