@@ -175,7 +175,10 @@ async function openConversation(id,changeLayout=true,preserveDraft=false){
  $("timeline").textContent="Cargando historial…";
  $("reply").value=draft;resizeReply();updateComposer();
  if(changeLayout){$("conversation-section").classList.remove("hidden-mobile");$("inbox-section").classList.add("hidden-mobile");}
- const response=t.channel==="messenger"?await db.rpc("cl360_messenger_inbox",{p_conversation:t.externalId}):await db.from("cl360_chat_messages").select("id,source,visibility,body,created_at").eq("workspace_id",WS).eq("conversation_id",id).order("created_at",{ascending:true}).limit(150);
+ const [response,live]=await Promise.all([
+ t.channel==="messenger"?db.rpc("cl360_messenger_inbox",{p_conversation:t.externalId}):db.from("cl360_chat_messages").select("id,source,visibility,body,created_at").eq("workspace_id",WS).eq("conversation_id",id).order("created_at",{ascending:true}).limit(150),
+ t.channel==="messenger"?db.rpc("cl360_messenger_live_intake",{p_conversation:t.externalId}):Promise.resolve({data:null})
+ ]);
  const error=response.error;
  const data=t.channel==="messenger"?(response.data||[]).map(m=>({...m,source:m.direction==="incoming"?"candidate":"staff",visibility:"candidate",body:m.body||"["+ (m.message_type||"Mensaje") +"]"})):response.data;
  if(activeId!==id)return;
@@ -198,7 +201,7 @@ async function openConversation(id,changeLayout=true,preserveDraft=false){
  if(preserveDraft&&oldHeight>0&&oldHeight-oldScroll>timeline.clientHeight+75)timeline.scrollTop=oldScroll;
  else timeline.scrollTop=timeline.scrollHeight;
  renderActions(t);
- renderContext(t,data||[]);
+ renderContext(t,data||[],live.error?null:live.data);
 }
 
 function extractIntakeEvidence(messages){
@@ -230,19 +233,22 @@ function extractMessengerDeclarations(messages){
  }
  return {phone:phones.size===1?[...phones][0]:"",phoneAmbiguous:phones.size>1,shift:shifts.size===1?[...shifts][0]:"",shiftAmbiguous:shifts.size>1};
 }
-function appendIntakeReview(panel,messages){
+function appendIntakeReview(panel,messages,live){
  const fields=["Nombre declarado","Zona declarada","Experiencia declarada"];
  const evidence=extractIntakeEvidence(messages);
+ const keys={"Nombre declarado":"name","Zona declarada":"zone","Experiencia declarada":"experience"};
+ if(live){evidence.clear();for(const label of fields){const key=keys[label];if(live.fields?.[key]?.value&&!live.conflicts?.[key])evidence.set(label,live.fields[key].value);}}
  const detail=document.createElement("details");detail.className="context-system";detail.open=true;
- const title=document.createElement("summary");title.textContent="Expediente preliminar · "+evidence.size+"/3 datos por revisar";detail.append(title);
- const declared=extractMessengerDeclarations(messages);
+ const title=document.createElement("summary");title.textContent="Expediente preliminar · "+(live?Object.keys(live.fields||{}).filter(k=>!live.conflicts?.[k]).length+"/5":evidence.size+"/3")+" datos por revisar";detail.append(title);
+ const declared=live?{phone:live.fields?.phone?.value||"",phoneAmbiguous:!!live.conflicts?.phone,shift:live.fields?.shift?.value||"",shiftAmbiguous:!!live.conflicts?.shift}:extractMessengerDeclarations(messages);
  const note=document.createElement("p");note.textContent="Respuestas del chat, no datos verificados. Confirma identidad y consentimiento antes de vincular o registrar un expediente. No se guardan copias automáticamente.";detail.append(note);
- for(const label of fields){const row=document.createElement("div");row.className="context-row";const name=document.createElement("small");name.textContent=label;const value=document.createElement("strong");value.textContent=evidence.get(label)||"Por confirmar";row.append(name,value);detail.append(row);}
+ for(const label of fields){const row=document.createElement("div");row.className="context-row";const name=document.createElement("small");name.textContent=label;const value=document.createElement("strong");value.textContent=live?.conflicts?.[keys[label]]?"Respuestas distintas; confirmar":evidence.get(label)||"Por confirmar";row.append(name,value);detail.append(row);}
  for(const [label,value] of [["Teléfono sugerido",declared.phoneAmbiguous?"Varios números; confirmar":declared.phone||"Por confirmar"],["Turno mencionado",declared.shiftAmbiguous?"Varias opciones; confirmar":declared.shift||"Por confirmar"],["Precalificación","Pendiente de revisión humana"]]){
   const row=document.createElement("div");row.className="context-row";const name=document.createElement("small");name.textContent=label;const content=document.createElement("strong");content.textContent=value;row.append(name,content);detail.append(row);
  }
+ if(live?.declined){const p=document.createElement("p");p.textContent="Hay una solicitud de no continuar o no contactar en el historial. Revisar antes de cualquier seguimiento.";detail.append(p);}
  const last=messages.filter(m=>m.source==="candidate").at(-1);
- if(last&&/\b(ll[aá]mame|m[aá]rcame|llamar|llamada|marcarme|contactame)\b/i.test(last.body||"")){const p=document.createElement("p");p.textContent="Próxima acción sugerida: revisar solicitud de llamada. No hay una tarea creada automáticamente.";detail.append(p);}
+ if(live?.call_requested||(!live&&last&&/\b(ll[aá]mame|m[aá]rcame|llamar|llamada|marcarme|contactame)\b/i.test(last.body||""))){const p=document.createElement("p");p.textContent="Próxima acción sugerida: revisar solicitud de llamada. No hay una tarea creada automáticamente.";detail.append(p);}
  panel.append(detail);
 }
 
@@ -257,7 +263,7 @@ function appendAndyProgress(panel,progress){
  for(const [label,value] of rows){const row=document.createElement("div");row.className="context-row";const name=document.createElement("small");name.textContent=label;const content=document.createElement("strong");content.textContent=value;row.append(name,content);detail.append(row);}
  panel.append(detail);
 }
-function renderContext(t,messages){
+function renderContext(t,messages,live){
  const panel=$("context-details");panel.replaceChildren();
  const c=candidate(t.candidate_id);
  const rows=[["Nombre",c?.full_name||"No informado"],["Vacante",job(c?.job_slug)],
@@ -269,7 +275,7 @@ function renderContext(t,messages){
   const content=document.createElement("strong");content.textContent=value;
   row.append(name,content);panel.append(row);
  }
- if(t.channel==="messenger"){appendIntakeReview(panel,messages);appendAndyProgress(panel,t.andy);}
+ if(t.channel==="messenger"){appendIntakeReview(panel,messages,live);appendAndyProgress(panel,t.andy);}
  const system=messages.filter(m=>m.source==="system");
  if(system.length){
   const detail=document.createElement("details");detail.className="context-system";
