@@ -67,12 +67,13 @@ async function refresh(silent=false){
  loading=false;$("refresh").disabled=false;
  if(user?.id!==actor)return;
  if(t.error||c.error||j.error){$("count").textContent="Error al cargar. Pulsa ↻ para reintentar.";return;}
- messengerReadError=!!fb.error;
- if(!fb.error){window.CL360Sound?.observe(fb.data||[],actor);void pollMessageAlerts(fb.data||[],actor).catch(()=>{});}
+ messengerReadError=!!fb.error||!Array.isArray(fb.data);
+ const external=messengerReadError?[]:fb.data;
+ if(!messengerReadError){window.CL360Sound?.observe(external,actor);void pollMessageAlerts(external,actor).catch(()=>{});}
  threads=t.data||[];candidates=c.data||[];jobs=j.data||[];previews=m.error?[]:(m.data||[]);
- const linked=new Set((fb.data||[]).map(x=>x.candidate_id).filter(Boolean));
+ const linked=new Set(external.map(x=>x.candidate_id).filter(Boolean));
  threads=threads.filter(t=>!linked.has(t.candidate_id)||t.live_chat_enabled);
- for(const x of fb.data||[]){
+ for(const x of external){
   const id="messenger:"+x.id;
   const real=x.candidate_id&&candidate(x.candidate_id);
   threads.push({id,externalId:x.id,channel:"messenger",candidate_id:real?real.id:id,andy:x.andy||null,status:["closed","archived"].includes(x.status)?"closed":x.assigned_user_id?"human":"waiting",handler_id:x.assigned_user_id,last_message_at:x.last_message_at});

@@ -72,7 +72,7 @@ function candidateIntakeSummary(candidate){
 const stageNames={new:"Sin contactar",contacted:"Contactado",screening:"Filtrado",interview:"Entrevista",qualified:"Calificado",hired:"Contratado",rejected:"No seleccionado",archived:"Archivado"};
 let user=null, staffRole=null, candidates=[], followups=[], jobs=[], selected=null, canLoad=false;
 const working=(msg)=>{if($("detail"))$("detail").innerHTML='<p class="loading">'+safe(msg)+'</p>'};
-function authScreen(show){if(show){window.CL360Sound?.reset();operationsLoaded=false;operationsFilter="all";operationsScope="team";pipelineQuery="";pipelineJob="";pipelineScope="all";messengerContacts=[];threads=[];candidates=[];followups=[];$("andy-executive")?.remove();browserReminderEnabled=false;executiveAlertCounts={};executiveAlertOwner=null;previousReminderSignature="";$("crm-alerts-list")?.replaceChildren();}$("auth-screen").classList.toggle("hide",!show);$("dashboard").classList.toggle("hide",show);$("signout").classList.toggle("hide",show);}
+function authScreen(show){if(show){window.CL360Sound?.reset();operationsLoaded=false;operationsFilter="all";operationsScope="team";agendaFilter="all";agendaKind="all";agendaOwner="all";pipelineQuery="";pipelineJob="";pipelineScope="all";messengerContacts=[];threads=[];candidates=[];followups=[];$("andy-executive")?.remove();browserReminderEnabled=false;executiveAlertCounts={};executiveAlertOwner=null;previousReminderSignature="";$("crm-alerts-list")?.replaceChildren();}$("auth-screen").classList.toggle("hide",!show);$("dashboard").classList.toggle("hide",show);$("signout").classList.toggle("hide",show);}
 function err(error){alert(error?.message||"No se pudo completar la operación. Reintenta.");}
 async function checkFlyAvailability(){
  try{
@@ -569,12 +569,17 @@ function showQuickFollowup(row,candidate){
  });
  row.append(form);titleInput.focus();
 }
-let agendaFilter="all";
+let agendaFilter="all",agendaKind="all",agendaOwner="all";
+function followupKind(title){const q=String(title||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();return /\bentrevistas?\b/.test(q)?"interview":/\b(llamar|llamada|llamadas|telefonica|telefonico|marcar)\b/.test(q)?"call":"other";}
+function agendaMatches(f,kind,owner,actor){return (kind==="all"||followupKind(f.title)===kind)&&(owner==="all"||owner==="mine"&&f.assigned_user_id===actor||owner==="unassigned"&&!f.assigned_user_id);}
+function validFutureFollowup(value,now=Date.now()){const ms=Date.parse(value);return Number.isFinite(ms)&&ms>now;}
+
 function renderFollowups(){
  const panel=$("followups");if(!panel)return;
  const now=Date.now(),dayFormat=new Intl.DateTimeFormat("en-CA",{timeZone:"America/Mexico_City",year:"numeric",month:"2-digit",day:"2-digit"});
  const day=dayFormat.format(now);
- const pending=followups.filter(f=>f.status==="pending").sort((a,b)=>(Date.parse(a.due_at)||Infinity)-(Date.parse(b.due_at)||Infinity));
+ const allPending=followups.filter(f=>f.status==="pending");
+ const pending=allPending.filter(f=>agendaMatches(f,agendaKind,agendaOwner,user?.id)).sort((a,b)=>(Date.parse(a.due_at)||Infinity)-(Date.parse(b.due_at)||Infinity));
  const overdue=pending.filter(f=>Number.isFinite(Date.parse(f.due_at))&&Date.parse(f.due_at)<now);
  const today=pending.filter(f=>Date.parse(f.due_at)>=now&&dayFormat.format(new Date(f.due_at))===day);
  const future=pending.filter(f=>Date.parse(f.due_at)>=now&&dayFormat.format(new Date(f.due_at))!==day);
@@ -582,6 +587,11 @@ function renderFollowups(){
  panel.replaceChildren();
  const heading=document.createElement("h3");heading.textContent="Agenda inteligente · Fly Operations";panel.append(heading);
  const intro=document.createElement("p");intro.className="small";intro.textContent="Prioridades según vencimiento registrado, hora de Ciudad de México. Incluye entrevistas cuando están programadas como seguimiento. Datos cargados del CRM.";panel.append(intro);
+ const filters=document.createElement("div");filters.className="agenda-controls";
+ const addFilter=(label,options,value,set)=>{const wrap=document.createElement("label");wrap.textContent=label;const select=document.createElement("select");select.className="field";select.setAttribute("aria-label",label);for(const [key,text] of options){const o=document.createElement("option");o.value=key;o.textContent=text;select.append(o);}select.value=value;select.onchange=()=>{set(select.value);renderFollowups();};wrap.append(select);filters.append(wrap);};
+ addFilter("Tipo de actividad",[["all","Todas"],["call","Llamadas"],["interview","Entrevistas"],["other","Otros seguimientos"]],agendaKind,v=>{agendaKind=v;});
+ addFilter("Responsable",[["all","Todo el equipo"],["mine","Mis tareas"],["unassigned","Sin asignar"]],agendaOwner,v=>{agendaOwner=v;});
+ panel.append(filters);
  const groups=[["overdue","Vencidos",overdue],["today","Hoy · por atender",today],["future","Próximos días",future],["undated","Sin fecha válida",undated]];
  const summary=document.createElement("div");summary.className="fly-metric-grid";
  for(const [key,label,items] of groups){const b=document.createElement("button");b.type="button";b.className="fly-mini-metric";b.style.cssText="cursor:pointer;text-align:left;border:1px solid #dce6f1;background:white;"+(agendaFilter===key?"outline:2px solid #155486":"");b.setAttribute("aria-pressed",String(agendaFilter===key));const n=document.createElement("strong");n.textContent=String(items.length);const t=document.createElement("span");t.textContent=label;b.append(n,t);b.onclick=()=>{agendaFilter=agendaFilter===key?"all":key;renderFollowups();};summary.append(b);}panel.append(summary);
@@ -589,9 +599,36 @@ function renderFollowups(){
  for(const [key,label,items] of groups){if(agendaFilter!=="all"&&agendaFilter!==key)continue;const h=document.createElement("h4");h.textContent=label+" · "+items.length;panel.append(h);
  if(!items.length){const p=document.createElement("p");p.className="small";p.textContent="Sin tareas en esta sección.";panel.append(p);continue;}
  for(const f of items){const c=candidates.find(x=>x.id===f.candidate_id);const row=flyActionRow(f.title,(c?.full_name||"Candidato")+" · "+(Number.isFinite(Date.parse(f.due_at))?new Date(f.due_at).toLocaleString("es-MX",{timeZone:"America/Mexico_City"}):"Fecha por revisar"),c?()=>openCandidate(c.id):null,"Expediente");
- const done=document.createElement("button");done.type="button";done.className="btn ghost";done.textContent="Completar";done.onclick=async()=>{done.disabled=true;const {error}=await db.from("cl360_followups").update({status:"done"}).eq("id",f.id).eq("workspace_id",WS).eq("status","pending");if(error){done.disabled=false;return err(error);}await load();};row.append(done);panel.append(row);}
+ const actions=document.createElement("div");actions.className="agenda-row-actions";
+ const tag=document.createElement("span");tag.className="pill";tag.textContent=({call:"Llamada",interview:"Entrevista",other:"Seguimiento"})[followupKind(f.title)]+(f.assigned_user_id===user?.id?" · Mi tarea":!f.assigned_user_id?" · Sin asignar":" · Asignada");actions.append(tag);
+ const feedback=document.createElement("p");feedback.className="small";feedback.setAttribute("role","status");
+ const done=document.createElement("button");done.type="button";done.className="btn ghost";done.textContent="Completar";
+ const move=document.createElement("button");move.type="button";move.className="btn ghost";move.textContent="Reprogramar";
+ let busy=false;const actor=user?.id;
+ async function updateTask(changes){
+  if(busy||!canLoad||!actor||user?.id!==actor)return false;
+  busy=true;done.disabled=true;move.disabled=true;
+  try{let query=db.from("cl360_followups").update(changes).eq("id",f.id).eq("workspace_id",WS).eq("status","pending");
+   if(f.due_at)query=query.eq("due_at",f.due_at);
+   const {data,error}=await query.select("id");
+   if(error||!Array.isArray(data)||data.length!==1){feedback.textContent="No se confirmó el cambio. Actualiza la agenda y revisa permisos.";return false;}
+   await load();return true;
+  }catch{feedback.textContent="No se confirmó el cambio. Actualiza la agenda antes de reintentar.";return false;}finally{busy=false;done.disabled=false;move.disabled=false;}
  }
- const r=flyInsightsAt(now),unplanned=r.newCandidates.filter(c=>!pending.some(f=>f.candidate_id===c.id));const h=document.createElement("h3");h.textContent="Candidatos nuevos sin seguimiento pendiente · "+unplanned.length;panel.append(h);
+ done.onclick=()=>{if(confirm("¿Confirmas que esta actividad se realizó? No se cambiará la etapa del candidato."))void updateTask({status:"done"});};
+ move.onclick=()=>{if(busy||row.querySelector(".agenda-reschedule"))return;
+  const form=document.createElement("form");form.className="agenda-reschedule";
+  const label=document.createElement("label");label.textContent="Nueva fecha y hora (zona horaria de este dispositivo)";
+  const input=document.createElement("input");input.type="datetime-local";input.className="field";input.required=true;
+  const old=new Date(f.due_at);if(Number.isFinite(old.getTime()))input.value=new Date(old.getTime()-old.getTimezoneOffset()*60000).toISOString().slice(0,16);
+  label.append(input);const save=document.createElement("button");save.type="submit";save.className="btn";save.textContent="Guardar nueva fecha";
+  const cancel=document.createElement("button");cancel.type="button";cancel.className="btn ghost";cancel.textContent="Cancelar";cancel.onclick=()=>{if(!busy)form.remove();};
+  form.append(label,save,cancel);form.onsubmit=async e=>{e.preventDefault();if(!validFutureFollowup(input.value)){feedback.textContent="Selecciona una fecha futura válida.";return;}save.disabled=true;await updateTask({due_at:new Date(input.value).toISOString()});save.disabled=false;};
+  row.append(form);input.focus();
+ };
+ actions.append(move,done);row.append(actions,feedback);panel.append(row);}
+ }
+ const r=flyInsightsAt(now),unplanned=r.newCandidates.filter(c=>!allPending.some(f=>f.candidate_id===c.id));const h=document.createElement("h3");h.textContent="Candidatos nuevos sin seguimiento pendiente · "+unplanned.length;panel.append(h);
  for(const c of unplanned.slice(0,10))panel.append(flyActionRow(c.full_name,title(c.job_slug)+" · Primer contacto por revisar",()=>openCandidate(c.id),"Programar desde expediente"));
  if(unplanned.length>10)panel.append(flyActionRow("Más expedientes","Consulta los candidatos restantes.",()=>navigate("candidatos"),"Ver candidatos"));
  if(!unplanned.length){const p=document.createElement("p");p.className="small";p.textContent="Sin expedientes nuevos sin tarea pendiente entre los registros cargados.";panel.append(p);}
