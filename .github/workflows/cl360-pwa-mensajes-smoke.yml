@@ -56,7 +56,7 @@ jobs:
                     update(){return query},then(resolve){return Promise.resolve({data:rows[name]||[],error:null}).then(resolve)}};
                    return query;
                  },
-                 rpc:async(method,params)=>{if(method==='cl360_take_conversation'){
+                 rpc:async(method,params)=>{if(method==='cl360_messenger_pipeline')return {data:[],error:null};if(method==='cl360_take_conversation'){
                    thread.status=params.p_action==='take'?'human':params.p_action==='release'?'waiting':params.p_action==='close'?'closed':'waiting';
                    thread.handler_id=thread.status==='human'?owner:null;
                  }return {data:'human',error:null};}
@@ -68,6 +68,8 @@ jobs:
            await page.locator('#dashboard').waitFor({state:'visible',timeout:15000});
            if(!await page.locator('#install-crm').isVisible())throw Error('No aparece Instalar app');
            const inline=page.locator('link[rel="manifest"]');if(await inline.count()!==1)throw Error('Falta vínculo al manifest');
+           await page.locator('#home-operations .operations-priorities').waitFor({state:'visible'});
+           if(!await page.locator('#home-operations').getByText('Atender primero', {exact:false}).isVisible())throw Error('No aparece centro prioritario');
            await page.locator('.mobile-nav [data-nav="conversaciones"]').click();
            await page.locator('#view-conversaciones').waitFor({state:'visible'});
            await page.locator('#inbox-threads button').first().click();

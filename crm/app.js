@@ -1117,9 +1117,9 @@ async function loadConversations(){
   db.rpc("cl360_messenger_pipeline")
  ]);
  if(!canLoad||user?.id!==actor)return;
- conversationsLoadError=!!internal.error;threads=internal.error?[]:(internal.data||[]);
- messengerUnavailable=!!external.error;messengerContacts=external.error?[]:(external.data||[]);operationsLoaded=true;
- if(!external.error)window.CL360Sound?.observe(messengerContacts,actor);
+ conversationsLoadError=!!internal.error||!Array.isArray(internal.data);threads=conversationsLoadError?[]:internal.data;
+ messengerUnavailable=!!external.error||!Array.isArray(external.data);messengerContacts=messengerUnavailable?[]:external.data;operationsLoaded=true;
+ if(!messengerUnavailable)window.CL360Sound?.observe(messengerContacts,actor);
  const linked=new Set(messengerContacts.map(x=>x.candidate_id).filter(Boolean));
  $("nav-inbox-count").textContent=threads.filter(t=>t.status==="waiting"&&(!linked.has(t.candidate_id)||t.live_chat_enabled)).length+messengerContacts.filter(x=>messengerState(x)==="waiting").length;
  renderHome();renderInbox();renderFlyAgents();renderPipeline();renderCrmAlerts();maybeNotifyOverdue();
