@@ -72,7 +72,7 @@ function candidateIntakeSummary(candidate){
 const stageNames={new:"Sin contactar",contacted:"Contactado",screening:"Filtrado",interview:"Entrevista",qualified:"Calificado",hired:"Contratado",rejected:"No seleccionado",archived:"Archivado"};
 let user=null, staffRole=null, candidates=[], followups=[], jobs=[], selected=null, canLoad=false;
 const working=(msg)=>{if($("detail"))$("detail").innerHTML='<p class="loading">'+safe(msg)+'</p>'};
-function authScreen(show){if(show){operationsLoaded=false;operationsFilter="all";operationsScope="team";messengerContacts=[];threads=[];candidates=[];followups=[];$("andy-executive")?.remove();browserReminderEnabled=false;executiveAlertCounts={};executiveAlertOwner=null;previousReminderSignature="";$("crm-alerts-list")?.replaceChildren();}$("auth-screen").classList.toggle("hide",!show);$("dashboard").classList.toggle("hide",show);$("signout").classList.toggle("hide",show);}
+function authScreen(show){if(show){window.CL360Sound?.reset();operationsLoaded=false;operationsFilter="all";operationsScope="team";messengerContacts=[];threads=[];candidates=[];followups=[];$("andy-executive")?.remove();browserReminderEnabled=false;executiveAlertCounts={};executiveAlertOwner=null;previousReminderSignature="";$("crm-alerts-list")?.replaceChildren();}$("auth-screen").classList.toggle("hide",!show);$("dashboard").classList.toggle("hide",show);$("signout").classList.toggle("hide",show);}
 function err(error){alert(error?.message||"No se pudo completar la operación. Reintenta.");}
 async function checkFlyAvailability(){
  try{
@@ -813,6 +813,10 @@ function renderMarketing(){
 
 let activeView="inicio",threads=[],messages=[],activeConversationId=null,conversationsLoadError=false;
 const routeBase=new window.URL("./",document.baseURI);
+$("crm-sound-test")?.addEventListener("click",async()=>{
+ try{await window.CL360Sound.test();$("crm-sound-status").textContent="Sonido activado. Debes escuchar dos tonos; sonará en nuevos mensajes mientras el CRM esté visible.";}
+ catch(e){$("crm-sound-status").textContent="No se pudo reproducir. Revisa volumen y permisos de audio: "+e.message;}
+});
 const pushClient=window.CL360Push?.setup({db,url:URL,key:KEY,scope:routeBase.href,getActor:()=>canLoad?user?.id:null,onStatus:message=>{$("crm-push-status").textContent=message;}});
 for(const [id,action] of [["crm-push-enable","enable"],["crm-push-test","test"],["crm-push-disable","disable"]]){
  $(id)?.addEventListener("click",()=>pushClient?.perform(action));
@@ -1079,6 +1083,7 @@ async function loadConversations(){
  if(!canLoad||user?.id!==actor)return;
  conversationsLoadError=!!internal.error;threads=internal.error?[]:(internal.data||[]);
  messengerUnavailable=!!external.error;messengerContacts=external.error?[]:(external.data||[]);operationsLoaded=true;
+ if(!external.error)window.CL360Sound?.observe(messengerContacts,actor);
  const linked=new Set(messengerContacts.map(x=>x.candidate_id).filter(Boolean));
  $("nav-inbox-count").textContent=threads.filter(t=>t.status==="waiting"&&(!linked.has(t.candidate_id)||t.live_chat_enabled)).length+messengerContacts.filter(x=>messengerState(x)==="waiting").length;
  renderHome();renderInbox();renderFlyAgents();renderPipeline();renderCrmAlerts();maybeNotifyOverdue();

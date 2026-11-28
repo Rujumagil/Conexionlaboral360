@@ -16,18 +16,25 @@ function setup({db,url,key,scope,getActor,onStatus}){
   if(error||!session||session.user.id!==actor||getActor()!==actor)throw Error("session_required");
   const res=await fetch(endpoint,{method:"POST",headers:{apikey:key,Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"},body:JSON.stringify(body),cache:"no-store"});
   const result=await res.json().catch(()=>null);
-  if(!res.ok||!result?.ok)throw Error(result?.error||"push_unavailable");
+  if(!res.ok||!result?.ok)throw Error(result?.error||(res.status===401?"session_required":res.status===403?"push_forbidden":"push_http_"+res.status));
   return result;
  }
  async function registration(){
   if(!root.isSecureContext||!root.Notification||!root.PushManager||!navigator.serviceWorker)throw Error("unsupported");
-  const reg=await navigator.serviceWorker.getRegistration(scope);
+  let reg=await navigator.serviceWorker.getRegistration(scope);
+  if(!reg||reg.scope!==scope)reg=await navigator.serviceWorker.register(new URL("sw.js",scope).href,{scope});
+  if(!reg.active){
+   const worker=reg.installing||reg.waiting;
+   if(worker)await new Promise(resolve=>{let timer;const done=()=>{clearTimeout(timer);worker.removeEventListener("statechange",check);resolve();};const check=()=>{if(["activated","redundant"].includes(worker.state))done();};timer=setTimeout(done,8000);worker.addEventListener("statechange",check);check();});
+   reg=await navigator.serviceWorker.getRegistration(scope);
+  }
   if(!reg?.active||!reg.pushManager||reg.scope!==scope)throw Error("worker_not_ready");
   return reg;
  }
  async function perform(action){
   if(busy)return;const actor=getActor();if(!actor)return;
   busy=true;
+  onStatus(action==="enable"?"Registrando dispositivo…":action==="test"?"Enviando prueba…":"Desactivando push…");
   try{
    if(action==="enable"){
     // Request permission before asynchronous work to preserve the click gesture on iOS.
@@ -49,8 +56,8 @@ function setup({db,url,key,scope,getActor,onStatus}){
     else if(action==="disable"){await request({action:"disable",endpoint:sub.endpoint},actor);await mark(actor,false);await sub.unsubscribe();onStatus("Notificaciones push desactivadas en este dispositivo.");}
    }
   }catch(e){
-   const labels={unsupported:"El navegador no admite Web Push. En iPhone instala primero la app en la pantalla de inicio.",worker_not_ready:"Abre o actualiza la aplicación instalada y vuelve a intentar.",permission_denied:"Permiso no concedido; revisa los ajustes de notificaciones.",vapid_missing:"El servidor aún no tiene configuradas las claves push.",device_not_registered:"Primero activa las notificaciones push.",retry_after_10_seconds:"Espera 10 segundos desde la activación antes de probar.",registration_failed:"No se pudo registrar el dispositivo. Si está asociado a otra cuenta, desactívalo con esa cuenta.",session_required:"Inicia sesión para gestionar este dispositivo."};
-   onStatus(labels[e.message]||"No se pudo completar la operación push. Revisa la conexión e inténtalo nuevamente.");
+   const labels={unsupported:"El navegador no admite Web Push. En iPhone instala primero la app en la pantalla de inicio.",worker_not_ready:"Abre o actualiza la aplicación instalada y vuelve a intentar.",permission_denied:"Permiso no concedido; revisa los ajustes de notificaciones.",vapid_missing:"El servidor aún no tiene configuradas las claves push.",device_not_registered:"Primero activa las notificaciones push.",retry_after_10_seconds:"Espera 10 segundos desde la activación antes de probar.",registration_failed:"No se pudo registrar el dispositivo. Si está asociado a otra cuenta, desactívalo con esa cuenta.",session_required:"Inicia sesión para gestionar este dispositivo.",push_forbidden:"El servidor no autorizó este usuario u origen. Confirma que usas el acceso oficial y tu cuenta de reclutamiento."};
+   onStatus(labels[e.message]||"No se pudo completar la operación push ("+(e.message.startsWith("push_http_")?e.message:e.name||"error") +"). Revisa la conexión e inténtalo nuevamente.");
   }finally{busy=false;}
  }
  return {perform};
