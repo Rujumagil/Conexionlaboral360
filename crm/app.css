@@ -201,3 +201,13 @@ body{background:#edf2f8}
 .historical-foot{margin:12px 0 0;line-height:1.5}
 @media(max-width:760px){.historical-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.crm-alerts-panel{margin:8px;max-width:none}.historical-chart{gap:2px;padding:10px 4px 0}.historical-bar-item small{font-size:.54rem;writing-mode:vertical-rl;min-height:45px}}
 @media(max-width:430px){.alerts-head{flex-wrap:wrap}.alert-task{align-items:start;flex-direction:column}.alert-task button{align-self:flex-end}.historical-stat{padding:10px}}
+
+/* Operations queue: compact on mobile, full navigation in Seguimientos. */
+.operations-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:10px 0 14px}
+.operations-toolbar label{font-size:.85rem;color:var(--muted)}
+.operations-toolbar select{max-width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+.operations-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:8px;margin:10px 0 16px}
+.operations-metric{cursor:pointer;text-align:left;min-width:0;min-height:72px;background:#fff;overflow-wrap:anywhere}
+.operations-metric[aria-pressed="true"]{outline:2px solid var(--blue);outline-offset:-2px;background:#eef6fc}
+.operations-group-title{font-size:1rem;margin:20px 0 8px;border-bottom:1px solid var(--line);padding-bottom:6px}
+@media(max-width:480px){.operations-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.operations-toolbar{align-items:flex-start}.operations-toolbar label{display:flex;flex-direction:column;gap:5px}}
