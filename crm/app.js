@@ -953,6 +953,7 @@ function messengerCard(x,compact=false){
  const state=document.createElement("span");state.className="pill";state.textContent=conversationLabel(messengerState(x));
  b.append(name,channel,date,state);
  if(x.andy){const progress=document.createElement("span");progress.className="small";progress.textContent=x.andy.human_requested||x.andy.handoff_sent?"Andy derivó a revisión humana":x.andy.sent_count?"Andy · "+x.andy.sent_count+" respuestas enviadas":"Sin respuestas automáticas registradas";b.append(progress);}
+ if(x.intake){const intake=document.createElement("span");intake.className="small";intake.textContent=x.intake.declined?"Revisar solicitud de no continuar":x.intake.call_requested?"Solicitó llamada · revisar":x.intake.needs_review?"Datos en conflicto · revisar":(x.intake.available_count||0)+"/"+(x.intake.field_count||5)+" datos declarados por revisar";b.append(intake);}
  if(compact&&x.last_message_preview){const preview=document.createElement("span");preview.className="small";preview.textContent=String(x.last_message_preview).slice(0,150);b.append(preview);}
  b.addEventListener("click",()=>openMessenger(x));return b;
 }
