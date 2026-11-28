@@ -10,7 +10,7 @@ begin
   norm:=lower(translate(body,'ÁÉÍÓÚÜÑáéíóúüñ','AEIOUUNaeiouun'));
   if m->>'direction'='outgoing' then
    pending:=null;
-   if coalesce(m->>'status','') in ('failed','pending') then continue; end if;
+   if coalesce(m->>'status','') not in ('sent','delivered','read') or m->>'message_type' is distinct from 'text' or body !~ '[?¿]' then continue; end if;
    pending:=case when norm ~ 'con quien tengo el gusto|cual es tu nombre' then 'name'
      when norm ~ 'por que colonia o zona vives|en que (colonia|zona|municipio) vives|donde vives' then 'zone'
      when norm ~ 'has trabajado antes en seguridad privada|tienes experiencia trabajando en seguridad privada|tienes experiencia en seguridad' then 'experience'
@@ -20,8 +20,8 @@ begin
    continue;
   end if;
   if m->>'direction' is distinct from 'incoming' or m->>'message_type' is distinct from 'text' then pending:=null;continue;end if;
-  if norm ~ '(no me (escribas|contactes|interesa)|no estoy interesad[oa]|eliminar mis datos|no quiero continuar)' then declined:=true; end if;
-  if norm ~ '(llamame|marcame|contactame|contacteme|puedes llamar|pueden llamar|puede llamarme)' then call_requested:=true; end if;
+  if norm ~ '(no me (escribas|escriban|contactes|contacten|llames|llamen|marques|marquen|interesa)|no estoy interesad[oa]|eliminar mis datos|no quiero continuar)' then declined:=true; pending:=null; continue; end if;
+  if norm ~ '(llamame|marcame|contactame|contacteme|puedes llamar|pueden llamar|puede llamarme)' and norm !~ '(no (puedes|pueden|puede|quiero)|no me)' then call_requested:=true; end if;
   field_key:=null;value:=null;
   if char_length(body) between 2 and 180 and body !~ '[?¿]|https?://|@' then
    if norm ~ '^(mi nombre es|me llamo) ' then field_key:='name';value:=btrim(regexp_replace(body,'^(mi nombre es|me llamo) +','','i'));
@@ -40,7 +40,7 @@ begin
    end if;
   end if;
   -- Only explicitly labeled or standalone phone-like text, not numbers in links or unrelated IDs.
-  if body !~ 'https?://|@' and (pending='phone' or norm ~ '(telefono|celular|mi numero|contacteme|contactame)' or norm ~ '^[+0-9 ().-]+$') then
+  if body !~ '[?¿]|https?://|@' and (pending='phone' or norm ~ '(telefono|celular|mi numero|contacteme|contactame)' or norm ~ '^[+0-9 ().-]+$') then
    for matches in select regexp_matches(body,'(?<![0-9])(?:\+?52[ .()-]*(?:1[ .()-]*)?)?\(?[0-9]{2,3}\)?[ .-]*[0-9]{3,4}[ .-]*[0-9]{4}(?![0-9])','g') loop
     digits:=regexp_replace(matches[1],'[^0-9]','','g');
     if length(digits)=13 and left(digits,3)='521' then digits:=right(digits,10);elsif length(digits)=12 and left(digits,2)='52' then digits:=right(digits,10);end if;
@@ -50,7 +50,7 @@ begin
     end if;
    end loop;
   end if;
-  if body !~ '[?¿]|https?://' then
+  if body !~ '[?¿]|https?://' and norm !~ '(no (puedo|quiero|prefiero|busco|acepto)|no me (funciona|sirve|interesa)|excepto)' then
    for matches in select regexp_matches(norm,'\m(24 *[x×/] *48|24 *[x×/] *24|12 *[x×/] *12|12 *[x×/] *24|diurno|nocturno|vespertino)\M','g') loop
     value:=regexp_replace(replace(replace(matches[1],'×','x'),'/','x'),' ','','g');
     if evidence ? 'shift' and lower(evidence->'shift'->>'value')<>value then conflicts:=conflicts||jsonb_build_object('shift',true);end if;
@@ -59,6 +59,7 @@ begin
   end if;
   pending:=null;
  end loop;
+ if declined then return jsonb_build_object('fields','{}'::jsonb,'conflicts','{}'::jsonb,'call_requested',false,'declined',true); end if;
  return jsonb_build_object('fields',evidence,'conflicts',conflicts,'call_requested',call_requested,'declined',declined);
 end $$;
 revoke all on function public.cl360_extract_intake(jsonb) from public,anon,authenticated;
