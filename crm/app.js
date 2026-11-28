@@ -47,7 +47,7 @@ function candidateIntakeSummary(candidate){
  if(!screened.preferred_zone)review.push("Zona preferida sin especificar.");
  review.push("Validar requisitos, sueldo, prestaciones y siguientes pasos con la persona reclutadora.");
  const fields=[
-  screened.source_channel==="facebook_messenger"?"RESUMEN DE PREENTREVISTA · MESSENGER":"RESUMEN DE PREENTREVISTA · ANDY",
+  screened.source_channel==="whatsapp_manual"?"RESUMEN DE REGISTRO MANUAL · WHATSAPP":screened.source_channel==="facebook_messenger"?"RESUMEN DE PREENTREVISTA · MESSENGER":"RESUMEN DE PREENTREVISTA · ANDY",
   "Estado: Pendiente de revisión humana",
   "Candidato: "+(candidate.full_name||"Por confirmar"),
   "Teléfono: "+(candidate.phone||"Por confirmar"),
@@ -72,7 +72,7 @@ function candidateIntakeSummary(candidate){
 const stageNames={new:"Sin contactar",contacted:"Contactado",screening:"Filtrado",interview:"Entrevista",qualified:"Calificado",hired:"Contratado",rejected:"No seleccionado",archived:"Archivado"};
 let user=null, staffRole=null, candidates=[], followups=[], jobs=[], selected=null, canLoad=false;
 const working=(msg)=>{if($("detail"))$("detail").innerHTML='<p class="loading">'+safe(msg)+'</p>'};
-function authScreen(show){if(show){window.CL360Sound?.reset();operationsLoaded=false;operationsFilter="all";operationsScope="team";agendaFilter="all";agendaKind="all";agendaOwner="all";pipelineQuery="";pipelineJob="";pipelineScope="all";messengerContacts=[];threads=[];candidates=[];followups=[];$("andy-executive")?.remove();browserReminderEnabled=false;executiveAlertCounts={};executiveAlertOwner=null;previousReminderSignature="";$("crm-alerts-list")?.replaceChildren();}$("auth-screen").classList.toggle("hide",!show);$("dashboard").classList.toggle("hide",show);$("signout").classList.toggle("hide",show);}
+function authScreen(show){if(show){$("manual-candidate-panel")?.remove();$("filter-candidate-source")?.remove();window.CL360Sound?.reset();operationsLoaded=false;operationsFilter="all";operationsScope="team";agendaFilter="all";agendaKind="all";agendaOwner="all";pipelineQuery="";pipelineJob="";pipelineScope="all";messengerContacts=[];threads=[];candidates=[];followups=[];$("andy-executive")?.remove();browserReminderEnabled=false;executiveAlertCounts={};executiveAlertOwner=null;previousReminderSignature="";$("crm-alerts-list")?.replaceChildren();}$("auth-screen").classList.toggle("hide",!show);$("dashboard").classList.toggle("hide",show);$("signout").classList.toggle("hide",show);}
 function err(error){alert(error?.message||"No se pudo completar la operación. Reintenta.");}
 async function checkFlyAvailability(){
  try{
@@ -152,11 +152,84 @@ $("new-job-form").addEventListener("submit",async(e)=>{
  if(error){$("job-error").textContent="No se pudo guardar la vacante. Revisa si el nombre ya existe.";return;}
  e.target.reset();await load();
 });
+function whatsappManualPhone(value){
+ const raw=String(value??"").trim();
+ if(!/^[+0-9(). -]{10,30}$/.test(raw))return "";
+ let digits=raw.replace(/\D/g,"");
+ if(digits.length===13&&digits.startsWith("521"))digits=digits.slice(-10);
+ else if(digits.length===12&&digits.startsWith("52"))digits=digits.slice(-10);
+ return /^\d{10}$/.test(digits)?digits:"";
+}
+function manualCandidateSource(c){
+ return c.screening_data?.source_channel==="whatsapp_manual"?"WhatsApp · Registro manual":({whatsapp:"WhatsApp",facebook:"Facebook",landing:"Página web",manual:"Manual",fly:"Andy"})[c.source]||"Sin origen";
+}
+function mountManualCandidate(){
+ if(!$("manual-candidate-form")){
+  const intro=document.querySelector?.("#view-candidatos .page-intro");
+  if(!intro)return;
+  const panel=document.createElement("section");panel.className="panel form-block";panel.id="manual-candidate-panel";
+  panel.innerHTML='<div class="panel-head"><div><h2>Registro manual · WhatsApp</h2><p class="small">Agrega a quienes te escriben directamente. No se importan chats ni se envían mensajes automáticos.</p></div><button type="button" class="btn yellow" id="manual-candidate-toggle" aria-expanded="false">+ Registrar candidato</button></div><p id="manual-candidate-status" class="small" role="status" aria-live="polite"></p><form id="manual-candidate-form" class="hide">'+
+   '<div class="job-form-grid"><div><label class="label" for="manual-name">Nombre completo *</label><input class="field" id="manual-name" required minlength="3" maxlength="120" autocomplete="off"></div>'+
+   '<div><label class="label" for="manual-phone">WhatsApp (México) *</label><input class="field" id="manual-phone" type="tel" required maxlength="30" placeholder="33 1234 5678" autocomplete="off"></div>'+
+   '<div><label class="label" for="manual-job">Vacante activa *</label><select class="field" id="manual-job" required><option value="">Selecciona una vacante</option></select></div>'+
+   '<div><label class="label" for="manual-zone">Zona de interés</label><input class="field" id="manual-zone" maxlength="120"></div>'+
+   '<div><label class="label" for="manual-due">Próximo seguimiento (opcional)</label><input type="datetime-local" class="field" id="manual-due"></div></div>'+
+   '<label class="label" for="manual-experience">Experiencia declarada</label><textarea class="field" id="manual-experience" maxlength="1000"></textarea>'+
+   '<label class="label" for="manual-note">Nota de seguimiento</label><textarea class="field" id="manual-note" maxlength="1300" placeholder="Resumen de lo acordado, sin documentos ni datos sensibles"></textarea>'+
+   '<p><label><input type="checkbox" id="manual-contacted"> Ya respondí personalmente al candidato</label></p>'+
+   '<p><label><input type="checkbox" id="manual-consent" required> Confirmo que la persona autorizó el registro de sus datos y conoce el <a href="../aviso-candidatos.html" target="_blank" rel="noopener noreferrer">aviso de privacidad</a>.</label></p>'+
+   '<button class="btn yellow" id="manual-save" type="submit">Guardar candidato</button> <button class="btn ghost" id="manual-cancel" type="button">Cancelar</button><p id="manual-error" class="error" role="alert"></p></form>';
+  intro.after(panel);
+  const close=()=>{$("manual-candidate-form").reset();$("manual-candidate-form").classList.add("hide");$("manual-candidate-toggle").setAttribute("aria-expanded","false");$("manual-error").textContent="";};
+  $("manual-candidate-toggle").addEventListener("click",()=>{
+   const form=$("manual-candidate-form");
+   if(!form.classList.contains("hide")){close();return;}
+   $("manual-candidate-status").textContent="";form.classList.remove("hide");$("manual-candidate-toggle").setAttribute("aria-expanded","true");$("manual-name").focus();
+  });
+  $("manual-cancel").addEventListener("click",close);
+  $("manual-candidate-form").addEventListener("submit",async event=>{
+   event.preventDefault();
+   const save=$("manual-save");
+   if(!canLoad||!user||save.disabled)return;
+   const actor=user.id,feedback=$("manual-error"),phone=whatsappManualPhone($("manual-phone").value),name=$("manual-name").value.trim(),job=$("manual-job").value,due=$("manual-due").value;
+   feedback.textContent="";
+   if(name.length<3||!phone||!jobs.some(j=>j.slug===job&&j.status==="active")||!$("manual-consent").checked){feedback.textContent="Verifica nombre, teléfono mexicano, vacante activa y autorización.";return;}
+   const date=due?new Date(due):null;
+   if(date&&(!Number.isFinite(date.getTime())||date.getTime()<=Date.now()||date.getTime()>Date.now()+90*86400000)){feedback.textContent="Elige un seguimiento futuro dentro de los próximos 90 días.";return;}
+   save.disabled=true;
+   try{
+    const {data,error}=await db.rpc("cl360_register_whatsapp_candidate",{p_name:name,p_phone:phone,p_job_slug:job,p_zone:$("manual-zone").value.trim(),p_experience:$("manual-experience").value.trim(),p_note:$("manual-note").value.trim(),p_consent:true,p_contacted:$("manual-contacted").checked,p_due_at:date?date.toISOString():null});
+    if(!canLoad||user?.id!==actor)return;
+    if(error||!data?.candidate_id){feedback.textContent=error?.message==="job_not_active"?"La vacante ya no está activa. Actualiza el CRM.":"No se pudo guardar. Revisa los datos e inténtalo nuevamente.";return;}
+    close();
+    $("manual-candidate-status").textContent=data.already_exists?"Ya existe un expediente con ese teléfono y vacante. No se modificó.":"Candidato registrado desde WhatsApp.";
+    await load();
+    if(!canLoad||user?.id!==actor)return;
+    if(candidates.some(c=>c.id===data.candidate_id)){openCandidate(data.candidate_id);return;}
+    const result=await db.from("cl360_candidates").select("id,full_name,phone,job_slug,area,experience,screening_data,stage,source,campaign_attribution,consent_at,assigned_user_id,last_contact_at,next_followup_at,created_at,submission_count").eq("workspace_id",WS).eq("id",data.candidate_id).maybeSingle();
+    if(canLoad&&user?.id===actor&&result.data&&!result.error){candidates.push(result.data);openCandidate(result.data.id);}
+   }catch{if(canLoad&&user?.id===actor)feedback.textContent="No se pudo confirmar el registro. Reintenta; el servidor evita duplicados.";}
+   finally{save.disabled=false;}
+  });
+  const controls=document.querySelector?.("#candidates-section .controls");
+  if(controls){
+   const source=document.createElement("select");source.id="filter-candidate-source";source.setAttribute("aria-label","Filtrar por origen o responsable");source.innerHTML='<option value="">Todos los candidatos</option><option value="whatsapp_manual">WhatsApp manual</option><option value="mine">Mis candidatos</option>';controls.append(source);source.addEventListener("change",renderCandidates);
+  }
+ }
+ const select=$("manual-job");if(select){
+  const previous=select.value;
+  select.innerHTML='<option value="">Selecciona una vacante</option>'+jobs.filter(j=>j.status==="active").map(j=>'<option value="'+safe(j.slug)+'">'+safe(j.title)+'</option>').join("");
+  if(jobs.some(j=>j.status==="active"&&j.slug===previous))select.value=previous;
+ }
+}
+
 function renderCandidates(){
+ mountManualCandidate();
+ const sourceFilter=$("filter-candidate-source")?.value||"";
  const q=$("search").value.trim().toLocaleLowerCase("es-MX"), stage=$("filter-stage").value, turno=$("filter-turno").value;
- const matching=candidates.filter(x=>(!stage||x.stage===stage)&&(!turno||turno==="si"&&x.screening_data?.availability==="si"||turno==="revisar"&&["no","consultar"].includes(x.screening_data?.availability)||turno==="none"&&!x.screening_data?.availability)&&(!q||[x.full_name,x.phone,title(x.job_slug)].join(" ").toLocaleLowerCase("es-MX").includes(q)));
+ const matching=candidates.filter(x=>(!sourceFilter||sourceFilter==="whatsapp_manual"&&x.screening_data?.source_channel==="whatsapp_manual"||sourceFilter==="mine"&&x.assigned_user_id===user?.id)&&(!stage||x.stage===stage)&&(!turno||turno==="si"&&x.screening_data?.availability==="si"||turno==="revisar"&&["no","consultar"].includes(x.screening_data?.availability)||turno==="none"&&!x.screening_data?.availability)&&(!q||[x.full_name,x.phone,title(x.job_slug)].join(" ").toLocaleLowerCase("es-MX").includes(q)));
  $("result-count").textContent="("+matching.length+")";
- $("candidate-rows").innerHTML=matching.length?matching.map(x=>'<tr data-candidate="'+safe(x.id)+'" tabindex="0" role="button" aria-label="Abrir expediente de '+safe(x.full_name)+'"><td data-label="Candidato"><strong>'+safe(x.full_name)+'</strong><div class="small">'+safe(x.phone)+'</div></td><td data-label="Vacante">'+safe(title(x.job_slug))+'</td><td data-label="Etapa"><span class="pill '+safe(x.stage)+'">'+safe(stageNames[x.stage]||x.stage)+'</span></td><td data-label="Preentrevista"><span class="pill">'+safe(x.screening_data?.availability==="si"?"Turno disponible":["no","consultar"].includes(x.screening_data?.availability)?"Revisar turno":"Por confirmar")+'</span></td><td data-label="Registro">'+safe(fmt(x.created_at))+'</td></tr>').join(""):'<tr><td colspan="5" class="empty">'+(candidates.length?'No hay candidatos que coincidan con los filtros.':'Todavía no hay postulaciones. Los registros aparecerán aquí cuando una persona complete la preentrevista.')+'</td></tr>';
+ $("candidate-rows").innerHTML=matching.length?matching.map(x=>'<tr data-candidate="'+safe(x.id)+'" tabindex="0" role="button" aria-label="Abrir expediente de '+safe(x.full_name)+'"><td data-label="Candidato"><strong>'+safe(x.full_name)+'</strong><div class="small">'+safe(x.phone)+' · '+safe(manualCandidateSource(x))+'</div></td><td data-label="Vacante">'+safe(title(x.job_slug))+'</td><td data-label="Etapa"><span class="pill '+safe(x.stage)+'">'+safe(stageNames[x.stage]||x.stage)+'</span></td><td data-label="Preentrevista"><span class="pill">'+safe(x.screening_data?.availability==="si"?"Turno disponible":["no","consultar"].includes(x.screening_data?.availability)?"Revisar turno":"Por confirmar")+'</span></td><td data-label="Registro">'+safe(fmt(x.created_at))+'</td></tr>').join(""):'<tr><td colspan="5" class="empty">'+(candidates.length?'No hay candidatos que coincidan con los filtros.':'Todavía no hay postulaciones. Los registros aparecerán aquí cuando una persona complete la preentrevista.')+'</td></tr>';
  document.querySelectorAll("[data-candidate]").forEach(row=>{
   const open=()=>{selected=row.dataset.candidate;renderDetail(candidates.find(x=>x.id===selected));if(window.matchMedia("(max-width: 820px)").matches){$("detail").scrollIntoView({behavior:"smooth",block:"start"});}};
   row.addEventListener("click",open);
@@ -637,12 +710,13 @@ async function renderDetail(candidate){
  if(!candidate)return;
  $("detail").classList.remove("hide");
  $("detail").scrollIntoView({behavior:"smooth",block:"start"});
- const phone=String(candidate.phone).replace(/[^+0-9]/g,"");
+ const rawPhone=String(candidate.phone).replace(/[^+0-9]/g,"");
+ const phone=/^[0-9]{10}$/.test(rawPhone)?"+52"+rawPhone:rawPhone;
  const dateOptions=Object.entries(stageNames).map(([v,t])=>'<option value="'+v+'" '+(candidate.stage===v?"selected":"")+'>'+safe(t)+'</option>').join("");
  $("detail").innerHTML='<h3>'+safe(candidate.full_name)+'</h3><p class="detail-sub">'+safe(title(candidate.job_slug))+' · '+safe(candidate.area)+' · Registrado '+safe(fmt(candidate.created_at))+'</p>'+
  '<div class="detail-actions"><a class="btn" target="_blank" rel="noopener noreferrer" href="https://wa.me/'+encodeURIComponent(phone.replace(/^\+/,""))+'">Abrir WhatsApp</a><a class="btn ghost" href="tel:'+encodeURIComponent(phone)+'">Llamar</a></div>'+
  '<label class="label">Teléfono</label><div>'+safe(candidate.phone)+'</div><label class="label">Experiencia declarada</label><div style="white-space:pre-wrap">'+safe(candidate.experience||"Sin información")+'</div>'+
- '<div class="section-divider"></div><b>Origen publicitario</b>'+
+ '<div class="section-divider"></div><b>Origen del registro</b><div>'+safe(manualCandidateSource(candidate))+'</div><div class="section-divider"></div><b>Origen publicitario</b>'+
  '<label class="label">Canal</label><div>'+safe(candidate.campaign_attribution?.utm_source||"Sin atribución registrada")+'</div>'+
  '<label class="label">Campaña</label><div>'+safe(candidate.campaign_attribution?.utm_campaign||candidate.campaign_attribution?.campana||"—")+'</div>'+
  '<label class="label">Anuncio</label><div>'+safe(candidate.campaign_attribution?.utm_content||"—")+'</div>'+
