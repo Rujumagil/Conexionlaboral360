@@ -47,7 +47,7 @@ function candidateIntakeSummary(candidate){
  if(!screened.preferred_zone)review.push("Zona preferida sin especificar.");
  review.push("Validar requisitos, sueldo, prestaciones y siguientes pasos con la persona reclutadora.");
  const fields=[
-  "RESUMEN DE PREENTREVISTA · ANDY",
+  screened.source_channel==="facebook_messenger"?"RESUMEN DE PREENTREVISTA · MESSENGER":"RESUMEN DE PREENTREVISTA · ANDY",
   "Estado: Pendiente de revisión humana",
   "Candidato: "+(candidate.full_name||"Por confirmar"),
   "Teléfono: "+(candidate.phone||"Por confirmar"),
@@ -55,6 +55,7 @@ function candidateIntakeSummary(candidate){
   "Área: "+(job?.area||candidate.area||"Por confirmar"),
   "Zona anunciada: "+(job?.location||"Por confirmar con Astrid"),
   "Turno anunciado: "+(job?.shift||"Por confirmar con Astrid"),
+  "Turno declarado: "+(screened.declared_shift||"Por confirmar"),
   "Experiencia previa: "+(experienceLevels[screened.experience_level]||"Por confirmar"),
   "Experiencia compartida: "+(candidate.experience?.trim()||"Sin descripción"),
   "Disponibilidad: "+(availability[screened.availability]||"Por confirmar"),
