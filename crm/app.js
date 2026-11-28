@@ -813,6 +813,11 @@ function renderMarketing(){
 
 let activeView="inicio",threads=[],messages=[],activeConversationId=null,conversationsLoadError=false;
 const routeBase=new window.URL("./",document.baseURI);
+const pushClient=window.CL360Push?.setup({db,url:URL,key:KEY,scope:routeBase.href,getActor:()=>canLoad?user?.id:null,onStatus:message=>{$("crm-push-status").textContent=message;}});
+for(const [id,action] of [["crm-push-enable","enable"],["crm-push-test","test"],["crm-push-disable","disable"]]){
+ $(id)?.addEventListener("click",()=>pushClient?.perform(action));
+}
+
 function viewFromLocation(){
  const prefix=routeBase.pathname;
  const remainder=location.pathname.startsWith(prefix)?location.pathname.slice(prefix.length).replace(/^\/+|\/+$/g,""):"";
