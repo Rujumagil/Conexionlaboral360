@@ -832,7 +832,44 @@ async function loadMarketingMeta(){
  }
  }catch{if(version===marketingMetaVersion)status.textContent="No fue posible consultar las estadísticas asignadas. Consulta con Compás Evolution.";}
 }
+function recruitmentConversion(external,people,tasks){
+ const chats=[...new Map(external.filter(x=>x&&x.id).map(x=>[x.id,x])).values()];
+ const linked=chats.filter(x=>x.candidate_id);
+ const ids=new Set(linked.map(x=>x.candidate_id));
+ const unique=[...new Map(people.filter(c=>c&&ids.has(c.id)).map(c=>[c.id,c])).values()];
+ const interviewIds=new Set(tasks.filter(t=>t.status==="pending"&&/\bentrevistas?\b/i.test(t.title||"")&&ids.has(t.candidate_id)).map(t=>t.candidate_id));
+ const responded=chats.filter(x=>Number(x.andy?.sent_count)>0).length;
+ const hired=unique.filter(c=>c.stage==="hired").length;
+ return {contacts:chats.length,responded,linked:linked.length,linkedIds:ids.size,loaded:unique.length,missing:ids.size-unique.length,
+  withEvidence:chats.filter(x=>!x.intake?.declined&&Number(x.intake?.available_count)>0).length,
+  awaitingHuman:chats.filter(x=>!["closed","archived"].includes(x.status)&&!x.intake?.declined&&(x.intake?.call_requested||x.andy?.human_requested||x.andy?.handoff_sent||x.assigned_user_id)).length,
+  interviewPending:unique.filter(c=>interviewIds.has(c.id)).length,interviewStage:unique.filter(c=>c.stage==="interview").length,hired};
+}
+function renderRecruitmentConversion(){
+ const anchor=$("marketing-kpis");if(!anchor)return;
+ let panel=$("recruitment-conversion");
+ if(!panel){panel=document.createElement("section");panel.id="recruitment-conversion";panel.className="panel recruitment-conversion";anchor.closest("section").after(panel);}
+ panel.replaceChildren();
+ const h=document.createElement("h2");h.textContent="Conversión de Messenger a contratación";panel.append(h);
+ const desc=document.createElement("p");desc.className="small";desc.textContent="Vista acumulada de las conversaciones y expedientes cargados, independiente del filtro de periodo y de las campañas Meta. Una conversación no equivale necesariamente a una persona única.";panel.append(desc);
+ if(!operationsLoaded||messengerUnavailable){const p=document.createElement("p");p.setAttribute("role","status");p.textContent=operationsLoaded?"Messenger no disponible. Actualiza el CRM para consultar la conversión.":"Consultando conversaciones…";panel.append(p);return;}
+ const r=recruitmentConversion(messengerContacts,candidates,followups);
+ const ratio=(n,d)=>d?new Intl.NumberFormat("es-MX",{style:"percent",maximumFractionDigits:1}).format(n/d):"Sin base";
+ const grid=document.createElement("div");grid.className="fly-metric-grid conversion-rates";
+ for(const [label,value,detail] of [["Conversaciones con respuesta de Andy",ratio(r.responded,r.contacts),r.responded+" / "+r.contacts+" conversaciones"],["Conversaciones vinculadas a expediente",ratio(r.linked,r.contacts),r.linked+" / "+r.contacts+" conversaciones"],["Expedientes vinculados en etapa Contratado",r.missing?"No disponible":ratio(r.hired,r.loaded),r.missing?"Faltan expedientes vinculados en la consulta":r.hired+" / "+r.loaded+" expedientes únicos"]]){
+  const card=document.createElement("div");card.className="fly-mini-metric";const n=document.createElement("strong");n.textContent=value;const l=document.createElement("span");l.textContent=label;const d=document.createElement("span");d.className="small";d.textContent=detail;card.append(n,l,d);grid.append(card);
+ }panel.append(grid);
+ const section=(label,rows,denominator)=>{
+  const box=document.createElement("div");box.className="conversion-section";const title=document.createElement("h3");title.textContent=label;box.append(title);
+  for(const [caption,n] of rows){const row=document.createElement("div");row.className="conversion-row";const head=document.createElement("div");head.className="conversion-row-head";const name=document.createElement("span");name.textContent=caption;const count=document.createElement("strong");count.textContent=String(n);head.append(name,count);const bar=document.createElement("progress");bar.max=Math.max(1,denominator);bar.value=n;bar.setAttribute("aria-label",caption+": "+n+" de "+denominator);row.append(head,bar);box.append(row);}panel.append(box);
+ };
+ section("Captación y atención · conversaciones", [["Contactos recibidos (conversaciones)",r.contacts],["Con respuesta automática enviada",r.responded],["Con datos declarados para revisar",r.withEvidence],["Vinculadas a expediente",r.linked],["Atención humana por revisar",r.awaitingHuman]],r.contacts);
+ section("Resultados · expedientes vinculados únicos", [["Expedientes únicos cargados",r.loaded],["Con entrevista pendiente programada",r.interviewPending],["Actualmente en etapa Entrevista",r.interviewStage],["Actualmente en etapa Contratado",r.hired]],r.loaded);
+ const note=document.createElement("p");note.className="small";note.textContent="Los indicadores son independientes; no prueban una secuencia histórica ni atribuyen contrataciones a Andy. Entrevistas pendientes se identifican por el título de tareas registradas. Hasta 300 conversaciones, 500 expedientes y 500 tareas cargadas."+(r.missing?" Faltan "+r.missing+" expedientes vinculados en esta consulta.":"");panel.append(note);
+ const actions=document.createElement("div");actions.className="conversion-actions";for(const [label,view] of [["Abrir Pipeline","pipeline"],["Revisar agenda","seguimientos"]]){const button=document.createElement("button");button.type="button";button.className="btn ghost";button.textContent=label;button.onclick=()=>navigate(view);actions.append(button);}panel.append(actions);
+}
 function renderMarketing(){
+ renderRecruitmentConversion();
  const panel=$("marketing-kpis"),body=$("marketing-rows");if(!panel||!body)return;
  const period=$("marketing-period").value;
  const cutoff=period==="all"?0:Date.now()-Number(period)*86400000;
@@ -1204,7 +1241,7 @@ async function loadConversations(){
  if(!messengerUnavailable)window.CL360Sound?.observe(messengerContacts,actor);
  const linked=new Set(messengerContacts.map(x=>x.candidate_id).filter(Boolean));
  $("nav-inbox-count").textContent=threads.filter(t=>t.status==="waiting"&&(!linked.has(t.candidate_id)||t.live_chat_enabled)).length+messengerContacts.filter(x=>messengerState(x)==="waiting").length;
- renderHome();renderInbox();renderFlyAgents();renderPipeline();renderCrmAlerts();maybeNotifyOverdue();
+ renderHome();renderInbox();renderFlyAgents();renderPipeline();if(activeView==="marketing")renderRecruitmentConversion();renderCrmAlerts();maybeNotifyOverdue();
 }
 function renderInbox(){
  const list=$("inbox-threads");
