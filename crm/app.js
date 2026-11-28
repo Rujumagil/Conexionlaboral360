@@ -943,7 +943,7 @@ function openCandidate(id){
 }
 let messengerContacts=[],messengerUnavailable=false;
 function messengerState(x){return ["closed","archived"].includes(x.status)?"closed":x.assigned_user_id?"human":"waiting";}
-function openMessenger(x){location.href=new window.URL("../mensajes/?conversation="+encodeURIComponent(x.id),document.baseURI).href;}
+function openMessenger(x){location.href=new window.URL("../mensajes/?conversation="+encodeURIComponent(x.id),routeBase).href;}
 function messengerCard(x,compact=false){
  const b=document.createElement("button");b.type="button";b.className=compact?"inbox-item":"pipeline-card";
  const name=document.createElement("b");name.textContent=x.display_name||"Contacto de Facebook";
