@@ -239,21 +239,20 @@ function alertItems(now=Date.now(),tasks=followups){
   .sort((a,b)=>Date.parse(a.due_at)-Date.parse(b.due_at));
 }
 function renderCrmAlerts(){
- const overdue=alertItems();
  const badge=$("crm-alerts-count"),list=$("crm-alerts-list");
- badge.hidden=!overdue.length;badge.textContent=String(overdue.length);
  list.replaceChildren();
- if(!overdue.length){const p=document.createElement("p");p.className="small";p.textContent="Sin seguimientos vencidos registrados.";list.append(p);return;}
- for(const f of overdue.slice(0,10)){
-  const c=candidates.find(x=>x.id===f.candidate_id);
-  const row=document.createElement("div");row.className="alert-task";
-  const info=document.createElement("div");const title=document.createElement("strong");title.textContent=f.title;
-  const time=document.createElement("small");time.textContent=(c?.full_name||"Candidato")+" · "+fmt(f.due_at);
-  info.append(title,time);const button=document.createElement("button");button.className="btn ghost";button.type="button";button.textContent="Revisar";
-  button.addEventListener("click",()=>{if(c)openCandidate(c.id);else navigate("seguimientos");$("crm-alerts-panel").classList.add("hide");});
-  row.append(info,button);list.append(row);
+ const events=window.CL360Alerts?.collect(messengerContacts,followups,user?.id)||[];
+ badge.hidden=!events.length;badge.textContent=String(events.length);
+ if(messengerUnavailable||conversationsLoadError){const p=document.createElement("p");p.className="small";p.textContent="Consulta parcial: actualiza el CRM para revisar ambos canales.";list.append(p);}
+ if(!events.length){const p=document.createElement("p");p.className="small";p.textContent="Sin alertas prioritarias detectadas en los registros cargados.";list.append(p);return;}
+ for(const event of events.slice(0,30)){
+  const contact=messengerContacts.find(x=>x.id===event.id),task=followups.find(x=>x.id===event.id);
+  const c=task&&candidates.find(x=>x.id===task.candidate_id);
+  const heading=window.CL360Alerts.labels[event.type];
+  const detail=contact?(contact.display_name||"Contacto de Facebook"):task?((c?.full_name||"Candidato")+" · "+fmt(task.due_at)):"Caso por revisar";
+  list.append(flyActionRow(heading,detail,()=>{if(contact)openMessenger(contact);else if(c)openCandidate(c.id);else navigate("seguimientos");$("crm-alerts-panel").classList.add("hide");},"Revisar"));
  }
- if(overdue.length>10){const note=document.createElement("p");note.className="small";note.textContent="Hay "+(overdue.length-10)+" vencimientos adicionales. Revisa la agenda.";list.append(note);}
+ if(events.length>30)list.append(flyActionRow("Más alertas","Consulta todos los casos en el centro de seguimiento.",()=>navigate("seguimientos"),"Abrir centro"));
 }
 let executiveAlertRunning=false,executiveAlertOwner=null,executiveAlertCounts={};
 async function pollExecutiveNotifications(){
@@ -271,27 +270,16 @@ async function pollExecutiveNotifications(){
  for(const [n,label,target,key] of items){
  if(n==null){section.append(flyActionRow(label,"Datos no disponibles",()=>navigate(target),"Revisar"));continue;}
  if(n>0)section.append(flyActionRow(label+" · "+n,"Pendientes actuales",()=>{navigate(target);$("crm-alerts-panel").classList.add("hide");},"Abrir"));
- const previous=executiveAlertCounts[key];
- if(n>0&&(previous===undefined||n>previous)&&browserReminderEnabled&&window.Notification&&Notification.permission==="granted"){
- try{const registration=await navigator.serviceWorker?.getRegistration();if(!valid())return;
- if(registration)await registration.showNotification("Conexión Laboral 360",{body:label+": revisa el CRM.",tag:"cl360-"+key,data:{cl360View:target},renotify:false});
- else{const notification=new Notification("Conexión Laboral 360",{body:label+": revisa el CRM.",tag:"cl360-"+key});notification.onclick=()=>{if(valid()){window.focus();navigate(target);}notification.close();};}
- }catch{}}
  if(!valid())return;executiveAlertCounts[key]=n;
  }
- if(!valid())return;list.prepend(section);const badge=$("crm-alerts-count");const total=alertItems().length+(waiting??0)+(fresh??0);badge.hidden=!total;badge.textContent=String(total);
+ if(!valid())return;list.prepend(section);
  }finally{executiveAlertRunning=false;}
 }
 function maybeNotifyOverdue(){
- if(!browserReminderEnabled||!canLoad||!window.Notification||Notification.permission!=="granted")return;
- const items=alertItems().filter(t=>!t.assigned_user_id||t.assigned_user_id===user?.id);
- if(!items.length){previousReminderSignature="";return;}
- const signature=items.map(t=>t.id+":"+t.due_at).sort().join("|");
- if(signature===previousReminderSignature)return;
- previousReminderSignature=signature;
- try{const notification=new Notification("Conexión Laboral 360 · Seguimientos",{body:items.length+" tarea(s) vencida(s) requieren revisión en el CRM.",tag:"cl360-overdue",renotify:false});
-  notification.onclick=()=>{window.focus();$("crm-alerts-panel").classList.remove("hide");notification.close();};
- }catch{ $("crm-notification-status").textContent="Tu navegador bloqueó el aviso. Los pendientes siguen visibles en el CRM."; }
+ if(!browserReminderEnabled||!canLoad||!user?.id||!operationsLoaded||messengerUnavailable||conversationsLoadError)return;
+ const actor=user.id;
+ const events=window.CL360Alerts?.collect(messengerContacts,followups,actor)||[];
+ void window.CL360Alerts?.notify(actor,events,()=>canLoad&&user?.id===actor&&browserReminderEnabled,routeBase.href).catch(()=>{$("crm-notification-status").textContent="No se pudo mostrar el aviso. Revisa las alertas dentro del CRM.";});
 }
 async function pollDueTasks(){
  if(!canLoad||document.hidden)return;
@@ -897,7 +885,7 @@ $("crm-enable-notifications").addEventListener("click",async()=>{
  if(!window.isSecureContext){$("crm-notification-status").textContent="Se requiere HTTPS para activar avisos.";return;}
  const permission=await Notification.requestPermission();
  if(permission!=="granted"){$("crm-notification-status").textContent="No se concedió permiso. Las alertas siguen disponibles en el CRM.";return;}
- browserReminderEnabled=true;$("crm-notification-status").textContent="Avisos activados mientras la app esté abierta. No se envían con la app cerrada.";
+ browserReminderEnabled=true;$("crm-notification-status").textContent="Avisos inteligentes activados mientras la app esté abierta. No son push con la app cerrada.";
  previousReminderSignature="";executiveAlertCounts={};maybeNotifyOverdue();void pollExecutiveNotifications();
 });
 
@@ -1088,7 +1076,7 @@ async function loadConversations(){
  messengerUnavailable=!!external.error;messengerContacts=external.error?[]:(external.data||[]);operationsLoaded=true;
  const linked=new Set(messengerContacts.map(x=>x.candidate_id).filter(Boolean));
  $("nav-inbox-count").textContent=threads.filter(t=>t.status==="waiting"&&(!linked.has(t.candidate_id)||t.live_chat_enabled)).length+messengerContacts.filter(x=>messengerState(x)==="waiting").length;
- renderHome();renderInbox();renderFlyAgents();renderPipeline();
+ renderHome();renderInbox();renderFlyAgents();renderPipeline();renderCrmAlerts();maybeNotifyOverdue();
 }
 function renderInbox(){
  const list=$("inbox-threads");
@@ -1224,7 +1212,7 @@ async function changeConversationStatus(id,action){
 }
 
 setupCrmInstall();
-alertTimer=window.setInterval(async()=>{await pollDueTasks();await pollExecutiveNotifications();},60000);
-document.addEventListener("visibilitychange",()=>{if(!document.hidden)pollDueTasks();});
+alertTimer=window.setInterval(async()=>{if(!canLoad||document.hidden)return;await pollDueTasks();await loadConversations();await pollExecutiveNotifications();},60000);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&canLoad){void pollDueTasks();void loadConversations();}});
 checkAuth().catch(error=>{$("login-error").textContent="Error de conexión. Actualiza la página.";console.error(error?.message||"Error");});
 })();
