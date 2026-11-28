@@ -72,7 +72,7 @@ function candidateIntakeSummary(candidate){
 const stageNames={new:"Sin contactar",contacted:"Contactado",screening:"Filtrado",interview:"Entrevista",qualified:"Calificado",hired:"Contratado",rejected:"No seleccionado",archived:"Archivado"};
 let user=null, staffRole=null, candidates=[], followups=[], jobs=[], selected=null, canLoad=false;
 const working=(msg)=>{if($("detail"))$("detail").innerHTML='<p class="loading">'+safe(msg)+'</p>'};
-function authScreen(show){if(show){$("andy-executive")?.remove();browserReminderEnabled=false;executiveAlertCounts={};executiveAlertOwner=null;previousReminderSignature="";$("crm-alerts-list")?.replaceChildren();}$("auth-screen").classList.toggle("hide",!show);$("dashboard").classList.toggle("hide",show);$("signout").classList.toggle("hide",show);}
+function authScreen(show){if(show){operationsLoaded=false;operationsFilter="all";operationsScope="team";messengerContacts=[];threads=[];candidates=[];followups=[];$("andy-executive")?.remove();browserReminderEnabled=false;executiveAlertCounts={};executiveAlertOwner=null;previousReminderSignature="";$("crm-alerts-list")?.replaceChildren();}$("auth-screen").classList.toggle("hide",!show);$("dashboard").classList.toggle("hide",show);$("signout").classList.toggle("hide",show);}
 function err(error){alert(error?.message||"No se pudo completar la operación. Reintenta.");}
 async function checkFlyAvailability(){
  try{
@@ -856,6 +856,7 @@ function navigate(view,candidateId=null,fromHistory=false){
  if(view!=="candidatos")$("detail").classList.add("hide");
  if(view==="candidatos"&&selected){const c=candidates.find(x=>x.id===selected);if(c)renderDetail(c);}
  if(view==="pipeline")renderPipeline();
+ if(view==="seguimientos"){renderOperationsCenter();renderFollowups();}
  if(view==="conversaciones")renderInbox();
  if(view==="inicio"){renderHome();renderFlyAgents();}
  if(view==="fly")renderFlyAgents();
@@ -903,6 +904,7 @@ $("crm-enable-notifications").addEventListener("click",async()=>{
 $("inbox-filter").addEventListener("change",renderInbox);
 $("settings-signout").addEventListener("click",()=> $("signout").click());
 function renderHome(){
+ renderOperationsCenter();
  $("kpi-open-jobs").textContent=jobs.filter(j=>j.status==="active").length;
  $("kpi-waiting").textContent=threads.filter(t=>t.status==="waiting").length;
  $("kpi-human").textContent=threads.filter(t=>t.status==="human").length;
@@ -942,7 +944,90 @@ function openCandidate(id){
  renderDetail(c);
  $("detail").scrollIntoView({behavior:"smooth",block:"start"});
 }
-let messengerContacts=[],messengerUnavailable=false;
+let messengerContacts=[],messengerUnavailable=false,operationsLoaded=false,operationsFilter="all",operationsScope="team";
+function buildOperationsGroups(external,internal,people,tasks,now,scope,actor){
+ const owned=id=>scope!=="mine"||!id||id===actor;
+ const contactOpen=x=>!["closed","archived"].includes(x.status);
+ const linked=new Set(external.map(x=>x.candidate_id).filter(Boolean));
+ const restricted=new Set(external.filter(x=>x.intake?.declined).map(x=>x.candidate_id).filter(Boolean));
+ const person=id=>people.find(c=>c.id===id);
+ const contactRow=(x,reason)=>({kind:"messenger",id:x.id,label:x.display_name||"Contacto de Facebook",description:reason,when:x.last_message_at,assigned:x.assigned_user_id});
+ const groups=[
+  {key:"calls",label:"Solicitudes de llamada",items:[]},
+  {key:"review",label:"Expedientes por revisar",items:[]},
+  {key:"chats",label:"Conversaciones pendientes",items:[]},
+  {key:"interviews",label:"Entrevistas programadas",items:[]},
+  {key:"overdue",label:"Seguimientos vencidos",items:[]},
+  {key:"privacy",label:"Revisar no contacto",items:[]},
+  {key:"unplanned",label:"Postulaciones sin seguimiento",items:[]}
+ ];
+ const add=(key,row)=>groups.find(g=>g.key===key).items.push(row);
+ for(const x of external.filter(contactOpen).filter(x=>owned(x.assigned_user_id))){
+  if(x.intake?.declined){add("privacy",contactRow(x,"Revisar la solicitud antes de cualquier contacto"));continue;}
+  if(x.intake?.call_requested){add("calls",contactRow(x,"Solicitud de llamada detectada · revisar si ya se atendió"));continue;}
+  if(x.intake?.needs_review||(!x.candidate_id&&((x.intake?.available_count||0)>0||x.andy?.human_requested||x.andy?.handoff_sent))){
+   add("review",contactRow(x,x.intake?.needs_review?"Respuestas distintas · confirmar":(x.intake?.available_count||0)+"/5 datos declarados · revisar postulación"));continue;
+  }
+  if(!x.assigned_user_id)add("chats",contactRow(x,"Messenger · conversación sin asignar"));
+ }
+ for(const t of internal){
+  if(t.status!=="waiting"||!owned(t.handler_id)||restricted.has(t.candidate_id)||(linked.has(t.candidate_id)&&!t.live_chat_enabled))continue;
+  const c=person(t.candidate_id);if(!c)continue;
+  add("chats",{kind:"internal",id:t.id,label:c.full_name,description:"Chat interno · pendiente de atención",when:t.last_message_at});
+ }
+ const pending=tasks.filter(f=>f.status==="pending");
+ for(const f of pending.filter(f=>owned(f.assigned_user_id))){
+  const c=person(f.candidate_id);
+  const due=Date.parse(f.due_at);
+  const row={kind:"task",id:f.id,candidateId:f.candidate_id,label:f.title||"Seguimiento",description:(c?.full_name||"Candidato")+" · "+(restricted.has(f.candidate_id)?"Revisar solicitud de no contacto":"Actividad registrada"),when:f.due_at};
+  if(Number.isFinite(due)&&due<now)add("overdue",row);
+  else if(Number.isFinite(due)&&/\bentrevista(s)?\b/i.test(f.title||""))add("interviews",row);
+ }
+ for(const c of people){
+  if(c.stage==="new"&&owned(c.assigned_user_id)&&!restricted.has(c.id)&&!pending.some(f=>f.candidate_id===c.id))add("unplanned",{kind:"candidate",id:c.id,label:c.full_name,description:"Postulación nueva · programar seguimiento",when:c.created_at});
+ }
+ for(const g of groups)g.items.sort((a,b)=>(Date.parse(a.when)||Infinity)-(Date.parse(b.when)||Infinity));
+ return groups;
+}
+function renderOperationsCenter(){
+ const panels=[$("home-operations"),$("operations-center")].filter(Boolean);
+ if(!panels.length)return;
+ const groups=buildOperationsGroups(messengerContacts,threads,candidates,followups,Date.now(),operationsScope,user?.id);
+ for(const panel of panels){
+  panel.replaceChildren();
+  if(!operationsLoaded){const p=document.createElement("p");p.className="small";p.textContent="Consultando conversaciones y seguimientos…";panel.append(p);continue;}
+  const compact=panel.id==="home-operations";
+  const controls=document.createElement("div");controls.className="operations-toolbar";
+  const label=document.createElement("label");label.textContent="Responsable: ";
+  const scope=document.createElement("select");scope.setAttribute("aria-label","Filtrar por responsable");
+  for(const [v,t] of [["team","Todo el equipo"],["mine","Mis casos y sin asignar"]]){const option=document.createElement("option");option.value=v;option.textContent=t;scope.append(option);}
+  scope.value=operationsScope;scope.onchange=()=>{operationsScope=scope.value;renderOperationsCenter();};label.append(scope);controls.append(label);
+  if(!compact){const all=document.createElement("button");all.type="button";all.className="btn ghost";all.textContent="Mostrar todo";all.onclick=()=>{operationsFilter="all";renderOperationsCenter();};controls.append(all);}
+  panel.append(controls);
+  if(messengerUnavailable||conversationsLoadError){const warning=document.createElement("p");warning.className="small";warning.textContent="Consulta parcial: no se pudo leer uno de los canales. Actualiza el CRM; los recuentos pueden estar incompletos.";panel.append(warning);}
+  const summary=document.createElement("div");summary.className="operations-metrics";
+  for(const g of groups){const b=document.createElement("button");b.type="button";b.className="fly-mini-metric operations-metric";b.setAttribute("aria-pressed",String(!compact&&operationsFilter===g.key));const n=document.createElement("strong");n.textContent=String(g.items.length);const l=document.createElement("span");l.textContent=g.label;b.append(n,l);b.onclick=()=>{operationsFilter=g.key;if(compact)navigate("seguimientos");renderOperationsCenter();};summary.append(b);}
+  panel.append(summary);
+  if(compact)continue;
+  const note=document.createElement("p");note.className="small";note.textContent="Las solicitudes y los datos detectados requieren revisión humana. Las entrevistas se identifican por las tareas registradas; los vencimientos tienen prioridad. No se generan citas ni llamadas automáticamente.";panel.append(note);
+  for(const g of groups){
+   if(operationsFilter!=="all"&&operationsFilter!==g.key)continue;
+   const h=document.createElement("h3");h.className="operations-group-title";h.textContent=g.label+" · "+g.items.length;panel.append(h);
+   if(!g.items.length){const p=document.createElement("p");p.className="small";p.textContent="Sin casos registrados en esta sección.";panel.append(p);continue;}
+   for(const row of g.items){
+    const action=()=>{
+     if(row.kind==="messenger"){const x=messengerContacts.find(c=>c.id===row.id);if(x)openMessenger(x);}
+     else if(row.kind==="internal"){navigate("conversaciones");void openConversation(row.id);}
+     else if(row.kind==="candidate")openCandidate(row.id);
+     else if(row.candidateId&&candidates.some(c=>c.id===row.candidateId))openCandidate(row.candidateId);
+     else {agendaFilter="all";renderFollowups();$("followups")?.scrollIntoView({behavior:"smooth",block:"start"});}
+    };
+    panel.append(flyActionRow(row.label,row.description+" · "+fmt(row.when),action,row.kind==="messenger"||row.kind==="internal"?"Abrir chat":"Abrir expediente"));
+   }
+  }
+ }
+}
+
 function messengerState(x){return ["closed","archived"].includes(x.status)?"closed":x.assigned_user_id?"human":"waiting";}
 function openMessenger(x){location.href=new window.URL("../mensajes/?conversation="+encodeURIComponent(x.id),routeBase).href;}
 function messengerCard(x,compact=false){
@@ -998,7 +1083,7 @@ async function loadConversations(){
   db.rpc("cl360_messenger_pipeline")
  ]);
  conversationsLoadError=!!internal.error;threads=internal.error?[]:(internal.data||[]);
- messengerUnavailable=!!external.error;messengerContacts=external.error?[]:(external.data||[]);
+ messengerUnavailable=!!external.error;messengerContacts=external.error?[]:(external.data||[]);operationsLoaded=true;
  const linked=new Set(messengerContacts.map(x=>x.candidate_id).filter(Boolean));
  $("nav-inbox-count").textContent=threads.filter(t=>t.status==="waiting"&&(!linked.has(t.candidate_id)||t.live_chat_enabled)).length+messengerContacts.filter(x=>messengerState(x)==="waiting").length;
  renderHome();renderInbox();renderFlyAgents();renderPipeline();
