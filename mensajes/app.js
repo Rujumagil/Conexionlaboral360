@@ -6,6 +6,16 @@ const $=id=>document.getElementById(id);
 const fmt=s=>s?new Date(s).toLocaleString("es-MX",{dateStyle:"short",timeStyle:"short"}):"—";
 const statusNames={waiting:"Pendiente",bot:"Andy",human:"Atención humana",closed:"Cerrada"};
 let user=null,threads=[],candidates=[],jobs=[],previews=[],activeId=null,loading=false,installPrompt=null,refreshTimer=null,messengerReadError=false;
+let messageAlertsEnabled=false;
+const messageScope=new window.URL("./",document.baseURI).href;
+async function pollMessageAlerts(contacts,actor){
+ if(!messageAlertsEnabled||user?.id!==actor||!window.CL360Alerts)return;
+ const {data,error}=await db.from("cl360_followups").select("id,candidate_id,title,due_at,status,assigned_user_id").eq("workspace_id",WS).eq("status","pending").order("due_at").limit(500);
+ if(error||user?.id!==actor)return;
+ const events=window.CL360Alerts.collect(contacts,data||[],actor);
+ try{await window.CL360Alerts.notify(actor,events,()=>user?.id===actor&&messageAlertsEnabled,messageScope);}
+ catch{$("install-hint").textContent="No se pudo mostrar el aviso. Consulta el centro de seguimiento.";}
+}
 const candidate=id=>candidates.find(c=>c.id===id);
 const job=slug=>jobs.find(j=>j.slug===slug)?.title||slug||"Postulación";
 const phone=p=>{const digits=String(p||"").replace(/\D/g,"");return digits.length===10?"52"+digits:digits;};
@@ -35,6 +45,7 @@ async function authenticate(){
 }
 async function refresh(silent=false){
  if(!user||loading)return;
+ const actor=user.id;
  loading=true;$("refresh").disabled=true;
  if(!silent)$("count").textContent="Actualizando conversaciones…";
  const [t,c,j,m,fb]=await Promise.all([
@@ -45,8 +56,10 @@ async function refresh(silent=false){
   db.rpc("cl360_messenger_pipeline")
  ]);
  loading=false;$("refresh").disabled=false;
+ if(user?.id!==actor)return;
  if(t.error||c.error||j.error){$("count").textContent="Error al cargar. Pulsa ↻ para reintentar.";return;}
  messengerReadError=!!fb.error;
+ if(!fb.error)void pollMessageAlerts(fb.data||[],actor).catch(()=>{});
  threads=t.data||[];candidates=c.data||[];jobs=j.data||[];previews=m.error?[]:(m.data||[]);
  const linked=new Set((fb.data||[]).map(x=>x.candidate_id).filter(Boolean));
  threads=threads.filter(t=>!linked.has(t.candidate_id)||t.live_chat_enabled);
@@ -547,7 +560,7 @@ $("signin-form").addEventListener("submit",async event=>{
  button.disabled=false;$("password").value="";
  if(error){$("signin-error").textContent="Correo o contraseña incorrectos.";return;}await authenticate();
 });
-$("signout").addEventListener("click",async()=>{if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null;}await db?.auth.signOut();user=null;activeId=null;threads=[];setActiveChat(false);showApp(false);$("app-menu").classList.add("hidden");});
+$("signout").addEventListener("click",async()=>{if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null;}messageAlertsEnabled=false;await db?.auth.signOut();user=null;activeId=null;threads=[];setActiveChat(false);showApp(false);$("app-menu").classList.add("hidden");});
 $("refresh").addEventListener("click",refresh);
 $("filter").addEventListener("change",()=>setFilter($("filter").value));
 document.querySelectorAll("[data-filter]").forEach(btn=>btn.addEventListener("click",()=>setFilter(btn.dataset.filter)));
@@ -558,6 +571,15 @@ $("menu-toggle").addEventListener("click",()=>{
 });
 $("menu-refresh").addEventListener("click",()=>{$("app-menu").classList.add("hidden");refresh();});
 $("install-menu").addEventListener("click",()=>{$("app-menu").classList.add("hidden");$("install").click();});
+$("alerts-menu").addEventListener("click",async()=>{
+ $("app-menu").classList.add("hidden");
+ if(!window.Notification||!window.isSecureContext){$("install-hint").textContent="Este navegador no permite avisos del sistema.";return;}
+ const actor=user?.id;if(!actor)return;
+ const permission=await Notification.requestPermission();
+ if(user?.id!==actor)return;
+ if(permission!=="granted"){$("install-hint").textContent="Permiso no concedido. Consulta el centro de seguimiento.";return;}
+ messageAlertsEnabled=true;$("install-hint").textContent="Avisos inteligentes activados mientras Mensajes esté abierto.";await refresh(true);
+});
 document.addEventListener("pointerdown",event=>{if(!event.target.closest(".header-actions")&&!event.target.closest("#app-menu")){$("app-menu").classList.add("hidden");$("menu-toggle").setAttribute("aria-expanded","false");}});
 document.addEventListener("keydown",event=>{if(event.key==="Escape"){$("app-menu").classList.add("hidden");$("context-panel").classList.add("hidden");$("info-toggle").setAttribute("aria-expanded","false");}});
 $("info-toggle").addEventListener("click",()=>{
