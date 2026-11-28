@@ -744,6 +744,39 @@ async function marketingCandidateCount(r){
  const result=await db.from("cl360_candidates").select("id",{count:"exact",head:true}).eq("workspace_id",WS).gte("created_at",from).lt("created_at",until).eq("campaign_attribution->>utm_source","meta").eq("campaign_attribution->>utm_medium","paid_social").eq("campaign_attribution->>utm_campaign",alias);
  return result.error?null:result.count;
 }
+function campaignUnitCost(spend,currency,count){
+ if(spend==null||spend===""||typeof currency!=="string"||!currency.trim()||!Number.isFinite(Number(spend))||Number(spend)<0||!Number.isInteger(count)||count<=0)return null;
+ return Number(spend)/count;
+}
+async function marketingOutcomeCounts(r){
+ const alias=marketingPilotAlias[r.external_campaign_id];if(!alias)return null;
+ const end=new Date(r.period_end+"T00:00:00Z");if(!Number.isFinite(end.getTime())||!/^\d{4}-\d{2}-\d{2}$/.test(r.period_start)||r.period_start>r.period_end)return null;
+ end.setUTCDate(end.getUTCDate()+1);
+ const from=r.period_start+"T00:00:00-06:00",until=end.toISOString().slice(0,10)+"T00:00:00-06:00";
+ const count=async(stage)=>{
+  try{const result=await db.from("cl360_candidates").select("id",{count:"exact",head:true}).eq("workspace_id",WS).gte("created_at",from).lt("created_at",until).eq("campaign_attribution->>utm_source","meta").eq("campaign_attribution->>utm_medium","paid_social").eq("campaign_attribution->>utm_campaign",alias).eq("stage",stage);
+  return result.error||!Number.isInteger(result.count)?null:result.count;}catch{return null;}
+ };
+ const [interview,hired]=await Promise.all([count("interview"),count("hired")]);return {interview,hired};
+}
+function appendCampaignEconomics(card,r,registrations,outcomes){
+ const section=document.createElement("section");section.className="campaign-economics";
+ const h=document.createElement("h3");h.textContent="Eficiencia de inversión publicitaria";section.append(h);
+ const intro=document.createElement("p");intro.className="small";intro.textContent="Costos orientativos para el periodo de inversión sincronizado. Las etapas del CRM corresponden al estado actual de expedientes registrados en esas fechas.";section.append(intro);
+ const mapped=!!marketingPilotAlias[r.external_campaign_id];
+ const rows=[["Clics (todos)",r.clicks==null?null:Number(r.clicks),true],["Conversaciones Messenger atribuidas",null,false],["Postulaciones atribuidas por UTM",mapped?registrations:null,mapped],["Expedientes actualmente en entrevista",mapped?outcomes?.interview??null:null,mapped],["Expedientes actualmente contratados",mapped?outcomes?.hired??null:null,mapped]];
+ const table=document.createElement("table");table.className="campaign-cost-table";const head=document.createElement("thead");const hr=document.createElement("tr");for(const label of ["Resultado medido","Cantidad","Costo unitario"]){const th=document.createElement("th");th.scope="col";th.textContent=label;hr.append(th);}head.append(hr);table.append(head);const body=document.createElement("tbody");
+ for(const [label,count,known] of rows){const tr=document.createElement("tr");const cost=known?campaignUnitCost(r.spend,r.currency,count):null;const formatted=cost===null?"—":cost.toLocaleString("es-MX",{minimumFractionDigits:2,maximumFractionDigits:2})+" "+r.currency;
+  for(const [i,val] of [label,count==null?"No disponible":String(count),formatted].entries()){const cell=document.createElement(i===0?"th":"td");if(i===0)cell.scope="row";cell.textContent=val;tr.append(cell);}body.append(tr);
+ }table.append(body);const wrap=document.createElement("div");wrap.className="campaign-cost-scroll";wrap.append(table);section.append(wrap);
+ const warnings=[];
+ if(r.spend==null)warnings.push("Inversión aún no disponible en la sincronización.");
+ if(!mapped)warnings.push("Sin asociación comprobada de campaña a etiquetas UTM del CRM.");
+ warnings.push("No hay un contador de conversaciones iniciadas en Meta ni atribución individual confirmada de Messenger en esta integración.");
+ warnings.push("— significa que falta información o que no existe un resultado positivo para dividir el gasto. No es costo cero.");
+ warnings.push("No equivale a costo histórico por entrevista realizada o contratación en el periodo; tampoco es ROI, porque no hay ingresos atribuidos.");
+ const p=document.createElement("p");p.className="small";p.textContent=warnings.join(" ");section.append(p);card.append(section);
+}
 async function marketingFunnelCounts(r,channel){
  const alias=marketingPilotAlias[r.external_campaign_id];if(!alias)return null;
  const end=new Date(r.period_end+"T00:00:00Z");end.setUTCDate(end.getUTCDate()+1);
@@ -817,7 +850,7 @@ async function loadMarketingMeta(){
  if(!rows.length){status.textContent="No hay estadísticas disponibles para esta sesión. Compás Evolution debe sincronizar las campañas asignadas; si persiste, verifica los permisos.";return;}
  status.textContent="Estadísticas de Meta Ads · resumen de siete días por campaña. El periodo de postulaciones se controla por separado.";
  for(const r of rows){
- const [count,funnel,other,daily]=await Promise.all([marketingCandidateCount(r),marketingFunnelCounts(r),marketingFunnelCounts(r,"unattributed"),marketingDailyReport(r)]);
+ const [count,funnel,other,daily,outcomes]=await Promise.all([marketingCandidateCount(r),marketingFunnelCounts(r),marketingFunnelCounts(r,"unattributed"),marketingDailyReport(r),marketingOutcomeCounts(r)]);
  if(version!==marketingMetaVersion)return;
  const card=document.createElement("article");card.style.cssText="grid-column:1/-1;border:1px solid #dce6f1;border-radius:12px;padding:16px";
  const title=document.createElement("h3");title.textContent=r.campaign_name;card.append(title);
@@ -828,7 +861,7 @@ async function loadMarketingMeta(){
  values.push(["Registros atribuidos por UTM",fmt(count)],["Costo por registro atribuido",count>0&&r.spend!=null&&r.currency?(Number(r.spend)/count).toLocaleString("es-MX",{minimumFractionDigits:2,maximumFractionDigits:2})+" "+r.currency:"—"]);
  const grid=document.createElement("div");grid.style.cssText="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px";
  for(const [label,value] of values){const cell=document.createElement("div");const l=document.createElement("div");l.className="small";l.textContent=label;const v=document.createElement("strong");v.textContent=value;v.style.cssText="font-size:1.4rem;display:block";cell.append(l,v);grid.append(cell);}
- card.append(grid);appendMarketingFunnel(card,r,funnel,count,other);appendFlyMarketingAdvice(card,r,funnel,other);appendDailyMarketingReport(card,r,daily,funnel,other);panel.append(card);
+ card.append(grid);appendCampaignEconomics(card,r,count,outcomes);appendMarketingFunnel(card,r,funnel,count,other);appendFlyMarketingAdvice(card,r,funnel,other);appendDailyMarketingReport(card,r,daily,funnel,other);panel.append(card);
  }
  }catch{if(version===marketingMetaVersion)status.textContent="No fue posible consultar las estadísticas asignadas. Consulta con Compás Evolution.";}
 }

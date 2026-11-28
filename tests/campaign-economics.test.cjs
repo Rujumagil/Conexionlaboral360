@@ -1,0 +1,5 @@
+const test=require("node:test"),assert=require("node:assert/strict"),fs=require("node:fs"),vm=require("node:vm"),path=require("node:path");
+const crm=fs.readFileSync(path.join(__dirname,"../crm/app.js"),"utf8");
+const fn=vm.runInNewContext(crm.match(/function campaignUnitCost\([^\n]+\)\{[\s\S]*?\n\}/)[0]+";campaignUnitCost;");
+test("campaign unit costs require known spend, currency and positive denominator",()=>{for(const [a,b,c,d] of [[48.8,"MXN",40,1.22],[null,"MXN",40,null],[48.8,"MXN",0,null],[48.8,"",10,null],[0,"MXN",10,0],[-1,"MXN",10,null],["48.80","MXN",2,24.4],[48.8,"MXN",null,null],[48.8,"MXN",1.5,null]])assert.equal(fn(a,b,c),d);});
+test("campaign outcome query requires exact attribution and creation cohort",()=>{const q=crm.match(/async function marketingOutcomeCounts\([^\n]+\)\{[\s\S]*?\n\}/)[0];assert.match(q,/if\(!alias\)return null/);assert.match(q,/campaign_attribution->>utm_campaign/);assert.match(q,/\.eq\("stage",stage\)/);assert.match(q,/\.gte\("created_at",from\)\.lt\("created_at",until\)/);});
