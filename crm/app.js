@@ -302,7 +302,7 @@ async function pollDueTasks(){
  renderCrmAlerts();maybeNotifyOverdue();
  if(activeView==="inicio"){if(!document.querySelector(".priority-quick-form")){renderFlyAgents();renderHome();}$("m-overdue").textContent=alertItems().length;}
  if(activeView==="fly")renderFlyAgents();
- if(activeView==="seguimientos")renderFollowups();
+ if(activeView==="seguimientos"){renderFollowups();renderOperationsCenter();}
 }
 let supervisorMarketingVersion=0;
 async function renderFlySupervisor(r){
@@ -1078,10 +1078,12 @@ function conversationLabel(s){return({waiting:"Pendiente",bot:"Asistente virtual
 function conversationCandidate(t){return candidates.find(c=>c.id===t.candidate_id);}
 async function loadConversations(){
  if(!canLoad)return;
+ const actor=user?.id;
  const [internal,external]=await Promise.all([
   db.from("cl360_conversations").select("id,candidate_id,status,handler_id,taken_at,last_message_at,created_at,live_chat_enabled").eq("workspace_id",WS).order("last_message_at",{ascending:false}).limit(300),
   db.rpc("cl360_messenger_pipeline")
  ]);
+ if(!canLoad||user?.id!==actor)return;
  conversationsLoadError=!!internal.error;threads=internal.error?[]:(internal.data||[]);
  messengerUnavailable=!!external.error;messengerContacts=external.error?[]:(external.data||[]);operationsLoaded=true;
  const linked=new Set(messengerContacts.map(x=>x.candidate_id).filter(Boolean));
