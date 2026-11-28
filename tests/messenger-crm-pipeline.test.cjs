@@ -29,3 +29,21 @@ test("registration persists human-reviewed fields and checks consent",()=>{
  assert.match(messages,/!permission\.checked\|\|!verified\.checked/);
  assert.match(messages,/p_shift_declared:declaredShift\.value\.trim\(\),p_availability:availability\.value,p_experience_level:experienceLevel\.value/);
 });
+test("preliminary pipeline groups preserve privacy and human attention",()=>{
+ const fn=vm.runInNewContext(crm.match(/function preliminaryPipelineStage\([^\n]+\)\{[\s\S]*?\n\}/)[0]+";preliminaryPipelineStage;");
+ assert.equal(fn({intake:{declined:true,call_requested:true},andy:{handoff_sent:true}}),"privacy");
+ assert.equal(fn({intake:{call_requested:true,available_count:5}}),"human");
+ assert.equal(fn({assigned_user_id:"u"}),"human");
+ assert.equal(fn({intake:{available_count:3}}),"review");
+ assert.equal(fn({intake:{needs_review:true}}),"review");
+ assert.equal(fn({andy:{sent_count:2}}),"intake");
+ assert.equal(fn({intake:{available_count:1}}),"intake");
+ assert.equal(fn({}),"fresh");
+});
+test("pipeline filters by name and confirmed job, including unknown vacancy",()=>{
+ const fn=vm.runInNewContext(crm.match(/function pipelineMatches\([^\n]+\)\{[\s\S]*?\n\}/)[0]+";pipelineMatches;");
+ assert.equal(fn("José","job-a","jose","job-a"),true);
+ assert.equal(fn("José","job-a","jose","job-b"),false);
+ assert.equal(fn("José","","","__unassigned__"),true);
+ assert.equal(fn("José","job-a","","__unassigned__"),false);
+});

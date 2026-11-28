@@ -72,7 +72,7 @@ function candidateIntakeSummary(candidate){
 const stageNames={new:"Sin contactar",contacted:"Contactado",screening:"Filtrado",interview:"Entrevista",qualified:"Calificado",hired:"Contratado",rejected:"No seleccionado",archived:"Archivado"};
 let user=null, staffRole=null, candidates=[], followups=[], jobs=[], selected=null, canLoad=false;
 const working=(msg)=>{if($("detail"))$("detail").innerHTML='<p class="loading">'+safe(msg)+'</p>'};
-function authScreen(show){if(show){window.CL360Sound?.reset();operationsLoaded=false;operationsFilter="all";operationsScope="team";messengerContacts=[];threads=[];candidates=[];followups=[];$("andy-executive")?.remove();browserReminderEnabled=false;executiveAlertCounts={};executiveAlertOwner=null;previousReminderSignature="";$("crm-alerts-list")?.replaceChildren();}$("auth-screen").classList.toggle("hide",!show);$("dashboard").classList.toggle("hide",show);$("signout").classList.toggle("hide",show);}
+function authScreen(show){if(show){window.CL360Sound?.reset();operationsLoaded=false;operationsFilter="all";operationsScope="team";pipelineQuery="";pipelineJob="";pipelineScope="all";messengerContacts=[];threads=[];candidates=[];followups=[];$("andy-executive")?.remove();browserReminderEnabled=false;executiveAlertCounts={};executiveAlertOwner=null;previousReminderSignature="";$("crm-alerts-list")?.replaceChildren();}$("auth-screen").classList.toggle("hide",!show);$("dashboard").classList.toggle("hide",show);$("signout").classList.toggle("hide",show);}
 function err(error){alert(error?.message||"No se pudo completar la operación. Reintenta.");}
 async function checkFlyAvailability(){
  try{
@@ -1076,35 +1076,80 @@ function messengerCard(x,compact=false){
  b.addEventListener("click",()=>openMessenger(x));return b;
 }
 const pipelineStages=["new","contacted","screening","interview","qualified","hired","rejected","archived"];
+let pipelineQuery="",pipelineJob="",pipelineScope="all";
+function preliminaryPipelineStage(x){
+ if(x.intake?.declined)return "privacy";
+ if(x.intake?.call_requested||x.andy?.human_requested||x.andy?.handoff_sent||x.assigned_user_id)return "human";
+ if(x.intake?.needs_review||Number(x.intake?.available_count)>=3)return "review";
+ if(Number(x.intake?.available_count)>0||Number(x.andy?.sent_count)>0)return "intake";
+ return "fresh";
+}
+function pipelineMatches(name,job,query,filter){
+ const normalize=v=>String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+ return (!filter||(filter==="__unassigned__"?!job:job===filter))&&(!query||normalize(name).includes(normalize(query.trim())));
+}
 function renderPipeline(){
- const board=$("pipeline-board");
- board.replaceChildren();
- const preliminary=document.createElement("section");preliminary.className="pipeline-column";
- const header=document.createElement("div");header.className="pipeline-column-header";
- const heading=document.createElement("b");heading.textContent="Contactos Messenger";
+ const board=$("pipeline-board");if(!board)return;
+ const priorScroll=Object.fromEntries(Array.from(board.querySelectorAll("[data-pipeline-lane]"),el=>[el.dataset.pipelineLane,el.scrollLeft]));
+ const priorColumnScroll=Object.fromEntries(Array.from(board.querySelectorAll("[data-pipeline-column]"),el=>[el.dataset.pipelineColumn,el.scrollTop]));
+ board.replaceChildren();board.classList.add("pipeline-v2");
+ let toolbar=$("pipeline-toolbar-v2");
+ if(!toolbar){
+  toolbar=document.createElement("div");toolbar.id="pipeline-toolbar-v2";toolbar.className="pipeline-toolbar-v2";
+  const search=document.createElement("input");search.type="search";search.className="field";search.placeholder="Buscar por nombre";search.setAttribute("aria-label","Buscar en el Pipeline");search.id="pipeline-query-v2";
+  search.oninput=()=>{pipelineQuery=search.value;renderPipeline();};
+  const vacancy=document.createElement("select");vacancy.className="field";vacancy.id="pipeline-job-v2";vacancy.setAttribute("aria-label","Filtrar por vacante");vacancy.onchange=()=>{pipelineJob=vacancy.value;renderPipeline();};
+  const scope=document.createElement("select");scope.className="field";scope.id="pipeline-scope-v2";scope.setAttribute("aria-label","Tipo de registro");
+  for(const [value,label] of [["all","Todos los registros"],["messenger","Solo contactos Messenger"],["formal","Solo postulaciones"]]){const o=document.createElement("option");o.value=value;o.textContent=label;scope.append(o);}
+  scope.onchange=()=>{pipelineScope=scope.value;renderPipeline();};
+  const reset=document.createElement("button");reset.type="button";reset.className="btn ghost";reset.textContent="Limpiar filtros";reset.onclick=()=>{pipelineQuery="";pipelineJob="";pipelineScope="all";search.value="";scope.value="all";renderPipeline();};
+  toolbar.append(search,vacancy,scope,reset);board.before(toolbar);
+ }
+ const vacancy=$("pipeline-job-v2");vacancy.replaceChildren();
  const pending=messengerContacts.filter(x=>!x.candidate_id&&messengerState(x)!=="closed");
- const count=document.createElement("span");count.textContent=messengerUnavailable?"—":pending.length;header.append(heading,count);preliminary.append(header);
- const help=document.createElement("p");help.className="small";help.textContent=messengerUnavailable?"No se pudo consultar Messenger. Actualiza el CRM.":"Contactos por revisar; todavía no son postulaciones confirmadas.";preliminary.append(help);
- for(const x of pending)preliminary.append(messengerCard(x));
- board.append(preliminary);
- pipelineStages.forEach(stage=>{
-  const col=document.createElement("section");col.className="pipeline-column";
-  const header=document.createElement("div");header.className="pipeline-column-header";
-  const name=document.createElement("b");name.textContent=stageNames[stage]||stage;
-  const count=document.createElement("span");const items=candidates.filter(c=>c.stage===stage);count.textContent=items.length;
-  header.append(name,count);col.append(header);
-  if(!items.length){const empty=document.createElement("p");empty.className="pipeline-empty";empty.textContent="Sin candidatos";col.append(empty);}
-  items.forEach(c=>{
-   const b=document.createElement("button");b.type="button";b.className="pipeline-card";
+ const jobIds=new Set([...jobs.map(j=>j.slug),...candidates.map(c=>c.job_slug),...pending.map(x=>x.andy?.job_slug)].filter(Boolean));
+ for(const [value,label] of [["","Todas las vacantes"],["__unassigned__","Sin vacante confirmada"],...Array.from(jobIds).map(id=>[id,title(id)])]){const o=document.createElement("option");o.value=value;o.textContent=label;vacancy.append(o);}
+ if(pipelineJob&&!Array.from(vacancy.options).some(o=>o.value===pipelineJob))pipelineJob="";
+ vacancy.value=pipelineJob;$("pipeline-query-v2").value=pipelineQuery;$("pipeline-scope-v2").value=pipelineScope;
+ const preliminary=pending.filter(x=>pipelineMatches(x.display_name||"Contacto de Facebook",x.andy?.job_slug,pipelineQuery,pipelineJob));
+ const formal=candidates.filter(c=>pipelineMatches(c.full_name,c.job_slug,pipelineQuery,pipelineJob));
+ const lane=(key,label,description,count)=>{
+  const section=document.createElement("section");section.className="pipeline-lane";
+  const head=document.createElement("div");head.className="pipeline-lane-head";
+  const h=document.createElement("h3");h.textContent=label+" · "+count;const p=document.createElement("p");p.className="small";p.textContent=description;head.append(h,p);
+  const row=document.createElement("div");row.className="pipeline-board pipeline-lane-board";row.dataset.pipelineLane=key;row.setAttribute("aria-label",label);section.append(head,row);board.append(section);return row;
+ };
+ const column=(row,key,label,items,card,unknown=false)=>{
+  const col=document.createElement("section");col.className="pipeline-column";col.dataset.pipelineStage=key;
+  const head=document.createElement("div");head.className="pipeline-column-header";
+  const h=document.createElement("b");h.textContent=label;const n=document.createElement("span");n.textContent=unknown?"—":String(items.length);head.append(h,n);
+  const list=document.createElement("div");list.className="pipeline-column-list";list.dataset.pipelineColumn=key;list.tabIndex=0;list.setAttribute("aria-label",label);
+  if(!items.length){const p=document.createElement("p");p.className="pipeline-empty";p.textContent=unknown?"Consulta no disponible":"Sin registros";list.append(p);}
+  items.forEach(x=>list.append(card(x)));col.append(head,list);row.append(col);list.scrollTop=priorColumnScroll[key]||0;
+ };
+ if(pipelineScope!=="formal"){
+  const row=lane("messenger","Contactos Messenger","Contactos preliminares; no son postulaciones confirmadas. Los grupos describen atención, no idoneidad laboral.",messengerUnavailable?"—":preliminary.length);
+  for(const [key,label] of [["fresh","Nuevos contactos"],["intake","Preentrevista en curso"],["review","Expedientes por revisar"],["human","Atención humana"],["privacy","No contacto · revisión"]]){
+   column(row,"m-"+key,label,preliminary.filter(x=>preliminaryPipelineStage(x)===key),x=>{
+    const card=messengerCard(x);card.classList.add("pipeline-compact-card");
+    if(x.intake&&!x.intake.declined){const total=Math.max(1,Number(x.intake.field_count)||5),n=Math.min(total,Math.max(0,Number(x.intake.available_count)||0));const progress=document.createElement("progress");progress.className="pipeline-evidence";progress.max=total;progress.value=n;progress.setAttribute("aria-label","Datos declarados: "+n+" de "+total);card.append(progress);}
+    if(x.andy?.job_slug){const job=document.createElement("span");job.className="small";job.textContent="Vacante: "+title(x.andy.job_slug);card.append(job);}
+    return card;
+   },messengerUnavailable);
+  }
+  row.scrollLeft=priorScroll.messenger||0;
+ }
+ if(pipelineScope!=="messenger"){
+  const row=lane("formal","Postulaciones confirmadas","Etapas registradas por el equipo. Abre el expediente para modificar su etapa; no hay descartes automáticos.",formal.length);
+  pipelineStages.forEach(stage=>column(row,"c-"+stage,stageNames[stage]||stage,formal.filter(c=>c.stage===stage),c=>{
+   const b=document.createElement("button");b.type="button";b.className="pipeline-card pipeline-compact-card";
    const name=document.createElement("b");name.textContent=c.full_name;
    const job=document.createElement("span");job.className="small";job.textContent=title(c.job_slug);
    const when=document.createElement("span");when.className="small";when.textContent="Registrado: "+fmt(c.created_at);
-   const tag=document.createElement("span");tag.className="pill";
-   tag.textContent=c.screening_data?.availability==="si"?"Turno declarado compatible":c.screening_data?.availability==="no"?"Revisión de horario": "Disponibilidad por confirmar";
-   b.append(name,job,when,tag);b.addEventListener("click",()=>openCandidate(c.id));col.append(b);
-  });
-  board.append(col);
- });
+   const tag=document.createElement("span");tag.className="pill";tag.textContent=c.screening_data?.availability==="si"?"Turno declarado compatible":c.screening_data?.availability==="no"?"Revisión de horario":"Disponibilidad por confirmar";
+   b.append(name,job,when,tag);b.addEventListener("click",()=>openCandidate(c.id));return b;
+  }));row.scrollLeft=priorScroll.formal||0;
+ }
 }
 function waContact(phone){const digits=String(phone||"").replace(/\D/g,"");return digits.length===10?"52"+digits:digits;}
 function conversationLabel(s){return({waiting:"Pendiente",bot:"Asistente virtual",human:"Tomada por humano",closed:"Cerrada"})[s]||s;}
