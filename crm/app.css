@@ -211,3 +211,5 @@ body{background:#edf2f8}
 .operations-metric[aria-pressed="true"]{outline:2px solid var(--blue);outline-offset:-2px;background:#eef6fc}
 .operations-group-title{font-size:1rem;margin:20px 0 8px;border-bottom:1px solid var(--line);padding-bottom:6px}
 @media(max-width:480px){.operations-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.operations-toolbar{align-items:flex-start}.operations-toolbar label{display:flex;flex-direction:column;gap:5px}}
+
+.operations-priorities,.operations-andy{margin:16px 0;padding:12px;border:1px solid var(--line);border-radius:12px;min-width:0}.operations-priorities h3,.operations-andy h3{font-size:1rem;margin:0 0 10px}.operations-priorities .fly-action-row{overflow-wrap:anywhere}.operations-andy .fly-mini-metric{min-width:0;overflow-wrap:anywhere}

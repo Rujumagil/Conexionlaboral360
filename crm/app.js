@@ -951,7 +951,9 @@ function buildOperationsGroups(external,internal,people,tasks,now,scope,actor){
  const contactRow=(x,reason)=>({kind:"messenger",id:x.id,label:x.display_name||"Contacto de Facebook",description:reason,when:x.last_message_at,assigned:x.assigned_user_id});
  const groups=[
   {key:"calls",label:"Solicitudes de llamada",items:[]},
+  {key:"handoff",label:"Atención humana",items:[]},
   {key:"review",label:"Expedientes por revisar",items:[]},
+  {key:"incomplete",label:"Datos por completar",items:[]},
   {key:"chats",label:"Conversaciones pendientes",items:[]},
   {key:"interviews",label:"Entrevistas programadas",items:[]},
   {key:"overdue",label:"Seguimientos vencidos",items:[]},
@@ -962,9 +964,12 @@ function buildOperationsGroups(external,internal,people,tasks,now,scope,actor){
  for(const x of external.filter(contactOpen).filter(x=>owned(x.assigned_user_id))){
   if(x.intake?.declined){add("privacy",contactRow(x,"Revisar la solicitud antes de cualquier contacto"));continue;}
   if(x.intake?.call_requested){add("calls",contactRow(x,"Solicitud de llamada detectada · revisar si ya se atendió"));continue;}
-  if(x.intake?.needs_review||(!x.candidate_id&&((x.intake?.available_count||0)>0||x.andy?.human_requested||x.andy?.handoff_sent))){
-   add("review",contactRow(x,x.intake?.needs_review?"Respuestas distintas · confirmar":(x.intake?.available_count||0)+"/5 datos declarados · revisar postulación"));continue;
+  if(x.andy?.human_requested||x.andy?.handoff_sent){add("handoff",contactRow(x,x.andy?.human_requested?"Solicitó atención humana · verificar si ya fue atendida":"Andy derivó el chat · revisar motivo y respuesta"));continue;}
+  const count=Number(x.intake?.available_count)||0,total=Number(x.intake?.field_count)||5;
+  if(x.intake?.needs_review||(!x.candidate_id&&count>=3)){
+   add("review",contactRow(x,x.intake?.needs_review?"Respuestas distintas · confirmar":count+"/"+total+" datos declarados · revisar postulación"));continue;
   }
+  if(!x.candidate_id&&count>0&&count<3){add("incomplete",contactRow(x,count+"/"+total+" datos declarados · continuar entrevista sin inferir respuestas"));continue;}
   if(!x.assigned_user_id)add("chats",contactRow(x,"Messenger · conversación sin asignar"));
  }
  for(const t of internal){
@@ -981,10 +986,26 @@ function buildOperationsGroups(external,internal,people,tasks,now,scope,actor){
   else if(Number.isFinite(due)&&/\bentrevista(s)?\b/i.test(f.title||""))add("interviews",row);
  }
  for(const c of people){
-  if(c.stage==="new"&&owned(c.assigned_user_id)&&!restricted.has(c.id)&&!pending.some(f=>f.candidate_id===c.id))add("unplanned",{kind:"candidate",id:c.id,label:c.full_name,description:"Postulación nueva · programar seguimiento",when:c.created_at});
+  if(c.stage==="new"&&owned(c.assigned_user_id)&&!restricted.has(c.id)&&!pending.some(f=>f.candidate_id===c.id))add("unplanned",{kind:"candidate",id:c.id,label:c.full_name,description:(c.last_contact_at?"Postulación nueva · revisar contacto anterior y programar seguimiento":"Postulación nueva · sin contacto registrado; programar seguimiento")+(c.screening_data?.availability==="si"?" · indica que puede cubrir el turno":c.screening_data?.availability==="no"?" · revisar otro turno":""),when:c.created_at});
  }
  for(const g of groups)g.items.sort((a,b)=>(Date.parse(a.when)||Infinity)-(Date.parse(b.when)||Infinity));
  return groups;
+}
+function operationsPriority(groups,limit=6){
+ const order=["overdue","calls","handoff","interviews","review","unplanned","incomplete","chats"];
+ const map=new Map(groups.map(g=>[g.key,g]));
+ return order.flatMap(key=>(map.get(key)?.items||[]).filter(row=>!row.description.includes("Revisar solicitud de no contacto")).map(row=>({row,key,label:map.get(key).label}))).slice(0,limit);
+}
+function operationsAndyMetrics(external,scope,actor){
+ const rows=external.filter(x=>scope!=="mine"||!x.assigned_user_id||x.assigned_user_id===actor);
+ return [
+ ["Conversaciones cargadas",rows.length],
+ ["Conversaciones con respuesta de Andy",rows.filter(x=>Number(x.andy?.sent_count)>0).length],
+ ["Respuestas de Andy enviadas",rows.reduce((sum,x)=>sum+Math.max(0,Number(x.andy?.sent_count)||0),0)],
+ ["Derivaciones registradas por Andy",rows.filter(x=>x.andy?.handoff_sent===true).length],
+ ["Solicitudes de llamada detectadas",rows.filter(x=>x.intake?.call_requested&&!x.intake?.declined).length],
+ ["Conversaciones con expediente vinculado",rows.filter(x=>x.candidate_id).length]
+ ];
 }
 function renderOperationsCenter(){
  const panels=[$("home-operations"),$("operations-center")].filter(Boolean);
@@ -1005,7 +1026,22 @@ function renderOperationsCenter(){
   const summary=document.createElement("div");summary.className="operations-metrics";
   for(const g of groups){const b=document.createElement("button");b.type="button";b.className="fly-mini-metric operations-metric";b.setAttribute("aria-pressed",String(!compact&&operationsFilter===g.key));const n=document.createElement("strong");n.textContent=String(g.items.length);const l=document.createElement("span");l.textContent=g.label;b.append(n,l);b.onclick=()=>{operationsFilter=g.key;if(compact)navigate("seguimientos");renderOperationsCenter();};summary.append(b);}
   panel.append(summary);
+  if(compact||operationsFilter==="all"){
+   const priorities=document.createElement("section");priorities.className="operations-priorities";
+   const title=document.createElement("h3");title.textContent="Atender primero · hasta 6 pendientes";priorities.append(title);
+   const items=operationsPriority(groups);
+   if(!items.length){const p=document.createElement("p");p.className="small";p.textContent=messengerUnavailable||conversationsLoadError?"Consulta incompleta; actualiza antes de dar por terminados los pendientes.":"Sin pendientes prioritarios en los registros cargados.";priorities.append(p);}
+   for(const item of items)priorities.append(flyActionRow(item.row.label,item.label+" · "+item.row.description+" · "+fmt(item.row.when),()=>{
+    operationsFilter=item.key;if(compact)navigate("seguimientos");renderOperationsCenter();
+   },"Ver pendientes"));
+   panel.append(priorities);
+  }
   if(compact)continue;
+  const metrics=document.createElement("section");metrics.className="operations-andy";
+  const mh=document.createElement("h3");mh.textContent="Actividad registrada de Andy";metrics.append(mh);
+  const expl=document.createElement("p");expl.className="small";expl.textContent=messengerUnavailable?"Messenger no disponible; no se pueden calcular indicadores.":"Historial de las conversaciones cargadas; no representa un periodo ni una tasa de contratación. Las respuestas de Andy no acreditan datos del candidato.";metrics.append(expl);
+  if(!messengerUnavailable){const grid=document.createElement("div");grid.className="operations-metrics";for(const [label,value] of operationsAndyMetrics(messengerContacts,operationsScope,user?.id)){const cell=document.createElement("div");cell.className="fly-mini-metric";const n=document.createElement("strong");n.textContent=String(value);const l=document.createElement("span");l.textContent=label;cell.append(n,l);grid.append(cell);}metrics.append(grid);}
+  panel.append(metrics);
   const note=document.createElement("p");note.className="small";note.textContent="Las solicitudes y los datos detectados requieren revisión humana. Las entrevistas se identifican por las tareas registradas; los vencimientos tienen prioridad. No se generan citas ni llamadas automáticamente.";panel.append(note);
   for(const g of groups){
    if(operationsFilter!=="all"&&operationsFilter!==g.key)continue;
