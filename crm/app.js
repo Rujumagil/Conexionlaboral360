@@ -952,6 +952,7 @@ function messengerCard(x,compact=false){
  const date=document.createElement("span");date.className="small";date.textContent=fmt(x.last_message_at);
  const state=document.createElement("span");state.className="pill";state.textContent=conversationLabel(messengerState(x));
  b.append(name,channel,date,state);
+ if(x.andy){const progress=document.createElement("span");progress.className="small";progress.textContent=x.andy.human_requested||x.andy.handoff_sent?"Andy derivó a revisión humana":x.andy.sent_count?"Andy · "+x.andy.sent_count+" respuestas enviadas":"Sin respuestas automáticas registradas";b.append(progress);}
  if(compact&&x.last_message_preview){const preview=document.createElement("span");preview.className="small";preview.textContent=String(x.last_message_preview).slice(0,150);b.append(preview);}
  b.addEventListener("click",()=>openMessenger(x));return b;
 }
