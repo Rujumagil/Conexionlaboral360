@@ -53,7 +53,7 @@ async function refresh(silent=false){
  for(const x of fb.data||[]){
   const id="messenger:"+x.id;
   const real=x.candidate_id&&candidate(x.candidate_id);
-  threads.push({id,externalId:x.id,channel:"messenger",candidate_id:real?real.id:id,status:["closed","archived"].includes(x.status)?"closed":x.assigned_user_id?"human":"waiting",handler_id:x.assigned_user_id,last_message_at:x.last_message_at});
+  threads.push({id,externalId:x.id,channel:"messenger",candidate_id:real?real.id:id,andy:x.andy||null,status:["closed","archived"].includes(x.status)?"closed":x.assigned_user_id?"human":"waiting",handler_id:x.assigned_user_id,last_message_at:x.last_message_at});
   if(!real)candidates.push({id,full_name:x.display_name||"Contacto de Facebook",job_slug:"Facebook Messenger"});
   if(x.last_message_preview)previews.push({conversation_id:id,source:"candidate",visibility:"candidate",body:x.last_message_preview});
  }
@@ -246,6 +246,17 @@ function appendIntakeReview(panel,messages){
  panel.append(detail);
 }
 
+function appendAndyProgress(panel,progress){
+ if(!progress)return;
+ const detail=document.createElement("details");detail.className="context-system";detail.open=true;
+ const heading=document.createElement("summary");heading.textContent="Continuidad con Andy";detail.append(heading);
+ const note=document.createElement("p");note.textContent="El historial de Andy muestra lo enviado, no confirma las respuestas del contacto ni sus requisitos.";detail.append(note);
+ const labels={greeting:"Presentación",ask_zone:"Zona",ask_experience:"Experiencia",ask_phone:"Teléfono",vacancy:"Vacante",vacancies:"Vacantes",handoff:"Derivación a Astrid"};
+ const topics=Array.isArray(progress.topics_sent)?progress.topics_sent.map(x=>labels[x]).filter(Boolean):[];
+ const rows=[["Respuestas enviadas por Andy",String(progress.sent_count||0)],["Temas tratados",topics.join(" · ")||"Sin historial automático"],["Último tema",labels[progress.last_topic]||"Sin información"],["Nombre revisado",progress.name_confirmed?"Confirmado":"Por confirmar"],["Vacante revisada",progress.job_slug?job(progress.job_slug):"Por confirmar"],["Turno conversado",progress.shift_discussed?"Marcado":"Por confirmar"],["Experiencia conversada",progress.experience_discussed?"Marcada":"Por confirmar"],["Postulación explicada",progress.application_discussed?"Marcada":"Por confirmar"],["Seguimiento",progress.human_requested||progress.handoff_sent?"Revisar atención humana":"Continuar conversación"]];
+ for(const [label,value] of rows){const row=document.createElement("div");row.className="context-row";const name=document.createElement("small");name.textContent=label;const content=document.createElement("strong");content.textContent=value;row.append(name,content);detail.append(row);}
+ panel.append(detail);
+}
 function renderContext(t,messages){
  const panel=$("context-details");panel.replaceChildren();
  const c=candidate(t.candidate_id);
@@ -258,7 +269,7 @@ function renderContext(t,messages){
   const content=document.createElement("strong");content.textContent=value;
   row.append(name,content);panel.append(row);
  }
- if(t.channel==="messenger")appendIntakeReview(panel,messages);
+ if(t.channel==="messenger"){appendIntakeReview(panel,messages);appendAndyProgress(panel,t.andy);}
  const system=messages.filter(m=>m.source==="system");
  if(system.length){
   const detail=document.createElement("details");detail.className="context-system";
@@ -307,7 +318,7 @@ function appendAndyMemoryControls(wrap,t){
     save.disabled=true;hint.textContent="Guardando…";
     const {error}=await db.rpc("cl360_messenger_memory",{p_conversation:t.externalId,p_patch:{revision:mem.revision,name_confirmed:name.checked,job_slug:jobSelect.value,shift_discussed:shift.checked,human_requested:human.checked,experience_discussed:experience.checked,application_discussed:application.checked}});
     if(error){hint.textContent="No se guardó. Cierra y vuelve a abrir la memoria para revisar la información actual.";save.disabled=false;return;}
-    dialog.close();if(activeId===t.id&&user?.id===actor)$("reply-hint").textContent="Memoria actualizada. Andy utilizará el siguiente tema confirmado.";
+    dialog.close();if(activeId===t.id&&user?.id===actor){await refresh(true);$("reply-hint").textContent="Memoria actualizada. Andy utilizará el siguiente tema confirmado.";}
    };
    buttons.append(cancel,save);dialog.append(buttons);dialog.addEventListener("close",()=>dialog.remove(),{once:true});document.body.append(dialog);dialog.showModal();
   }catch{if(activeId===t.id)$("reply-hint").textContent="No se pudo consultar la memoria.";}
@@ -425,6 +436,7 @@ function appendCandidateRegistration(wrap,t){
     const blank=document.createElement("option");blank.value="";blank.textContent="Selecciona la vacante";jobSelect.append(blank);
     for(const vacancy of jobs.filter(j=>j.status==="active")){const opt=document.createElement("option");opt.value=vacancy.slug;opt.textContent=vacancy.title;jobSelect.append(opt);}
     jobLabel.append(jobSelect);dialog.append(jobLabel);
+    if(t.andy?.job_slug&&jobs.some(j=>j.slug===t.andy.job_slug&&j.status==="active"))jobSelect.value=t.andy.job_slug;
     const reviewSelect=(label,options)=>{
      const row=document.createElement("label");row.style.cssText="display:block;margin:12px 0";row.textContent=label;
      const select=document.createElement("select");select.style.cssText="width:100%;display:block;padding:9px;margin-top:6px";
