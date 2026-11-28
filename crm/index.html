@@ -43,7 +43,7 @@
  <div class="crm-alerts-panel hide" id="crm-alerts-panel" aria-label="Centro de alertas">
   <div class="alerts-head"><div><strong>Alertas de seguimiento</strong><p>Solicitudes de Messenger, entrevistas y seguimientos</p></div><button type="button" class="btn ghost" id="crm-alerts-close">Cerrar</button></div>
   <div id="crm-alerts-list" aria-live="polite">Consultando agenda…</div>
-  <button type="button" class="btn ghost" id="crm-enable-notifications">Activar avisos del navegador</button>
+  <button type="button" class="btn ghost" id="crm-sound-test">Activar y probar sonido</button><p id="crm-sound-status" class="small" role="status">El sonido de mensajes se activa con este botón.</p><button type="button" class="btn ghost" id="crm-enable-notifications">Activar avisos del navegador</button>
   <div class="settings-actions"><button type="button" class="btn yellow" id="crm-push-enable">Activar avisos con app cerrada</button><button type="button" class="btn ghost" id="crm-push-test">Enviar prueba</button><button type="button" class="btn ghost" id="crm-push-disable">Desactivar push</button></div><p id="crm-push-status" class="small" role="status">Activa este dispositivo y realiza una prueba. En iPhone instala primero el CRM en la pantalla de inicio.</p><p id="crm-notification-status" class="small">Activa avisos para solicitudes de llamada, atención humana, expedientes y agenda. Funcionan mientras la app esté abierta.</p>
  </div>
  <div class="app-content">
@@ -156,6 +156,6 @@
 </main>
 <!-- Shared application layout: views use separate GitHub Pages URLs. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.min.js"></script>
-<script src="../assets/cl360-alerts.js" defer></script><script src="../assets/cl360-push-client.js" defer></script><script src="app.js" defer></script>
+<script src="../assets/cl360-alerts.js" defer></script><script src="../assets/cl360-sound.js" defer></script><script src="../assets/cl360-push-client.js" defer></script><script src="app.js" defer></script>
 </body>
 </html>
