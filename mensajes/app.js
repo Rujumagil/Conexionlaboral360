@@ -416,7 +416,8 @@ function appendCandidateRegistration(wrap,t){
     const name=field("Nombre confirmado",evidence.get("Nombre declarado"),120);
     const declarations=extractMessengerDeclarations(incoming);
     const phoneInput=field("Teléfono proporcionado por el candidato (10 dígitos)",declarations.phone,16,"tel");
-    const shiftHint=document.createElement("p");shiftHint.textContent="Turno mencionado: "+(declarations.shiftAmbiguous?"Varias opciones; confirmar":declarations.shift||"Por confirmar")+". Verificar con la vacante antes de calificar.";dialog.append(shiftHint);
+    const declaredShift=field("Turno declarado (revisar)",declarations.shift,120);
+    if(declarations.shiftAmbiguous){const shiftHint=document.createElement("p");shiftHint.textContent="Se detectaron varias opciones de turno. Confirma con la persona.";dialog.append(shiftHint);}
     const zone=field("Zona declarada (revisar)",evidence.get("Zona declarada"),120);
     const experience=field("Experiencia declarada (no es una evaluación)",evidence.get("Experiencia declarada"),1000,"textarea");
     const jobLabel=document.createElement("label");jobLabel.style.cssText="display:block;margin:12px 0";jobLabel.textContent="Vacante confirmada";
@@ -424,6 +425,15 @@ function appendCandidateRegistration(wrap,t){
     const blank=document.createElement("option");blank.value="";blank.textContent="Selecciona la vacante";jobSelect.append(blank);
     for(const vacancy of jobs.filter(j=>j.status==="active")){const opt=document.createElement("option");opt.value=vacancy.slug;opt.textContent=vacancy.title;jobSelect.append(opt);}
     jobLabel.append(jobSelect);dialog.append(jobLabel);
+    const reviewSelect=(label,options)=>{
+     const row=document.createElement("label");row.style.cssText="display:block;margin:12px 0";row.textContent=label;
+     const select=document.createElement("select");select.style.cssText="width:100%;display:block;padding:9px;margin-top:6px";
+     for(const [value,text] of options){const opt=document.createElement("option");opt.value=value;opt.textContent=text;select.append(opt);}
+     row.append(select);dialog.append(row);return select;
+    };
+    const availability=reviewSelect("Compatibilidad de turno (confirmar con la persona)",[["consultar","Por confirmar"],["si","La persona confirma que le funciona"],["no","La persona indica que no le funciona"]]);
+    const experienceLevel=reviewSelect("Experiencia previa declarada",[["prefiero_comentarlo","Por confirmar / comentar"],["si","Confirma experiencia previa"],["no","Indica que no tiene experiencia previa"]]);
+    jobSelect.onchange=()=>{availability.value="consultar";};
     const teamLabel=document.createElement("label");teamLabel.style.cssText="display:block;margin:12px 0";teamLabel.textContent="Asignar seguimiento a";
     const person=document.createElement("select");person.style.cssText="width:100%;display:block;padding:9px;margin-top:6px";
     for(const member of team.data){
@@ -453,10 +463,11 @@ function appendCandidateRegistration(wrap,t){
      }
      save.disabled=true;hint.textContent="Registrando y creando seguimiento…";
      try{
-     const {data,error}=await db.rpc("cl360_messenger_candidate_register",{
+     const {data,error}=await db.rpc("cl360_messenger_candidate_register_v2",{
       p_conversation:t.externalId,p_name:name.value.trim(),p_phone:normalized,p_job_slug:jobSelect.value,
       p_zone:zone.value.trim(),p_experience:experience.value.trim(),
-      p_consent:true,p_review_confirm:true,p_due_at:when.toISOString(),p_assignee:person.value
+      p_consent:true,p_review_confirm:true,p_due_at:when.toISOString(),p_assignee:person.value,
+      p_shift_declared:declaredShift.value.trim(),p_availability:availability.value,p_experience_level:experienceLevel.value
      });
      if(error||!data?.candidate_id){
       hint.textContent=String(error?.message||"").includes("candidate_already_exists")
