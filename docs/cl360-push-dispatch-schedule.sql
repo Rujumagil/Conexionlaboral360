@@ -1,0 +1,2 @@
+-- Run every five minutes; the function does not call the network when no enabled device exists.
+select cron.schedule('cl360-push-dispatch-every-5-min','*/5 * * * *',$job$select public.cl360_request_push_dispatch();$job$);
