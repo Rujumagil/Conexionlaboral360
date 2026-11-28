@@ -399,10 +399,11 @@ function appendCandidateRegistration(wrap,t){
   button.disabled=true;
   try{
    // No usar respuestas preliminares como datos confirmados sin revisión manual.
-   const [existing,transcript,team]=await Promise.all([
+   const [existing,transcript,team,live]=await Promise.all([
     db.rpc("cl360_messenger_candidate_link",{p_conversation:t.externalId}),
     db.rpc("cl360_messenger_inbox",{p_conversation:t.externalId}),
-    db.rpc("cl360_messenger_recruiters")
+    db.rpc("cl360_messenger_recruiters"),
+    db.rpc("cl360_messenger_live_intake",{p_conversation:t.externalId})
    ]);
    if(existing.error||transcript.error||team.error||!Array.isArray(team.data))throw Error("SERVICE_NOT_READY");
    if(activeId!==t.id||user?.id!==actor)return;
@@ -419,10 +420,11 @@ function appendCandidateRegistration(wrap,t){
     const intro=document.createElement("p");
     intro.textContent="Las respuestas extraídas son solo sugerencias. Verifica cada dato con la persona y confirma su permiso explícito antes de guardar.";
     dialog.append(intro);
-    const incoming=Array.isArray(transcript.data)?transcript.data.map(m=>({
-     source:m.direction==="incoming"?"candidate":"staff",body:m.body||""
-    })):[];
-    const evidence=extractIntakeEvidence(incoming);
+    const review=live.error?null:live.data;
+    const suggested=key=>review&&!review.conflicts?.[key]?review.fields?.[key]?.value||"":"";
+    if(review?.declined){const notice=document.createElement("p");notice.textContent="El historial contiene una solicitud de no continuar o de no contactar. Verifica si existe una autorización posterior antes de registrar.";dialog.append(notice);}
+    if(review&&Object.keys(review.conflicts||{}).length){const notice=document.createElement("p");notice.textContent="Hay respuestas distintas en el historial. Los campos en conflicto se dejaron vacíos para revisión.";dialog.append(notice);}
+    if(live.error){const notice=document.createElement("p");notice.textContent="La lectura automática no está disponible. Verifica los datos directamente en el historial.";dialog.append(notice);}
     const field=(title,value,max,type="text")=>{
      const label=document.createElement("label");label.style.cssText="display:block;margin:12px 0;font-size:14px;font-weight:600";label.textContent=title;
      const input=type==="textarea"?document.createElement("textarea"):document.createElement("input");
@@ -430,13 +432,12 @@ function appendCandidateRegistration(wrap,t){
      input.style.cssText="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:9px;border:1px solid #b9c9d7;border-radius:8px";
      input.maxLength=max;input.value=value||"";label.append(input);dialog.append(label);return input;
     };
-    const name=field("Nombre confirmado",evidence.get("Nombre declarado"),120);
-    const declarations=extractMessengerDeclarations(incoming);
-    const phoneInput=field("Teléfono proporcionado por el candidato (10 dígitos)",declarations.phone,16,"tel");
-    const declaredShift=field("Turno declarado (revisar)",declarations.shift,120);
-    if(declarations.shiftAmbiguous){const shiftHint=document.createElement("p");shiftHint.textContent="Se detectaron varias opciones de turno. Confirma con la persona.";dialog.append(shiftHint);}
-    const zone=field("Zona declarada (revisar)",evidence.get("Zona declarada"),120);
-    const experience=field("Experiencia declarada (no es una evaluación)",evidence.get("Experiencia declarada"),1000,"textarea");
+    const name=field("Nombre confirmado",suggested("name"),120);
+    const phoneInput=field("Teléfono proporcionado por el candidato (10 dígitos)",suggested("phone"),16,"tel");
+    const declaredShift=field("Turno declarado (revisar)",suggested("shift"),120);
+    if(review?.conflicts?.shift){const shiftHint=document.createElement("p");shiftHint.textContent="Se detectaron varias opciones de turno. Confirma con la persona.";dialog.append(shiftHint);}
+    const zone=field("Zona declarada (revisar)",suggested("zone"),120);
+    const experience=field("Experiencia declarada (no es una evaluación)",suggested("experience"),1000,"textarea");
     const jobLabel=document.createElement("label");jobLabel.style.cssText="display:block;margin:12px 0";jobLabel.textContent="Vacante confirmada";
     const jobSelect=document.createElement("select");jobSelect.style.cssText="width:100%;display:block;padding:9px;margin-top:6px";
     const blank=document.createElement("option");blank.value="";blank.textContent="Selecciona la vacante";jobSelect.append(blank);
