@@ -165,3 +165,5 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
  .composer-actions{gap:7px}
  .composer-actions .secondary-link,.composer-actions .copy-button{min-height:34px}
 }
+
+.intake-review-v2{border:1px solid #d8e6ec;border-radius:12px;padding:12px;background:#f8fbfd}.intake-review-v2 p{font-size:.79rem;line-height:1.5;margin:8px 0;color:#456274}.intake-progress{width:100%;height:9px;accent-color:#1975a7}.intake-field{padding:9px 0;border-bottom:1px solid #e0e9ee}.intake-field.intake-conflict strong,.intake-warning{color:#92520b}.intake-field.intake-missing strong,.intake-field.intake-unavailable strong{color:#62778a}.intake-field.intake-declared strong{color:#145575}.intake-source{justify-self:start;font-size:.72rem;padding:5px 8px}.bubble.evidence-highlight{outline:3px solid #d5a51c;outline-offset:3px}

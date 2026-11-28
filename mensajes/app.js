@@ -201,8 +201,8 @@ async function openConversation(id,changeLayout=true,preserveDraft=false){
  t.channel==="messenger"?db.rpc("cl360_messenger_inbox",{p_conversation:t.externalId}):db.from("cl360_chat_messages").select("id,source,visibility,body,created_at").eq("workspace_id",WS).eq("conversation_id",id).order("created_at",{ascending:true}).limit(150),
  t.channel==="messenger"?db.rpc("cl360_messenger_live_intake",{p_conversation:t.externalId}):Promise.resolve({data:null})
  ]);
- const error=response.error;
- const data=t.channel==="messenger"?(response.data||[]).map(m=>({...m,source:m.direction==="incoming"?"candidate":"staff",visibility:"candidate",body:m.body||"["+ (m.message_type||"Mensaje") +"]"})):response.data;
+ const error=response.error||!Array.isArray(response.data);
+ const data=t.channel==="messenger"?(Array.isArray(response.data)?response.data:[]).map(m=>({...m,source:m.direction==="incoming"?"candidate":"staff",visibility:"candidate",body:m.body||"["+ (m.message_type||"Mensaje") +"]"})):response.data;
  if(activeId!==id)return;
  const timeline=$("timeline");timeline.replaceChildren();
  if(error||!data?.length){const p=document.createElement("p");p.className="conversation-empty";p.textContent=error?"No se pudo consultar el historial.":"Todavía no hay mensajes guardados en este expediente.";timeline.append(p);}
@@ -214,6 +214,7 @@ async function openConversation(id,changeLayout=true,preserveDraft=false){
  else data.forEach(m=>{
   if(m.source==="system")return;
   const bubble=document.createElement("div");bubble.className="bubble "+(m.source==="fly"?"andy":m.source==="candidate"?"candidate":m.source==="staff"?"staff":"system");
+  if(m.source==="candidate"&&typeof m.id==="string"){bubble.dataset.evidenceMessage=m.id;bubble.tabIndex=-1;}
   if(m.source==="staff"&&m.visibility==="internal")bubble.classList.add("internal-note");
   const author=document.createElement("b");author.textContent=({fly:"Andy",candidate:"Candidato",staff:m.visibility==="candidate"?(t.channel==="messenger"?"Página · "+({sent:"Enviado",delivered:"Entregado",read:"Leído",failed:"Fallido"}[m.status]||m.status||""):"Astrid · enviado en el chat"):"Nota interna",system:"Sistema"})[m.source]||"Mensaje";
   const text=document.createElement("p");text.textContent=m.body;
@@ -255,31 +256,57 @@ function extractMessengerDeclarations(messages){
  }
  return {phone:phones.size===1?[...phones][0]:"",phoneAmbiguous:phones.size>1,shift:shifts.size===1?[...shifts][0]:"",shiftAmbiguous:shifts.size>1};
 }
+function intakeReviewRows(live){
+ const definitions=[["name","Nombre declarado"],["phone","Teléfono sugerido"],["zone","Zona declarada"],["experience","Experiencia declarada"],["shift","Turno mencionado"]];
+ const available=!!live&&typeof live.fields==="object"&&live.fields!==null&&!Array.isArray(live.fields);
+ return definitions.map(([key,label])=>{
+  if(live?.declined)return {key,label,state:"restricted",value:"Revisar solicitud de no contacto"};
+  if(!available)return {key,label,state:"unavailable",value:"Consultar historial manualmente"};
+  if(live.conflicts?.[key])return {key,label,state:"conflict",value:key==="phone"?"Varios números; confirmar":key==="shift"?"Varias opciones; confirmar":"Respuestas distintas; confirmar"};
+  const field=live.fields[key];
+  if(typeof field?.value==="string"&&field.value.trim())return {key,label,state:"declared",value:field.value,messageId:field.message_id,createdAt:field.created_at};
+  return {key,label,state:"missing",value:"Por confirmar"};
+ });
+}
 function appendIntakeReview(panel,messages,live){
- const fields=["Nombre declarado","Zona declarada","Experiencia declarada"];
- const evidence=extractIntakeEvidence(messages);
- const keys={"Nombre declarado":"name","Zona declarada":"zone","Experiencia declarada":"experience"};
- if(live){evidence.clear();for(const label of fields){const key=keys[label];if(live.fields?.[key]?.value&&!live.conflicts?.[key])evidence.set(label,live.fields[key].value);}}
- const detail=document.createElement("details");detail.className="context-system";detail.open=true;
- const title=document.createElement("summary");title.textContent="Expediente preliminar · "+(live?Object.keys(live.fields||{}).filter(k=>!live.conflicts?.[k]).length+"/5":evidence.size+"/3")+" datos por revisar";detail.append(title);
- const declared=live?{phone:live.fields?.phone?.value||"",phoneAmbiguous:!!live.conflicts?.phone,shift:live.fields?.shift?.value||"",shiftAmbiguous:!!live.conflicts?.shift}:extractMessengerDeclarations(messages);
- const note=document.createElement("p");note.textContent="Respuestas del chat, no datos verificados. Confirma identidad y consentimiento antes de vincular o registrar un expediente. No se guardan copias automáticamente.";detail.append(note);
- for(const label of fields){const row=document.createElement("div");row.className="context-row";const name=document.createElement("small");name.textContent=label;const value=document.createElement("strong");value.textContent=live?.conflicts?.[keys[label]]?"Respuestas distintas; confirmar":evidence.get(label)||"Por confirmar";row.append(name,value);detail.append(row);}
- for(const [label,value] of [["Teléfono sugerido",declared.phoneAmbiguous?"Varios números; confirmar":declared.phone||"Por confirmar"],["Turno mencionado",declared.shiftAmbiguous?"Varias opciones; confirmar":declared.shift||"Por confirmar"],["Precalificación","Pendiente de revisión humana"]]){
-  const row=document.createElement("div");row.className="context-row";const name=document.createElement("small");name.textContent=label;const content=document.createElement("strong");content.textContent=value;row.append(name,content);detail.append(row);
+ const rows=intakeReviewRows(live);
+ const available=rows.every(r=>r.state!=="unavailable");
+ const count=rows.filter(r=>r.state==="declared").length;
+ const detail=document.createElement("details");detail.className="context-system intake-review-v2";detail.open=true;
+ const title=document.createElement("summary");title.textContent="Expediente preliminar · "+(available?count+"/5 datos por revisar":"Consulta no disponible");detail.append(title);
+ const note=document.createElement("p");note.textContent="Datos declarados, no verificados. El avance mide información recopilada, no elegibilidad laboral. Confirma identidad y consentimiento antes de registrar.";detail.append(note);
+ if(live?.declined){const p=document.createElement("p");p.className="intake-warning";p.textContent="Solicitud de no continuar o no contactar. No iniciar seguimiento sin revisar el historial.";detail.append(p);}
+ else if(!available){const p=document.createElement("p");p.className="intake-warning";p.textContent="No se pudo verificar la extracción automática. Consulta el historial directamente; no se mostrarán sugerencias locales como datos confirmados.";detail.append(p);}
+ else {
+  const progress=document.createElement("progress");progress.max=5;progress.value=count;progress.className="intake-progress";progress.setAttribute("aria-label","Datos declarados: "+count+" de 5");detail.append(progress);
+  const missing=rows.filter(r=>r.state==="missing").map(r=>r.label);
+  const conflicts=rows.filter(r=>r.state==="conflict").length;
+  const p=document.createElement("p");p.textContent=(missing.length?"Falta confirmar: "+missing.join(", ")+". ":"")+(conflicts?conflicts+" campo(s) con respuestas distintas. ":"")+(count===5?"Los cinco datos están disponibles para revisión humana.":"");detail.append(p);
  }
- if(live?.declined){const p=document.createElement("p");p.textContent="Hay una solicitud de no continuar o no contactar en el historial. Revisar antes de cualquier seguimiento.";detail.append(p);}
- const last=messages.filter(m=>m.source==="candidate").at(-1);
- if(live?.call_requested||(!live&&last&&/\b(ll[aá]mame|m[aá]rcame|llamar|llamada|marcarme|contactame)\b/i.test(last.body||""))){const p=document.createElement("p");p.textContent="Próxima acción sugerida: revisar solicitud de llamada. No hay una tarea creada automáticamente.";detail.append(p);}
+ for(const item of rows){
+  const row=document.createElement("div");row.className="context-row intake-field intake-"+item.state;
+  const name=document.createElement("small");name.textContent=item.label;
+  const value=document.createElement("strong");value.textContent=item.value;row.append(name,value);
+  if(item.state==="declared"&&item.messageId&&messages.some(m=>m.id===item.messageId&&m.source==="candidate")){
+   const source=document.createElement("button");source.type="button";source.className="subtle intake-source";source.textContent="Ver mensaje original";source.onclick=()=>{
+    const bubble=Array.from($("timeline").querySelectorAll("[data-evidence-message]")).find(el=>el.dataset.evidenceMessage===item.messageId);
+    if(!bubble)return;
+    $("context-panel").classList.add("hidden");$("info-toggle").setAttribute("aria-expanded","false");
+    bubble.scrollIntoView({block:"center",behavior:"smooth"});bubble.classList.add("evidence-highlight");bubble.focus({preventScroll:true});setTimeout(()=>bubble.classList.remove("evidence-highlight"),2500);
+   };row.append(source);
+  }
+  detail.append(row);
+ }
+ if(live?.call_requested&&!live.declined){const p=document.createElement("p");p.className="intake-warning";p.textContent="Solicitud de llamada detectada. Revisa si ya fue atendida; no se creó una tarea automáticamente.";detail.append(p);}
  panel.append(detail);
 }
-
+ 
 function appendAndyProgress(panel,progress){
  if(!progress)return;
  const detail=document.createElement("details");detail.className="context-system";detail.open=true;
  const heading=document.createElement("summary");heading.textContent="Continuidad con Andy";detail.append(heading);
  const note=document.createElement("p");note.textContent="El historial de Andy muestra lo enviado, no confirma las respuestas del contacto ni sus requisitos.";detail.append(note);
- const labels={greeting:"Presentación",ask_zone:"Zona",ask_experience:"Experiencia",ask_phone:"Teléfono",vacancy:"Vacante",vacancies:"Vacantes",handoff:"Derivación a Astrid"};
+ const labels={greeting:"Presentación",ask_zone:"Zona",ask_experience:"Experiencia",ask_phone:"Teléfono",ask_shift:"Disponibilidad de turno",clarify:"Aclaración",info_pending:"Información por confirmar",vacancy:"Vacante",vacancies:"Vacantes",handoff:"Derivación a Astrid"};
  const topics=Array.isArray(progress.topics_sent)?progress.topics_sent.map(x=>labels[x]).filter(Boolean):[];
  const rows=[["Respuestas enviadas por Andy",String(progress.sent_count||0)],["Temas tratados",topics.join(" · ")||"Sin historial automático"],["Último tema",labels[progress.last_topic]||"Sin información"],["Nombre revisado",progress.name_confirmed?"Confirmado":"Por confirmar"],["Vacante revisada",progress.job_slug?job(progress.job_slug):"Por confirmar"],["Turno conversado",progress.shift_discussed?"Marcado":"Por confirmar"],["Experiencia conversada",progress.experience_discussed?"Marcada":"Por confirmar"],["Postulación explicada",progress.application_discussed?"Marcada":"Por confirmar"],["Seguimiento",progress.human_requested||progress.handoff_sent?"Revisar atención humana":"Continuar conversación"]];
  for(const [label,value] of rows){const row=document.createElement("div");row.className="context-row";const name=document.createElement("small");name.textContent=label;const content=document.createElement("strong");content.textContent=value;row.append(name,content);detail.append(row);}

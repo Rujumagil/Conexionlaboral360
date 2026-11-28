@@ -8,9 +8,9 @@ const messages=fs.readFileSync(path.join(root,"mensajes/app.js"),"utf8");
 const crm=fs.readFileSync(path.join(root,"crm/app.js"),"utf8");
 test("both applications parse",()=>{new vm.Script(messages);new vm.Script(crm);});
 test("live evidence leaves conflicting fields blank and is not an eligibility score",()=>{
- const snippets=["extractIntakeEvidence","extractMessengerDeclarations","appendIntakeReview"].map(n=>messages.match(new RegExp("function "+n+"\\([^\\n]*\\)\\{[\\s\\S]*?\\n\\}"))?.[0]);
+ const snippets=["intakeReviewRows","appendIntakeReview"].map(n=>messages.match(new RegExp("function "+n+"\\([^\\n]*\\)\\{[\\s\\S]*?\\n\\}"))?.[0]);
  assert.ok(snippets.every(Boolean));
- const element=()=>({children:[],textContent:"",append(...x){this.children.push(...x);}});
+ const element=()=>({children:[],textContent:"",append(...x){this.children.push(...x);},setAttribute(){}});
  const panel=element();
  const document={createElement:element};
  const live={fields:{name:{value:"Persona Ejemplo"},phone:{value:"0000000000"},shift:{value:"24x48"}},conflicts:{phone:true},call_requested:true};
@@ -33,4 +33,16 @@ test("server intake distinguishes negated shifts and respects no-contact declara
  assert.ok(sql.includes("contactes|contacten|llames|llamen"));
  assert.ok(sql.includes("if declined then return jsonb_build_object('fields','{}'::jsonb"));
  assert.ok(sql.includes("not in ('sent','delivered','read')"));
+});
+
+test("preliminary checklist never exposes conflicted or no-contact data",()=>{
+ const source=messages.match(/function intakeReviewRows\([^\n]+\)\{[\s\S]*?\n\}/)[0];
+ const rows=vm.runInNewContext(source+";intakeReviewRows;");
+ assert.equal(rows(null).every(r=>r.state==="unavailable"),true);
+ assert.equal(rows({declined:true,fields:{phone:{value:"123"}}}).every(r=>r.state==="restricted"),true);
+ const r=rows({fields:{phone:{value:"123"},name:{value:"Ejemplo",message_id:"m1"}},conflicts:{phone:true}});
+ assert.equal(r.find(x=>x.key==="phone").state,"conflict");
+ assert.equal(r.find(x=>x.key==="phone").value,"Varios números; confirmar");
+ assert.equal(r.find(x=>x.key==="name").messageId,"m1");
+ assert.equal(r.filter(x=>x.state==="declared").length,1);
 });
