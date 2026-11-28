@@ -1,4 +1,22 @@
 import webpush from "npm:web-push@3.6.7";
+import { createECDH } from "node:crypto";
+import { Buffer } from "node:buffer";
+function normalizeVapid(value:string,label:string){
+ let s=value.trim().replace(new RegExp("^"+label+"\\s*:\\s*","i"),"").trim();
+ if((s.startsWith('"')&&s.endsWith('"'))||(s.startsWith("'")&&s.endsWith("'")))s=s.slice(1,-1);
+ s=s.replace(/\s/g,"");
+ if(!/^[A-Za-z0-9+/_-]+={0,2}$/.test(s))throw Error("vapid_format");
+ return s.replace(/=+$/,"").replace(/\+/g,"-").replace(/\//g,"_");
+}
+function validatedVapid(rawPub:string,rawPk:string){
+ const pub=normalizeVapid(rawPub,"public key"),pk=normalizeVapid(rawPk,"private key");
+ const p=Buffer.from(pub,"base64url"),k=Buffer.from(pk,"base64url");
+ if(p.length!==65||p[0]!==4||k.length!==32||p.toString("base64url")!==pub||k.toString("base64url")!==pk)throw Error("vapid_format");
+ const e=createECDH("prime256v1");e.setPrivateKey(k);
+ if(!e.getPublicKey().equals(p))throw Error("vapid_pair_mismatch");
+ return {pub,pk};
+}
+
 const ws="c7ab2a78-08e0-4a29-8a3b-fadaf244002f";
 const origins=["https://rujumagil.github.io","https://conexionlaboral360.app","https://conexionlaboral360.proyectocompas-info.workers.dev"];
 Deno.serve(async req=>{
@@ -17,9 +35,12 @@ Deno.serve(async req=>{
  const m=await fetch(url+"/rest/v1/workspace_members?select=role&workspace_id=eq."+ws+"&user_id=eq."+user.id+"&status=eq.active",{headers:priv});
  if(!m.ok||!(await m.json()).some((x:any)=>["owner","admin","manager"].includes(x.role)))return reply(403,{ok:false});
  const raw=await req.text();if(raw.length>6000)return reply(413,{ok:false});const data=JSON.parse(raw);
- const pub=Deno.env.get("CL360_VAPID_PUBLIC_KEY"),pk=Deno.env.get("CL360_VAPID_PRIVATE_KEY");
- if(!pub||!pk)return reply(503,{ok:false,error:"vapid_missing"});
- if(data.action==="config")return reply(200,{ok:true,publicKey:pub});
+ const rawPub=Deno.env.get("CL360_VAPID_PUBLIC_KEY"),rawPk=Deno.env.get("CL360_VAPID_PRIVATE_KEY");
+ if(!rawPub||!rawPk)return reply(503,{ok:false,error:"vapid_missing"});
+ let pub:string,pk:string;
+ try{({pub,pk}=validatedVapid(rawPub,rawPk));}
+ catch(e){const code=e instanceof Error&&e.message==="vapid_pair_mismatch"?"vapid_pair_mismatch":"vapid_format";console.warn("CL360 push configuration:",code);return reply(503,{ok:false,error:code});}
+ if(data.action==="config"){console.info("CL360 push configuration: valid");return reply(200,{ok:true,publicKey:pub});}
  const endpoint=data.subscription?.endpoint??data.endpoint;
  if(typeof endpoint!=="string"||endpoint.length>2048)return reply(400,{ok:false});
  const parsed=new URL(endpoint);
