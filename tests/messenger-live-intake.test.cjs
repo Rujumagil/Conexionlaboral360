@@ -27,3 +27,10 @@ test("registration requires confirmation and uses latest live intake",()=>{
  assert.match(messages,/!permission\.checked\|\|!verified\.checked/);
  assert.match(crm,/datos declarados por revisar/);
 });
+test("server intake distinguishes negated shifts and respects no-contact declarations",()=>{
+ const sql=fs.readFileSync(path.join(root,"docs/cl360-messenger-live-intake.sql"),"utf8");
+ assert.ok(sql.includes("no (puedo|quiero|prefiero|busco|acepto)"));
+ assert.ok(sql.includes("contactes|contacten|llames|llamen"));
+ assert.ok(sql.includes("if declined then return jsonb_build_object('fields','{}'::jsonb"));
+ assert.ok(sql.includes("not in ('sent','delivered','read')"));
+});
